@@ -46,3 +46,7 @@ typedef struct ast_program {
     token_t* tokens;
     arena_t allocator;
 } ast_program_t;
+
+void dump_ast(const ast_program_t* program);
+void dump_nodes(const ast_node_t** nodes, uint32_t indent);
+void dump_node(const ast_node_t* node, uint32_t indent);
