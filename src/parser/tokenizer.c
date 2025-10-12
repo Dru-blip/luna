@@ -1,4 +1,4 @@
-#include "tokenizer.h"
+#include "parser/tokenizer.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -6,7 +6,15 @@
 #include <string.h>
 
 #include "stb_ds.h"
-#include "tokenizer.h"
+
+static token_kind_t lookup_keyword(const char* ident) {
+    for (size_t i = 0; i < sizeof(keywords) / sizeof(keywords[0]); ++i) {
+        if (strcmp(keywords[i].key, ident) == 0) {
+            return keywords[i].value;
+        }
+    }
+    return token_kind_identifier;
+}
 
 static char current(tokenizer_t* t) {
     return (t->pos < t->len) ? t->src[t->pos] : '\0';
@@ -124,6 +132,13 @@ static token_t next_token(tokenizer_t* t) {
                 data.int_val = strtol(nptr, &endptr, 10);
                 kind = token_kind_integer;
                 free(nptr);
+            } else if (isalpha(c) || c == '_') {
+                size_t start_pos = t->pos;
+                while (isalnum(current(t)) || current(t) == '_') advance(t);
+                size_t len = t->pos - start_pos;
+                char* ident = strndup(t->src + start_pos, len);
+                kind = lookup_keyword(ident);
+                free(ident);
             } else {
                 fprintf(stderr, "unexpected character '%c'\n", c);
                 exit(1);

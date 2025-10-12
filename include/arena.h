@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstdlib>
+#include <stdlib.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -21,7 +21,7 @@ typedef struct arena {
 } arena_t;
 
 arena_block_t *arena_new_block(size_t capacity);
-inline void arena_init(arena_t *arena);
+void arena_init(arena_t *arena);
 void *arena_alloc(arena_t *arena, size_t size);
 void arena_reset(arena_t *arena);
 void arena_destroy(arena_t *arena);
@@ -42,7 +42,7 @@ arena_block_t *arena_new_block(size_t capacity) {
   return blk;
 }
 
-inline void arena_init(arena_t *arena) { arena->head = nullptr; }
+void arena_init(arena_t *arena) { arena->head = nullptr; }
 
 void *arena_alloc(arena_t *arena, size_t size) {
   arena_block_t *blk = arena->head;

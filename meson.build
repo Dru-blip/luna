@@ -4,8 +4,8 @@ project('luna','c',default_options:['c_std=c2x'])
 includedir=include_directories('include')
 
 
-ds_srcs = ['src/stb_ds.c']
-parser_srcs=['src/parser/tokenizer.c']
+ds_srcs = ['src/stb_ds.c','src/arena.c']
+parser_srcs=['src/parser/tokenizer.c','src/parser/parser.c']
 
 main_srcs=['src/main.c']
 

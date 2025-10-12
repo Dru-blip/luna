@@ -18,6 +18,9 @@ typedef enum token_kind {
     token_kind_modulus,
 
     token_kind_integer,
+    token_kind_identifier,
+
+    token_kind_keyword_return,
 
     token_kind_eof,
 } token_kind_t;
@@ -29,7 +32,10 @@ static const char* token_kind_labels[] = {
     "/",  // token_kind_slash
     "%",  // token_kind_modulus,
 
-    "integer",  // token_kind_integer
+    "integer",     // token_kind_integer
+    "identifier",  // token_kind_identifier
+
+    "return",  // token_kind_keyword_return
 
     "eof",  // token_kind_eof
 };
@@ -53,5 +59,14 @@ typedef struct tokenizer {
     uint32_t col;
     uint32_t line_start;
 } tokenizer_t;
+
+typedef struct keyword {
+    const char* key;
+    token_kind_t value;
+} keyword_t;
+
+static keyword_t keywords[] = {
+    {"return", token_kind_keyword_return},
+};
 
 token_t* tokenize(const char* source);

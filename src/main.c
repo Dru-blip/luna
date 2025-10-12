@@ -1,4 +1,13 @@
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "parser/ast.h"
+#include "parser/parser.h"
+
 int main() {
-  //
-  return 0;
+    //
+    ast_program_t program = parse_program("test.luna", "return 5");
+
+    return 0;
 }
