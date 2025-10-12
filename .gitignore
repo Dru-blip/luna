@@ -1,2 +1,4 @@
 builddir
 .clang-format
+*.json
+.clangd
