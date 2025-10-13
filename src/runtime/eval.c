@@ -1,6 +1,9 @@
 #include "runtime/eval.h"
 
+#include <stdio.h>
+
 #include "operator.h"
+#include "parser/ast.h"
 #include "runtime/heap.h"
 #include "runtime/istate.h"
 #include "runtime/object.h"
@@ -76,6 +79,9 @@ static lu_object_t* eval_expr(lu_istate_t* state, ast_node_t* expr) {
     switch (expr->kind) {
         case ast_node_kind_int: {
             return (lu_object_t*)lu_new_integer(state, expr->data.int_val);
+        }
+        case ast_node_kind_bool: {
+            return expr->data.int_val ? state->true_obj : state->false_obj;
         }
         case ast_node_kind_binop: {
             lu_object_t* lhs = eval_expr(state, expr->data.binop.lhs);

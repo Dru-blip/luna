@@ -9,6 +9,7 @@ typedef struct ast_node ast_node_t;
 
 typedef enum ast_node_kind {
     ast_node_kind_int,
+    ast_node_kind_bool,
     ast_node_kind_binop,
 
     ast_node_kind_return,

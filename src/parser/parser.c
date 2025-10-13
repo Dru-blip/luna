@@ -114,6 +114,13 @@ static ast_node_t* parse_primary_expression(parser_t* parser) {
             node->data.int_val = token->data.int_val;
             return node;
         }
+        case token_kind_keyword_true:
+        case token_kind_keyword_false: {
+            ast_node_t* node =
+                make_node(parser, ast_node_kind_bool, &token->span);
+            node->data.int_val = token->kind == token_kind_keyword_true;
+            return node;
+        }
         default: {
             printf("invalid syntax\n");
             exit(EXIT_FAILURE);
