@@ -16,6 +16,30 @@ static void parse_param_list(parser_t* parser, ast_node_t*** params);
 static ast_node_t* parse_expression(parser_t* parser, int8_t mbp);
 
 static operator_t operators[] = {
+    {operator_kind_infix, token_kind_pipe_pipe, 15, 16, binary_op_lor,
+     ast_node_kind_binop},
+    {operator_kind_infix, token_kind_ampersand_ampersand, 18, 19,
+     binary_op_land, ast_node_kind_binop},
+
+    {operator_kind_infix, token_kind_equal_equal, 35, 36, binary_op_eq,
+     ast_node_kind_binop},
+    {operator_kind_infix, token_kind_bang_equal, 35, 36, binary_op_neq,
+     ast_node_kind_binop},
+
+    {operator_kind_infix, token_kind_less, 40, 41, binary_op_lt,
+     ast_node_kind_binop},
+    {operator_kind_infix, token_kind_less_equal, 40, 41, binary_op_lte,
+     ast_node_kind_binop},
+    {operator_kind_infix, token_kind_greater, 40, 41, binary_op_gt,
+     ast_node_kind_binop},
+    {operator_kind_infix, token_kind_greater_equal, 40, 41, binary_op_gte,
+     ast_node_kind_binop},
+
+    {operator_kind_infix, token_kind_less_less, 45, 46, binary_op_shl,
+     ast_node_kind_binop},
+    {operator_kind_infix, token_kind_greater_greater, 45, 46, binary_op_shr,
+     ast_node_kind_binop},
+
     {operator_kind_infix, token_kind_plus, 50, 51, binary_op_add,
      ast_node_kind_binop},
     {operator_kind_infix, token_kind_minus, 50, 51, binary_op_sub,

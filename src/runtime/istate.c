@@ -10,6 +10,7 @@
 #include "runtime/eval.h"
 #include "runtime/heap.h"
 #include "runtime/object.h"
+#include "runtime/objects/boolean.h"
 #include "runtime/objects/integer.h"
 #include "stb_ds.h"
 
@@ -30,8 +31,11 @@ static char* read_file(const char* filename) {
 }
 
 static void init_builtin_type_objects(lu_istate_t* state) {
-    lu_type_t* int_type_obj = new_integer_type_object(state->heap);
+    lu_type_t* int_type_obj = lu_integer_type_object_new(state->heap);
     arrput(state->type_registry, int_type_obj);
+
+    lu_type_t* bool_type_obj = lu_bool_type_object_new(state->heap);
+    arrput(state->type_registry, bool_type_obj);
 }
 
 lu_istate_t* lu_istate_new() {
@@ -43,10 +47,13 @@ lu_istate_t* lu_istate_new() {
     state->type_registry = nullptr;
     init_builtin_type_objects(state);
 
+    state->false_obj = (lu_object_t*)lu_new_bool(state, false);
+    state->true_obj = (lu_object_t*)lu_new_bool(state, true);
+
     return state;
 }
 
-void destroy_istate(lu_istate_t* state) {
+void lu_istate_destroy(lu_istate_t* state) {
     heap_destroy(state->heap);
     free(state);
 }
@@ -67,7 +74,7 @@ static void delete_execution_context(lu_istate_t* state) {
     free(ctx);
 }
 
-lu_object_t* run_program(lu_istate_t* state, const char* filepath) {
+lu_object_t* lu_run_program(lu_istate_t* state, const char* filepath) {
     char* source = read_file(filepath);
     ast_program_t program = parse_program(filepath, source);
 
@@ -78,7 +85,7 @@ lu_object_t* run_program(lu_istate_t* state, const char* filepath) {
     state->context_stack->filepath = filepath;
     state->context_stack->program = program;
     call_frame_t* frame = push_call_frame(state->context_stack);
-    eval_program(state);
+    lu_eval_program(state);
     frame = pop_call_frame(state->context_stack);
     lu_object_t* result = frame->return_value;
     delete_execution_context(state);

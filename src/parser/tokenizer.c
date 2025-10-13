@@ -101,27 +101,120 @@ static token_t next_token(tokenizer_t* t) {
             break;
         case '+': {
             advance(t);
+            if (current(t) == '=') {
+                advance(t);
+                kind = token_kind_plus_equal;
+                break;
+            }
             kind = token_kind_plus;
             break;
         }
         case '-': {
             advance(t);
+            if (current(t) == '=') {
+                advance(t);
+                kind = token_kind_minus_equal;
+                break;
+            }
             kind = token_kind_minus;
             break;
         }
         case '*': {
             advance(t);
+            if (current(t) == '=') {
+                advance(t);
+                kind = token_kind_asterisk_equal;
+                break;
+            }
             kind = token_kind_asterisk;
             break;
         }
         case '/': {
             advance(t);
+            if (current(t) == '=') {
+                advance(t);
+                kind = token_kind_slash_equal;
+                break;
+            }
             kind = token_kind_slash;
             break;
         }
         case '%': {
             advance(t);
+            if (current(t) == '=') {
+                advance(t);
+                kind = token_kind_modulus_equal;
+                break;
+            }
             kind = token_kind_modulus;
+            break;
+        }
+        case '=': {
+            advance(t);
+            if (current(t) == '=') {
+                advance(t);
+                kind = token_kind_equal_equal;
+                break;
+            }
+            kind = token_kind_equal;
+            break;
+        }
+        case '!': {
+            advance(t);
+            if (current(t) == '=') {
+                advance(t);
+                kind = token_kind_bang_equal;
+                break;
+            }
+            kind = token_kind_bang;
+            break;
+        }
+        case '<': {
+            advance(t);
+            if (current(t) == '=') {
+                advance(t);
+                kind = token_kind_less_equal;
+                break;
+            } else if (current(t) == '<') {
+                advance(t);
+                kind = token_kind_less_less;
+                break;
+            }
+            kind = token_kind_less;
+            break;
+        }
+        case '>': {
+            advance(t);
+            if (current(t) == '=') {
+                advance(t);
+                kind = token_kind_greater_equal;
+                break;
+            } else if (current(t) == '>') {
+                advance(t);
+                kind = token_kind_greater_greater;
+                break;
+            }
+            kind = token_kind_greater;
+            break;
+        }
+        case '&': {
+            advance(t);
+            if (current(t) == '&') {
+                advance(t);
+                kind = token_kind_ampersand_ampersand;
+                break;
+            }
+            kind = token_kind_ampersand;
+            break;
+        }
+        case '|': {
+            advance(t);
+            if (current(t) == '|') {
+                advance(t);
+                kind = token_kind_pipe_pipe;
+                break;
+            }
+            kind = token_kind_pipe;
             break;
         }
         default:

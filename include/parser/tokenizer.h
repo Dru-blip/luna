@@ -12,10 +12,35 @@ typedef struct span {
 
 typedef enum token_kind {
     token_kind_plus,
+    token_kind_plus_equal,
     token_kind_minus,
+    token_kind_minus_equal,
     token_kind_asterisk,
+    token_kind_asterisk_equal,
     token_kind_slash,
+    token_kind_slash_equal,
     token_kind_modulus,
+    token_kind_modulus_equal,
+
+    token_kind_less,
+    token_kind_greater,
+    token_kind_less_equal,
+    token_kind_greater_equal,
+
+    token_kind_less_less,
+    token_kind_greater_greater,
+
+    token_kind_equal_equal,
+    token_kind_equal,
+
+    token_kind_bang,
+    token_kind_bang_equal,
+
+    token_kind_ampersand,
+    token_kind_ampersand_ampersand,
+
+    token_kind_pipe,
+    token_kind_pipe_pipe,
 
     token_kind_integer,
     token_kind_identifier,

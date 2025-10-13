@@ -13,5 +13,5 @@ typedef struct lu_integer {
     int64_t value;
 } lu_integer_t;
 
-lu_type_t* new_integer_type_object(heap_t* heap);
+lu_type_t* lu_integer_type_object_new(heap_t* heap);
 lu_integer_t* lu_new_integer(lu_istate_t* state, int64_t value);

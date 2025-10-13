@@ -32,3 +32,30 @@ typedef struct lu_type {
     to_string tostr;
     binary_func binop_slots[15];
 } lu_type_t;
+
+static inline void object_default_finalize(lu_object_t* self) {}
+
+#define LU_ARITH_OP(OP_NAME, TYPE_SLOT, TYPE_T, NEW_FUNC, OP)       \
+    static lu_object_t* OP_NAME(lu_istate_t* state, lu_object_t* a, \
+                                lu_object_t* b) {                   \
+        if (a->type == state->type_registry[TYPE_SLOT] &&           \
+            a->type == b->type) {                                   \
+            return (lu_object_t*)NEW_FUNC(                          \
+                state, ((TYPE_T*)a)->value OP((TYPE_T*)b)->value);  \
+        }                                                           \
+        state->op_result = op_result_not_implemented;               \
+        return nullptr;                                             \
+    }
+
+#define LU_COMPARE_OP(OP_NAME, TYPE_SLOT, TYPE_T, OP)               \
+    static lu_object_t* OP_NAME(lu_istate_t* state, lu_object_t* a, \
+                                lu_object_t* b) {                   \
+        if (a->type == state->type_registry[TYPE_SLOT] &&           \
+            a->type == b->type) {                                   \
+            return ((TYPE_T*)a)->value OP((TYPE_T*)b)->value        \
+                       ? state->true_obj                            \
+                       : state->false_obj;                          \
+        }                                                           \
+        state->op_result = op_result_not_implemented;               \
+        return nullptr;                                             \
+    }

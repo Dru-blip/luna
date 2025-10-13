@@ -10,7 +10,8 @@ ds_srcs = ['src/stb_ds.c','src/arena.c']
 parser_srcs=['src/parser/tokenizer.c','src/parser/parser.c','src/parser/ast.c']
 
 runtime_srcs=['src/runtime/objects/integer.c','src/runtime/eval.c',
-                'src/runtime/heap.c','src/runtime/istate.c']
+                'src/runtime/heap.c','src/runtime/istate.c',
+                'src/runtime/objects/boolean.c']
 
 main_srcs=['src/main.c']
 

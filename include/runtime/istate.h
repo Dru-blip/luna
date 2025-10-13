@@ -15,6 +15,10 @@ typedef enum signal_kind {
     signal_error,
 } signal_kind_t;
 
+typedef enum op_result_kind {
+    op_result_not_implemented,
+} op_result_kind_t;
+
 typedef struct scope {
     lu_object_t* values;
     struct scope* parent;
@@ -39,15 +43,18 @@ typedef struct execution_context {
 
 typedef struct lu_istate {
     lu_object_t* builtins;
-    lu_object_t** type_registry;
+    lu_type_t** type_registry;
+    lu_object_t* true_obj;
+    lu_object_t* false_obj;
     heap_t* heap;
     arena_t strings;
     lu_object_t* module_cache;
     execution_context_t* context_stack;
+    op_result_kind_t op_result;
 } lu_istate_t;
 
 lu_istate_t* lu_istate_new();
-void destroy_istate(lu_istate_t* state);
+void lu_istate_destroy(lu_istate_t* state);
 scope_t* new_scope(heap_t* heap, scope_t* parent);
 scope_t* new_scope_with(heap_t* heap, scope_t* parent, lu_object_t* values);
 call_frame_t* push_call_frame(execution_context_t* ctx);

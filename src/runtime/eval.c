@@ -1,5 +1,6 @@
 #include "runtime/eval.h"
 
+#include "operator.h"
 #include "runtime/heap.h"
 #include "runtime/istate.h"
 #include "runtime/object.h"
@@ -50,13 +51,38 @@ static void end_scope(lu_istate_t* state) {
     free(scope);
 }
 
+static lu_object_t* lu_binop(lu_istate_t* state, lu_object_t* a, lu_object_t* b,
+                             binary_op_t op_slot) {
+    lu_object_t* res = nullptr;
+
+    if (a->type->binop_slots[op_slot]) {
+        res = a->type->binop_slots[op_slot](state, a, b);
+        if (state->op_result != op_result_not_implemented) {
+            return res;
+        }
+    }
+
+    if (b->type->binop_slots[op_slot]) {
+        res = b->type->binop_slots[op_slot](state, a, b);
+        if (state->op_result != op_result_not_implemented) {
+            return res;
+        }
+    }
+
+    return res;
+}
+
 static lu_object_t* eval_expr(lu_istate_t* state, ast_node_t* expr) {
     switch (expr->kind) {
         case ast_node_kind_int: {
             return (lu_object_t*)lu_new_integer(state, expr->data.int_val);
         }
         case ast_node_kind_binop: {
-            break;
+            lu_object_t* lhs = eval_expr(state, expr->data.binop.lhs);
+            lu_object_t* rhs = eval_expr(state, expr->data.binop.rhs);
+
+            // Check for error
+            return lu_binop(state, lhs, rhs, expr->data.binop.op);
         }
         default: {
             break;
@@ -88,6 +114,6 @@ static signal_kind_t eval_stmts(lu_istate_t* state, ast_node_t** stmts) {
     return signal_none;
 }
 
-void eval_program(lu_istate_t* state) {
+void lu_eval_program(lu_istate_t* state) {
     eval_stmts(state, state->context_stack->program.nodes);
 }
