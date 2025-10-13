@@ -1,0 +1,90 @@
+
+#include "runtime/istate.h"
+
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "arena.h"
+#include "parser/parser.h"
+#include "runtime/eval.h"
+#include "runtime/heap.h"
+#include "runtime/object.h"
+#include "runtime/objects/integer.h"
+#include "stb_ds.h"
+
+static char* read_file(const char* filename) {
+    FILE* f = fopen(filename, "r");
+    if (!f) {
+        printf("Error: could not open file %s\n", filename);
+        exit(EXIT_FAILURE);
+    }
+    fseek(f, 0, SEEK_END);
+    size_t len = ftell(f);
+    rewind(f);
+    char* buffer = malloc(len + 1);
+    buffer[len] = '\0';
+    fread(buffer, 1, len, f);
+    fclose(f);
+    return buffer;
+}
+
+static void init_builtin_type_objects(lu_istate_t* state) {
+    lu_type_t* int_type_obj = new_integer_type_object(state->heap);
+    arrput(state->type_registry, int_type_obj);
+}
+
+lu_istate_t* lu_istate_new() {
+    lu_istate_t* state = malloc(sizeof(lu_istate_t));
+    // TODO:
+    //  arena_init(&state->strings);
+    state->heap = heap_create(state);
+
+    state->type_registry = nullptr;
+    init_builtin_type_objects(state);
+
+    return state;
+}
+
+void destroy_istate(lu_istate_t* state) {
+    heap_destroy(state->heap);
+    free(state);
+}
+
+static execution_context_t* create_execution_context(
+    lu_istate_t* state, execution_context_t* prev) {
+    execution_context_t* ctx = malloc(sizeof(execution_context_t));
+    ctx->call_stack = nullptr;
+    ctx->prev = prev;
+    ctx->scope = new_scope(state->heap, nullptr);
+    return ctx;
+}
+
+static void delete_execution_context(lu_istate_t* state) {
+    execution_context_t* ctx = state->context_stack;
+    state->context_stack = ctx->prev;
+    free(ctx->scope);
+    free(ctx);
+}
+
+lu_object_t* run_program(lu_istate_t* state, const char* filepath) {
+    char* source = read_file(filepath);
+    ast_program_t program = parse_program(filepath, source);
+
+    // slmodule_t* new_module = slmodule_new(state->heap, &program);
+
+    state->context_stack =
+        create_execution_context(state, state->context_stack);
+    state->context_stack->filepath = filepath;
+    state->context_stack->program = program;
+    call_frame_t* frame = push_call_frame(state->context_stack);
+    eval_program(state);
+    frame = pop_call_frame(state->context_stack);
+    lu_object_t* result = frame->return_value;
+    delete_execution_context(state);
+    free(frame);
+    // new_module->exported_object = result;
+    // state->module_cache->vtable->set(state->module_cache, filepath,
+    //                                  slvalue_from_obj((slobject_t*)new_module));
+    return result;
+}

@@ -1,14 +1,11 @@
-
-#include <stdio.h>
-#include <stdlib.h>
-
 #include "parser/ast.h"
 #include "parser/parser.h"
+#include "runtime/eval.h"
+#include "runtime/istate.h"
 
-int main() {
+int main(int argc, char* argv[]) {
     //
-    ast_program_t program = parse_program("test.luna", "return 5");
-    dump_ast(&program);
-
+    lu_istate_t* state = lu_istate_new();
+    run_program(state, argv[1]);
     return 0;
 }

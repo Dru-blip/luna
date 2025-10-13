@@ -9,10 +9,13 @@ includedir=include_directories('include')
 ds_srcs = ['src/stb_ds.c','src/arena.c']
 parser_srcs=['src/parser/tokenizer.c','src/parser/parser.c','src/parser/ast.c']
 
+runtime_srcs=['src/runtime/objects/integer.c','src/runtime/eval.c',
+                'src/runtime/heap.c','src/runtime/istate.c']
+
 main_srcs=['src/main.c']
 
 luna_runtime=shared_library('lunarun',
-    parser_srcs+ds_srcs,
+    parser_srcs+ds_srcs+runtime_srcs,
     include_directories:includedir
 )
 
