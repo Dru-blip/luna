@@ -2,16 +2,15 @@ project('luna','c',
         default_options:['c_std=c2x']
 )
 
-
 includedir=include_directories('include')
-
 
 ds_srcs = ['src/stb_ds.c','src/arena.c']
 parser_srcs=['src/parser/tokenizer.c','src/parser/parser.c','src/parser/ast.c']
 
 runtime_srcs=['src/runtime/objects/integer.c','src/runtime/eval.c',
                 'src/runtime/heap.c','src/runtime/istate.c',
-                'src/runtime/objects/boolean.c']
+                'src/runtime/objects/boolean.c','src/runtime/objects/strobj.c'
+                ,'src/strings/fly_string.c','src/strings/interner.c']
 
 main_srcs=['src/main.c']
 

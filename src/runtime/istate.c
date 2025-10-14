@@ -12,7 +12,9 @@
 #include "runtime/object.h"
 #include "runtime/objects/boolean.h"
 #include "runtime/objects/integer.h"
+#include "runtime/objects/strobj.h"
 #include "stb_ds.h"
+#include "strings/interner.h"
 
 static char* read_file(const char* filename) {
     FILE* f = fopen(filename, "r");
@@ -31,11 +33,14 @@ static char* read_file(const char* filename) {
 }
 
 static void init_builtin_type_objects(lu_istate_t* state) {
-    lu_type_t* int_type_obj = lu_integer_type_object_new(state->heap);
+    lu_type_t* int_type_obj = lu_integer_type_object_new(state);
     arrput(state->type_registry, int_type_obj);
 
-    lu_type_t* bool_type_obj = lu_bool_type_object_new(state->heap);
+    lu_type_t* bool_type_obj = lu_bool_type_object_new(state);
     arrput(state->type_registry, bool_type_obj);
+
+    lu_type_t* str_type_obj = lu_string_type_object_new(state);
+    arrput(state->type_registry, str_type_obj);
 }
 
 lu_istate_t* lu_istate_new() {
@@ -43,6 +48,7 @@ lu_istate_t* lu_istate_new() {
     // TODO:
     //  arena_init(&state->strings);
     state->heap = heap_create(state);
+    state->string_pool = lu_string_interner_init(state->heap);
 
     state->type_registry = nullptr;
     init_builtin_type_objects(state);

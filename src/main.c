@@ -1,6 +1,7 @@
 #include "runtime/eval.h"
 #include "runtime/istate.h"
 
+// TODO: binary ops between int and bool
 int main(int argc, char* argv[]) {
     lu_istate_t* state = lu_istate_new();
     lu_run_program(state, argv[1]);

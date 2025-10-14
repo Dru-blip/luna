@@ -25,6 +25,7 @@ typedef struct lu_type {
     LUNA_OBJECT_HEADER;
 
     size_t obj_size;
+    char* name;
     lu_object_t* name_strobj;
     struct lu_type* base;
 
@@ -35,11 +36,10 @@ typedef struct lu_type {
 
 static inline void object_default_finalize(lu_object_t* self) {}
 
-#define LU_ARITH_OP(OP_NAME, TYPE_SLOT, TYPE_T, NEW_FUNC, OP)       \
+#define LU_ARITH_OP(OP_NAME, TYPE_OBJ, TYPE_T, NEW_FUNC, OP)        \
     static lu_object_t* OP_NAME(lu_istate_t* state, lu_object_t* a, \
                                 lu_object_t* b) {                   \
-        if (a->type == state->type_registry[TYPE_SLOT] &&           \
-            a->type == b->type) {                                   \
+        if (a->type == TYPE_OBJ && a->type == b->type) {            \
             return (lu_object_t*)NEW_FUNC(                          \
                 state, ((TYPE_T*)a)->value OP((TYPE_T*)b)->value);  \
         }                                                           \
@@ -47,11 +47,10 @@ static inline void object_default_finalize(lu_object_t* self) {}
         return nullptr;                                             \
     }
 
-#define LU_COMPARE_OP(OP_NAME, TYPE_SLOT, TYPE_T, OP)               \
+#define LU_COMPARE_OP(OP_NAME, TYPE_OBJ, TYPE_T, OP)                \
     static lu_object_t* OP_NAME(lu_istate_t* state, lu_object_t* a, \
                                 lu_object_t* b) {                   \
-        if (a->type == state->type_registry[TYPE_SLOT] &&           \
-            a->type == b->type) {                                   \
+        if (a->type == TYPE_OBJ && a->type == b->type) {            \
             return ((TYPE_T*)a)->value OP((TYPE_T*)b)->value        \
                        ? state->true_obj                            \
                        : state->false_obj;                          \

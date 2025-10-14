@@ -4,7 +4,7 @@
 #include "runtime/object.h"
 
 void lu_eval_program(lu_istate_t* state);
-lu_object_t* lu_eval_call(lu_istate_t* state, lu_object_t* this);
+lu_object_t* lu_call_function(lu_istate_t* state, lu_object_t* self);
 lu_object_t* lu_run_program(lu_istate_t* state, const char* filepath);
 
 // TODO: implement

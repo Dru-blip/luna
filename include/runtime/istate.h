@@ -16,7 +16,9 @@ typedef enum signal_kind {
 } signal_kind_t;
 
 typedef enum op_result_kind {
+    op_result_success,
     op_result_not_implemented,
+    op_result_raised_error,
 } op_result_kind_t;
 
 typedef struct scope {
@@ -51,6 +53,8 @@ typedef struct lu_istate {
     lu_object_t* module_cache;
     execution_context_t* context_stack;
     op_result_kind_t op_result;
+    const char* error_message;
+    struct string_interner *string_pool;
 } lu_istate_t;
 
 lu_istate_t* lu_istate_new();
