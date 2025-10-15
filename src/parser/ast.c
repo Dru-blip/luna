@@ -32,6 +32,12 @@ void dump_node(const ast_node_t* node, uint32_t indent) {
             dump_node(node->data.node, indent + 2);
             break;
         }
+        case ast_node_kind_block: {
+            break;
+        }
+        case ast_node_kind_if_stmt: {
+            break;
+        }
         default: {
             printf("unknown node kind\n");
             break;

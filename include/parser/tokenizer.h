@@ -45,9 +45,24 @@ typedef enum token_kind {
     token_kind_integer,
     token_kind_identifier,
 
+    token_kind_semicolon,
+    token_kind_lparen,
+    token_kind_rparen,
+
+    token_kind_lbrace,
+    token_kind_rbrace,
+
+    token_kind_lbracket,
+    token_kind_rbracket,
+
+    token_kind_comma,
+    token_kind_dot,
+
     token_kind_keyword_return,
     token_kind_keyword_true,
     token_kind_keyword_false,
+    token_kind_keyword_if,
+    token_kind_keyword_else,
 
     token_kind_eof,
 } token_kind_t;
@@ -87,9 +102,21 @@ static const char* token_kind_labels[] = {
     "integer",     // token_kind_integer
     "identifier",  // token_kind_identifier
 
+    ";",  // token_kind_semicolon
+    "(",  // token_kind_lparen
+    ")",  // token_kind_rparen
+    "{",  // token_kind_lbrace
+    "}",  // token_kind_rbrace
+    "[",  // token_kind_lbracket
+    "]",  // token_kind_rbracket
+    ",",  // token_kind_comma
+    ".",  // token_kind_dot
+
     "return",  // token_kind_keyword_return
     "true",    // token_kind_keyword_true
     "false",   // token_kind_keyword_false
+    "if",      // token_kind_keyword_if
+    "else",    // token_kind_keyword_else
 
     "eof",  // token_kind_eof
 };
@@ -120,9 +147,9 @@ typedef struct keyword {
 } keyword_t;
 
 static keyword_t keywords[] = {
-    {"return", token_kind_keyword_return},
-    {"true", token_kind_keyword_true},
-    {"false", token_kind_keyword_false},
+    {"return", token_kind_keyword_return}, {"true", token_kind_keyword_true},
+    {"false", token_kind_keyword_false},   {"if", token_kind_keyword_if},
+    {"else", token_kind_keyword_else},
 };
 
 token_t* tokenize(const char* source);

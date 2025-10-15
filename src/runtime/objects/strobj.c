@@ -39,15 +39,26 @@ lu_object_t* lu_string_concat(lu_istate_t* state, lu_object_t* a,
         state->op_result = op_result_not_implemented;
         return nullptr;
     }
-    lu_string_t* rope =
-        (lu_string_t*)heap_allocate_object(state->heap, sizeof(lu_string_t));
-    rope->kind = lu_string_rope;
+    // implementing ropes
+    // will take more time for now leave it unoptimized by just concatinating
+    // buffers.
+    // lu_string_t* rope =
+    //     (lu_string_t*)heap_allocate_object(state->heap, sizeof(lu_string_t));
+    // rope->kind = lu_string_rope;
     lu_string_t* sa = (lu_string_t*)a;
     lu_string_t* sb = (lu_string_t*)b;
-    rope->length = sa->length + sb->length;
-    rope->left = sa;
-    rope->right = sb;
-    return (lu_object_t*)rope;
+    // rope->length = sa->length + sb->length;
+    // rope->left = sa;
+    // rope->right = sb;
+    // return (lu_object_t*)rope;
+    char* buffer = malloc(sa->length + sb->length);
+    memcpy(buffer, sa->data.str, sa->length);
+    memcpy(buffer + sa->length, sb->data.str, sb->length);
+    lu_string_t* str =
+        lu_intern_string(state->string_pool, buffer, sa->length + sb->length);
+    free(buffer);
+
+    return str;
 }
 
 lu_object_t* lu_string_eq(lu_istate_t* state, lu_object_t* a, lu_object_t* b) {
@@ -58,25 +69,27 @@ lu_object_t* lu_string_eq(lu_istate_t* state, lu_object_t* a, lu_object_t* b) {
     lu_string_t* sa = (lu_string_t*)a;
     lu_string_t* sb = (lu_string_t*)b;
 
-    if (sa->kind == lu_string_flat && sb->kind == lu_string_flat) {
-        return sa == sb ? state->true_obj : state->false_obj;
-    }
+    // just compare the two flat strings , rope implementation is delayed
+    //
+    // if (sa->kind == lu_string_flat && sb->kind == lu_string_flat) {
+    return sa == sb ? state->true_obj : state->false_obj;
+    // }
 
-    if (sa->kind != sb->kind) {
-        if (sa->kind == lu_string_rope)
-            sa = lu_rope_string_flatten(state, sa);
-        else
-            sb = lu_rope_string_flatten(state, sb);
-    }
+    //  if (sa->kind != sb->kind) {
+    //     if (sa->kind == lu_string_rope)
+    //         sa = lu_rope_string_flatten(state, sa);
+    //     else
+    //         sb = lu_rope_string_flatten(state, sb);
+    // }
 
-    if (sa == sb) {
-        return state->true_obj;
-    }
+    // if (sa == sb) {
+    //     return state->true_obj;
+    // }
 
-    // TODO: implement rope equality
-    if (sa->length != sb->length) {
-        return state->false_obj;
-    }
+    // // TODO: implement rope equality
+    // if (sa->length != sb->length) {
+    //     return state->false_obj;
+    // }
 }
 
 static void __flatten_node(lu_string_t* node, char* buffer, size_t* used) {

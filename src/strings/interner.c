@@ -14,7 +14,6 @@ string_interner_t* lu_string_interner_init(heap_t* heap) {
     interner->heap = heap;
     arena_init(&interner->node_arena);
     arena_init(&interner->string_arena);
-
     return interner;
 }
 

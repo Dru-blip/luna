@@ -99,6 +99,34 @@ static token_t next_token(tokenizer_t* t) {
             advance(t);
             kind = token_kind_eof;
             break;
+        case '(':
+            advance(t);
+            kind = token_kind_lparen;
+            break;
+        case ')':
+            advance(t);
+            kind = token_kind_rparen;
+            break;
+        case '{':
+            advance(t);
+            kind = token_kind_lbrace;
+            break;
+        case '}':
+            advance(t);
+            kind = token_kind_rbrace;
+            break;
+        case '[':
+            advance(t);
+            kind = token_kind_lbracket;
+            break;
+        case ']':
+            advance(t);
+            kind = token_kind_rbracket;
+            break;
+        case ';':
+            advance(t);
+            kind = token_kind_semicolon;
+            break;
         case '+': {
             advance(t);
             if (current(t) == '=') {

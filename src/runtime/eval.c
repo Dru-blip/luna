@@ -9,7 +9,9 @@
 #include "runtime/istate.h"
 #include "runtime/luerrors.h"
 #include "runtime/object.h"
+#include "runtime/objects/boolean.h"
 #include "runtime/objects/integer.h"
+#include "runtime/objects/strobj.h"
 #include "stb_ds.h"
 
 call_frame_t* push_call_frame(execution_context_t* ctx) {
@@ -54,6 +56,21 @@ static void end_scope(lu_istate_t* state) {
     state->context_stack->scope = scope->parent;
     state->context_stack->scope->depth--;
     free(scope);
+}
+
+static signal_kind_t eval_stmts(lu_istate_t* state, ast_node_t** stmts);
+
+static inline bool is_truthy(lu_object_t* value) {
+    if (value->type == Integer_type) {
+        return ((lu_integer_t*)value)->value != 0;
+    }
+    if (value->type == Bool_type) {
+        return ((lu_bool_t*)value)->value;
+    }
+    if (value->type == Str_type) {
+        return ((lu_string_t*)value)->length != 0;
+    }
+    return false;
 }
 
 static lu_object_t* lu_binop(lu_istate_t* state, lu_object_t* a, lu_object_t* b,
@@ -177,6 +194,22 @@ static signal_kind_t eval_stmt(lu_istate_t* state, ast_node_t* stmt) {
                 return signal_error;
             }
             return signal_return;
+        }
+        case ast_node_kind_block: {
+            begin_scope(state);
+            signal_kind_t sig = eval_stmts(state, stmt->data.list);
+            end_scope(state);
+            return sig;
+        }
+        case ast_node_kind_if_stmt: {
+            lu_object_t* cond = eval_expr(state, stmt->data.if_stmt.test);
+            if (is_truthy(cond)) {
+                return eval_stmt(state, stmt->data.if_stmt.consequent);
+            }
+            if (stmt->data.if_stmt.alternate) {
+                return eval_stmt(state, stmt->data.if_stmt.alternate);
+            }
+            break;
         }
         default: {
             break;

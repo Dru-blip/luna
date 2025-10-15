@@ -194,11 +194,71 @@ static ast_node_t* parse_return(parser_t* parser) {
     return node;
 }
 
+static ast_node_t* parse_block(parser_t* parser) {
+    // uint32_t token_index = parser->pos;
+    token_t* token = parse_expected(parser, token_kind_lbrace);
+    ast_node_t** stmts = nullptr;
+    while (!check(parser, token_kind_rbrace)) {
+        if (check(parser, token_kind_eof)) {
+            // char* msg =
+            //     make_error_msg_ctx("'}' to close block",
+            //     parser->token->kind);
+            // print_error(parser->filename, parser->source, parser->tokens,
+            //             parser->pos - 1, msg);
+            // free(msg);
+            exit(EXIT_FAILURE);
+        }
+        ast_node_t* stmt = parse_stmt(parser);
+        arrput(stmts, stmt);
+    }
+    ast_node_t* node = make_node(parser, ast_node_kind_block, &token->span);
+    node->data.list = stmts;
+    parse_expected(parser, token_kind_rbrace);
+    return node;
+}
+
+static ast_node_t* parse_if_stmt(parser_t* parser) {
+    token_t* token = parser_eat(parser);
+    if (check(parser, token_kind_lparen)) {
+        parser_advance(parser);
+    }
+    ast_node_t* test = parse_expression(parser, 0);
+    if (check(parser, token_kind_rparen)) {
+        parser_advance(parser);
+    }
+    ast_node_t* consequent = parse_stmt(parser);
+    ast_node_t* alternate = nullptr;
+    if (check(parser, token_kind_keyword_else)) {
+        parser_advance(parser);
+        if (check(parser, token_kind_eof)) {
+            // print_error(
+            //     parser->filename, parser->source, parser->tokens,
+            //     parser->pos - 1,
+            //     "expected statement after 'else', but found end of input");
+            exit(EXIT_FAILURE);
+        }
+        alternate = parse_stmt(parser);
+    }
+    ast_node_t* node = make_node(parser, ast_node_kind_if_stmt, &token->span);
+    node->data.if_stmt = (ast_if_stmt_t){
+        .test = test,
+        .consequent = consequent,
+        .alternate = alternate,
+    };
+    return node;
+}
+
 static ast_node_t* parse_stmt(parser_t* parser) {
     const token_t* token = parser->cur_token;
     switch (token->kind) {
         case token_kind_keyword_return: {
             return parse_return(parser);
+        }
+        case token_kind_lbrace: {
+            return parse_block(parser);
+        }
+        case token_kind_keyword_if: {
+            return parse_if_stmt(parser);
         }
         default: {
             // const uint32_t token_index = parser->pos;
