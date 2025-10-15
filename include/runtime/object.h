@@ -18,6 +18,7 @@ struct lu_istate;
 
 typedef lu_object_t* (*binary_func)(struct lu_istate*, lu_object_t*,
                                     lu_object_t*);
+typedef lu_object_t* (*unary_func)(struct lu_istate*, lu_object_t*);
 typedef void (*finalize_func)(lu_object_t*);
 typedef lu_object_t* (*to_string)(lu_object_t*);
 
@@ -31,6 +32,7 @@ typedef struct lu_type {
 
     finalize_func finialize;
     to_string tostr;
+    unary_func unop_slots[3];
     binary_func binop_slots[15];
 } lu_type_t;
 

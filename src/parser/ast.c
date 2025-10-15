@@ -11,6 +11,16 @@ void dump_node(const ast_node_t* node, uint32_t indent) {
             printf("%*sint: %ld\n", indent, "", node->data.int_val);
             break;
         }
+        case ast_node_kind_bool: {
+            printf("%*sint: %s\n", indent, "",
+                   node->data.int_val ? "true" : "false");
+            break;
+        }
+        case ast_node_kind_unop: {
+            printf("%*sunop: %d\n", "", node->data.unop.op);
+            dump_node(node->data.unop.argument, indent + 2);
+            break;
+        }
         case ast_node_kind_binop: {
             printf("%*sbinop: %d\n", indent, "", node->data.binop.op);
             dump_node(node->data.binop.lhs, indent + 2);

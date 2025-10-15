@@ -60,6 +60,7 @@ lu_istate_t* lu_istate_new() {
 }
 
 void lu_istate_destroy(lu_istate_t* state) {
+    // TODO: destroy string pool and other arenas
     heap_destroy(state->heap);
     free(state);
 }

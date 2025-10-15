@@ -1,11 +1,13 @@
 #include "runtime/eval.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "operator.h"
 #include "parser/ast.h"
 #include "runtime/heap.h"
 #include "runtime/istate.h"
+#include "runtime/luerrors.h"
 #include "runtime/object.h"
 #include "runtime/objects/integer.h"
 #include "stb_ds.h"
@@ -54,35 +56,35 @@ static void end_scope(lu_istate_t* state) {
     free(scope);
 }
 
-/**
- * Performs a binary operation between two Lu objects.
- *
- * function dispatches the given binary operation (`op_slot`) between two
- * operands `a` and `b` based on their types operator slot implementations.
- *
- * It currently only supports operations between objects of the same type,
- * or if both operand types define their own implementation for the operation.
- * There is no automatic type coercion or inheritance-based dispatch
- * (e.g., between a parent and child type). This behavior is planned for future
- * implementation.
- *
- * @note The function checks whether the operation is implemented on the
- * left-hand side (`a->type`) first. If it returns a result and the interpreter
- * does not mark the operation as `op_result_not_implemented`, that result is
- * returned immediately.
- *
- * If the operation was not handled by `a->type`, it then checks
- * `b->type->binop_slots[op_slot]` (the right-hand side type). If the right-hand
- * side type implements the operation and returns a valid result, it is
- * returned.
- *
- * TODO:
- * - Implement type coercion to handle mixed-type operations.
- * - Implement subtype slot dispatch so child types can delegate to parent
- *   type operators.
- */
 static lu_object_t* lu_binop(lu_istate_t* state, lu_object_t* a, lu_object_t* b,
                              binary_op_t op_slot) {
+    /**
+     * Performs a binary operation between two Lu objects.
+     *
+     * function dispatches the given binary operation (`op_slot`) between two
+     * operands `a` and `b` based on their types operator slot implementations.
+     *
+     * It currently only supports operations between objects of the same type,
+     * or if both operand types define their own implementation for the
+     * operation. There is no automatic type coercion or inheritance-based
+     * dispatch (e.g., between a parent and child type). This behavior is
+     * planned for future implementation.
+     *
+     * @note The function checks whether the operation is implemented on the
+     * left-hand side (`a->type`) first. If it returns a result and the
+     * interpreter does not mark the operation as `op_result_not_implemented`,
+     * that result is returned immediately.
+     *
+     * If the operation was not handled by `a->type`, it then checks
+     * `b->type->binop_slots[op_slot]` (the right-hand side type). If the
+     * right-hand side type implements the operation and returns a valid result,
+     * it is returned.
+     *
+     * TODO:
+     * - Implement type coercion to handle mixed-type operations.
+     * - Implement subtype slot dispatch so child types can delegate to parent
+     *   type operators.
+     */
     lu_object_t* res = nullptr;
 
     if (a->type->binop_slots[op_slot]) {
@@ -108,8 +110,22 @@ static lu_object_t* lu_binop(lu_istate_t* state, lu_object_t* a, lu_object_t* b,
         }
     }
 
-    printf("unsupported operand type(s) for %s : %s and %s\n",
-           binary_op_labels[op_slot], a->type->name, b->type->name);
+    state->op_result = op_result_raised_error;
+
+    size_t needed =
+        snprintf(nullptr, 0, "unsupported operand type(s) for %s : %s and %s",
+                 binary_op_labels[op_slot], a->type->name, b->type->name) +
+        1;
+    char* buffer = malloc(needed);
+
+    snprintf(buffer, needed, "unsupported operand type(s) for %s : %s and %s",
+             binary_op_labels[op_slot], a->type->name, b->type->name);
+
+    buffer[needed] = '\0';
+
+    lu_error_t* error = lu_error_from_str(state, buffer);
+    state->error = error;
+    free(buffer);
 
     return res;
 }
@@ -121,6 +137,9 @@ static lu_object_t* eval_expr(lu_istate_t* state, ast_node_t* expr) {
         }
         case ast_node_kind_bool: {
             return expr->data.int_val ? state->true_obj : state->false_obj;
+        }
+        case ast_node_kind_unop: {
+            lu_object_t* argument = eval_expr(state, expr->data.unop.argument);
         }
         case ast_node_kind_binop: {
             lu_object_t* lhs = eval_expr(state, expr->data.binop.lhs);
@@ -134,7 +153,14 @@ static lu_object_t* eval_expr(lu_istate_t* state, ast_node_t* expr) {
                 return rhs;
             }
             // Check for error
-            return lu_binop(state, lhs, rhs, expr->data.binop.op);
+            lu_object_t* res = lu_binop(state, lhs, rhs, expr->data.binop.op);
+
+            if (state->error) {
+                ((lu_error_t*)state->error)->span = expr->span;
+                ((lu_error_t*)state->error)->line = expr->span.line;
+            }
+
+            return res;
         }
         default: {
             break;
@@ -173,6 +199,8 @@ void lu_eval_program(lu_istate_t* state) {
     signal_kind_t signal =
         eval_stmts(state, state->context_stack->program.nodes);
     if (signal == signal_error) {
-        printf("Error: %s\n", state->error_message);
+        lu_error_t* err = (lu_error_t*)state->error;
+        lu_print_error(err);
+        // printf("Error: %s at line %ld\n", err->message, err->line);
     }
 }

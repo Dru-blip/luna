@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stddef.h>
+
 #include "arena.h"
 #include "runtime/heap.h"
 #include "runtime/objects/strobj.h"
@@ -14,5 +16,7 @@ typedef struct string_interner {
 } string_interner_t;
 
 string_interner_t* lu_string_interner_init(heap_t* heap);
-
-lu_string_t* lu_intern_string(string_interner_t* interner, char* str);
+lu_string_t* lu_intern_string(string_interner_t* interner, char* str,
+                              size_t str_len);
+lu_string_t* lu_intern_string_lookup(string_interner_t* interner, char* str,
+                                     size_t str_len);

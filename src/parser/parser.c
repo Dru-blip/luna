@@ -7,6 +7,7 @@
 #include "arena.h"
 #include "operator.h"
 #include "parser/ast.h"
+#include "parser/tokenizer.h"
 #include "stb_ds.h"
 
 static ast_node_t* parse_stmt(parser_t* parser);
@@ -131,6 +132,32 @@ static ast_node_t* parse_primary_expression(parser_t* parser) {
 static ast_node_t* parse_prefix_expression(parser_t* parser) {
     token_t* token = current_token(parser);
     switch (token->kind) {
+        case token_kind_plus:
+        case token_kind_minus: {
+            parser_advance(parser);
+            ast_node_t* argument = parse_expression(parser, 0);
+            ast_node_t* node =
+                make_node(parser, ast_node_kind_unop, &token->span);
+            node->data.unop = (ast_unop_t){
+                .op = token->kind == token_kind_plus ? unary_op_plus
+                                                     : unary_op_minus,
+                .is_prefix = true,
+                .argument = argument,
+            };
+            return node;
+        }
+        case token_kind_bang: {
+            parser_advance(parser);
+            ast_node_t* argument = parse_expression(parser, 0);
+            ast_node_t* node =
+                make_node(parser, ast_node_kind_unop, &token->span);
+            node->data.unop = (ast_unop_t){
+                .op = unary_op_lnot,
+                .is_prefix = true,
+                .argument = argument,
+            };
+            return node;
+        }
         default: {
             return parse_primary_expression(parser);
         }

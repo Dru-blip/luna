@@ -18,11 +18,28 @@ LU_COMPARE_OP(lu_bool_gte, Bool_type, lu_bool_t, >=)
 LU_COMPARE_OP(lu_bool_eq, Bool_type, lu_bool_t, ==)
 LU_COMPARE_OP(lu_bool_neq, Bool_type, lu_bool_t, !=)
 
+static lu_object_t* lu_bool_unplus(lu_istate_t* state, lu_object_t* a) {
+    return (lu_object_t*)lu_new_integer(state, ((lu_bool_t*)a)->value ? 1 : 0);
+}
+
+static lu_object_t* lu_bool_unminus(lu_istate_t* state, lu_object_t* a) {
+    return (lu_object_t*)lu_new_integer(
+        state, ((lu_bool_t*)a)->value ? -((lu_integer_t*)a)->value : 0);
+}
+
+static lu_object_t* lu_bool_unnot(lu_istate_t* state, lu_object_t* a) {
+    return ((lu_bool_t*)a)->value ? state->false_obj : state->true_obj;
+}
+
 lu_type_t* lu_bool_type_object_new(lu_istate_t* state) {
     lu_type_t* type = heap_allocate_object(state->heap, sizeof(lu_type_t));
     type->name = "bool";
 
-    type->name_strobj = lu_intern_string(state->string_pool, "bool");
+    type->name_strobj = lu_intern_string(state->string_pool, "bool", 4);
+
+    type->unop_slots[unary_op_plus] = lu_bool_unplus;
+    type->unop_slots[unary_op_minus] = lu_bool_unminus;
+    type->unop_slots[unary_op_lnot] = lu_bool_unnot;
 
     type->binop_slots[binary_op_add] = lu_bool_add;
     type->binop_slots[binary_op_sub] = lu_bool_sub;
@@ -44,7 +61,7 @@ lu_type_t* lu_bool_type_object_new(lu_istate_t* state) {
 lu_bool_t* lu_new_bool(lu_istate_t* state, bool value) {
     lu_bool_t* bool_obj = heap_allocate_object(state->heap, sizeof(lu_bool_t));
     bool_obj->value = value;
-    bool_obj->type = state->type_registry[BOOL_TYPE_SLOT];
+    bool_obj->type = Bool_type;
 
     return bool_obj;
 }

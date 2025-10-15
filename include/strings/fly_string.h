@@ -15,4 +15,7 @@ typedef struct fly_string_node {
     fly_string_node_color color;
 } fly_string_node_t;
 
-lu_string_t* fly_string_insert(struct string_interner* interner, char* str);
+lu_string_t* fly_string_insert(struct string_interner* interner, char* str,
+                               size_t str_len);
+lu_string_t* fly_string_lookup(fly_string_node_t* root, char* str,
+                               size_t str_len);

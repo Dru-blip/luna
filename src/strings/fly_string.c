@@ -99,10 +99,10 @@ static void __fix_insertion(fly_string_node_t* root, fly_string_node_t* node) {
     root->color = fly_string_node_black;
 }
 
-lu_string_t* fly_string_insert(struct string_interner* interner, char* str) {
+lu_string_t* fly_string_insert(struct string_interner* interner, char* str,
+                               size_t str_len) {
     fly_string_node_t* parent = nullptr;
     fly_string_node_t* temp = interner->root;
-    size_t str_len = strlen(str);
     while (temp) {
         parent = temp;
         int64_t cmp =
@@ -115,6 +115,7 @@ lu_string_t* fly_string_insert(struct string_interner* interner, char* str) {
 
     string_view_t view = {
         .str = arena_alloc(&interner->string_arena, str_len),
+        .len = str_len,
     };
     memcpy(view.str, str, str_len);
 
@@ -126,6 +127,7 @@ lu_string_t* fly_string_insert(struct string_interner* interner, char* str) {
     lu_string_t* new_string =
         (lu_string_t*)heap_allocate_object(interner->heap, sizeof(lu_string_t));
     new_string->data = view;
+    new_string->length = view.len;
     new_string->type = Str_type;
     new_node->str = new_string;
 
@@ -150,4 +152,19 @@ lu_string_t* fly_string_insert(struct string_interner* interner, char* str) {
         __fix_insertion(interner->root, new_node);
     }
     return new_node->str;
+}
+
+lu_string_t* fly_string_lookup(fly_string_node_t* root, char* str,
+                               size_t str_len) {
+    fly_string_node_t* temp = root;
+    while (temp) {
+        int64_t cmp =
+            lu_strcmp(str, temp->str->data.str, str_len, temp->str->data.len);
+        if (cmp == 0) {
+            return temp->str;
+        }
+        temp = cmp < 0 ? temp->left : temp->right;
+    }
+
+    return nullptr;
 }

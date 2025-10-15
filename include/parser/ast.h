@@ -10,6 +10,7 @@ typedef struct ast_node ast_node_t;
 typedef enum ast_node_kind {
     ast_node_kind_int,
     ast_node_kind_bool,
+    ast_node_kind_unop,
     ast_node_kind_binop,
 
     ast_node_kind_return,
@@ -19,6 +20,12 @@ typedef struct ast_pair {
     ast_node_t* fst;
     ast_node_t* snd;
 } ast_pair_t;
+
+typedef struct ast_unop {
+    uint8_t op;
+    bool is_prefix;
+    ast_node_t* argument;
+} ast_unop_t;
 
 typedef struct ast_binop {
     uint8_t op;
@@ -30,6 +37,7 @@ typedef union ast_node_data {
     int64_t int_val;
     ast_node_t* node;
     ast_pair_t pair;
+    ast_unop_t unop;
     ast_binop_t binop;
     char* id;
 } ast_node_data_t;

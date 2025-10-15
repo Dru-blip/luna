@@ -48,13 +48,12 @@ typedef struct lu_istate {
     lu_type_t** type_registry;
     lu_object_t* true_obj;
     lu_object_t* false_obj;
+    lu_object_t* error;
     heap_t* heap;
-    arena_t strings;
     lu_object_t* module_cache;
     execution_context_t* context_stack;
     op_result_kind_t op_result;
-    const char* error_message;
-    struct string_interner *string_pool;
+    struct string_interner* string_pool;
 } lu_istate_t;
 
 lu_istate_t* lu_istate_new();
