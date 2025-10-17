@@ -15,8 +15,23 @@ lu_type_t* Str_type = nullptr;
 lu_type_t* lu_string_type_object_new(lu_istate_t* state) {
     lu_type_t* type = heap_allocate_object(state->heap, sizeof(lu_type_t));
     type->name = "str";
+
+    // Segfault incoming thanks to my brilliance.
+    //  cause:
+    //  to intern a string, the string type object must already exist, since
+    //  interned strings are real string instances. But here we’re still
+    //  initializing that very type. so the initialized interned string object
+    //  contains a null reference to the string type object which causes a
+    //  segfault,when garbage collection is triggered or interpreter or anyother
+    //  system that is trying to access the string type object  before it is
+    //  fully initialized.
+    //
+    // Workaround:
+    // this string object type is set for name_strobj in istate.c (line:34) in
+    // init_builtin_type_objects()
     type->name_strobj = lu_intern_string(state->string_pool, "str", 3);
-    type->finialize = object_default_finalize;
+    type->finalize = object_default_finalize;
+    type->visit = object_default_visit;
 
     type->binop_slots[binary_op_add] = lu_string_concat;
     type->binop_slots[binary_op_eq] = lu_string_eq;
@@ -40,7 +55,7 @@ lu_object_t* lu_string_concat(lu_istate_t* state, lu_object_t* a,
         return nullptr;
     }
     // implementing ropes
-    // will take more time for now leave it unoptimized by just concatinating
+    // will take more time , for now leave it unoptimized by just concatinating
     // buffers.
     // lu_string_t* rope =
     //     (lu_string_t*)heap_allocate_object(state->heap, sizeof(lu_string_t));
@@ -103,7 +118,7 @@ static void __flatten_node(lu_string_t* node, char* buffer, size_t* used) {
 }
 
 lu_object_t* lu_rope_string_flatten(lu_istate_t* state, lu_string_t* a) {
-    // maybe maintain seperate auxillary arena for temporary allocations
+    // maybe maintain auxillary arena for temporary allocations
     // instead of calling malloc and free everytime.
     char* buffer = malloc(a->length);
     size_t used = 0;
@@ -111,13 +126,7 @@ lu_object_t* lu_rope_string_flatten(lu_istate_t* state, lu_string_t* a) {
     a->kind = lu_string_flat;
     a->left = nullptr;
     a->right = nullptr;
-    lu_string_t* interned =
-        lu_intern_string_lookup(state->string_pool, buffer, a->length);
-    if (interned) {
-        a = interned;
-    } else {
-        a = lu_intern_string(state->string_pool, buffer, a->length);
-    }
+    a = lu_intern_string(state->string_pool, buffer, a->length);
     free(buffer);
     return a;
 }

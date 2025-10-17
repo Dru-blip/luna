@@ -51,7 +51,7 @@ lu_type_t* lu_integer_type_object_new(lu_istate_t* state) {
     lu_type_t* type = heap_allocate_object(state->heap, sizeof(lu_type_t));
     type->name = "int";
 
-    type->name_strobj = lu_intern_string(state->string_pool, "int",3);
+    type->name_strobj = lu_intern_string(state->string_pool, "int", 3);
 
     type->unop_slots[unary_op_plus] = lu_int_unplus;
     type->unop_slots[unary_op_minus] = lu_int_unminus;
@@ -68,7 +68,8 @@ lu_type_t* lu_integer_type_object_new(lu_istate_t* state) {
     type->binop_slots[binary_op_eq] = lu_int_eq;
     type->binop_slots[binary_op_neq] = lu_int_neq;
 
-    type->finialize = object_default_finalize;
+    type->finalize = object_default_finalize;
+    type->visit = object_default_visit;
 
     Integer_type = type;
 

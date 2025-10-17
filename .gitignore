@@ -2,3 +2,4 @@ builddir
 .clang-format
 *.json
 .clangd
+.zed

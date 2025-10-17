@@ -10,7 +10,8 @@ parser_srcs=['src/parser/tokenizer.c','src/parser/parser.c','src/parser/ast.c']
 runtime_srcs=['src/runtime/objects/integer.c','src/runtime/eval.c',
                 'src/runtime/heap.c','src/runtime/istate.c',
                 'src/runtime/objects/boolean.c','src/runtime/objects/strobj.c'
-                ,'src/strings/fly_string.c','src/strings/interner.c','src/runtime/luerrors.c']
+                ,'src/strings/fly_string.c','src/strings/interner.c','src/runtime/luerrors.c',
+                'src/runtime/gc_objectset.c','src/runtime/object.c','src/runtime/worklist.c','src/runtime/objects/hashmap.c']
 
 main_srcs=['src/main.c']
 

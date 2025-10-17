@@ -52,7 +52,8 @@ lu_type_t* lu_bool_type_object_new(lu_istate_t* state) {
     type->binop_slots[binary_op_eq] = lu_bool_eq;
     type->binop_slots[binary_op_neq] = lu_bool_neq;
 
-    type->finialize = object_default_finalize;
+    type->finalize = object_default_finalize;
+    type->visit = object_default_visit;
 
     Bool_type = type;
     return type;

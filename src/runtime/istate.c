@@ -1,11 +1,9 @@
-
 #include "runtime/istate.h"
 
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "arena.h"
 #include "parser/parser.h"
 #include "runtime/eval.h"
 #include "runtime/heap.h"
@@ -33,14 +31,15 @@ static char* read_file(const char* filename) {
 }
 
 static void init_builtin_type_objects(lu_istate_t* state) {
+    lu_type_t* str_type_obj = lu_string_type_object_new(state);
+    str_type_obj->name_strobj->type = str_type_obj;
+    arrput(state->type_registry, str_type_obj);
+
     lu_type_t* int_type_obj = lu_integer_type_object_new(state);
     arrput(state->type_registry, int_type_obj);
 
     lu_type_t* bool_type_obj = lu_bool_type_object_new(state);
     arrput(state->type_registry, bool_type_obj);
-
-    lu_type_t* str_type_obj = lu_string_type_object_new(state);
-    arrput(state->type_registry, str_type_obj);
 }
 
 lu_istate_t* lu_istate_new() {
@@ -61,6 +60,7 @@ lu_istate_t* lu_istate_new() {
 
 void lu_istate_destroy(lu_istate_t* state) {
     // TODO: destroy string pool and other arenas
+    // collect_garbage(state->heap);
     heap_destroy(state->heap);
     free(state);
 }

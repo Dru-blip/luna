@@ -2,7 +2,6 @@
 
 #include <stddef.h>
 
-#include "arena.h"
 #include "parser/ast.h"
 #include "runtime/heap.h"
 #include "runtime/object.h"

@@ -16,7 +16,7 @@ static int64_t lu_strcmp(char* a, char* b, size_t a_len, size_t b_len) {
     return a_len < b_len ? -1 : a_len > b_len;
 }
 
-static void __rotate_left(fly_string_node_t** root, fly_string_node_t* node) {
+static void __rotate_left(string_interner_t * interner, fly_string_node_t* node) {
     fly_string_node_t* pivot = node->right;
     fly_string_node_t* parent = node->parent;
 
@@ -30,7 +30,7 @@ static void __rotate_left(fly_string_node_t** root, fly_string_node_t* node) {
     pivot->parent = parent;
 
     if (!parent) {
-        *root = pivot;
+        interner->root = pivot;
     } else if (parent->left == node) {
         parent->left = pivot;
     } else {
@@ -38,11 +38,11 @@ static void __rotate_left(fly_string_node_t** root, fly_string_node_t* node) {
     }
 }
 
-static void __rotate_right(fly_string_node_t** root, fly_string_node_t* node) {
+static void __rotate_right(string_interner_t* interner, fly_string_node_t* node) {
     fly_string_node_t* pivot = node->left;
     fly_string_node_t* parent = node->parent;
 
-    node->left = pivot->left;
+    node->left = pivot->right;
     if (node->left) {
         node->left->parent = node;
     }
@@ -52,7 +52,7 @@ static void __rotate_right(fly_string_node_t** root, fly_string_node_t* node) {
     pivot->parent = parent;
 
     if (!parent) {
-        *root = pivot;
+        interner->root = pivot;
     } else if (parent->left == node) {
         parent->left = pivot;
     } else {
@@ -60,7 +60,7 @@ static void __rotate_right(fly_string_node_t** root, fly_string_node_t* node) {
     }
 }
 
-static void __fix_insertion(fly_string_node_t* root, fly_string_node_t* node) {
+static void __fix_insertion(string_interner_t* interner, fly_string_node_t* node) {
     while (node->color == fly_string_node_red &&
            node->parent->color == fly_string_node_red) {
         fly_string_node_t* grandparent = node->parent->parent;
@@ -73,11 +73,11 @@ static void __fix_insertion(fly_string_node_t* root, fly_string_node_t* node) {
             } else {
                 if (node->parent->right == node) {
                     node = node->parent;
-                    __rotate_left(&root, node);
+                    __rotate_left(interner, node);
                 }
                 node->parent->color = fly_string_node_black;
                 grandparent->color = fly_string_node_red;
-                __rotate_right(&root, grandparent);
+                __rotate_right(interner, grandparent);
             }
         } else {
             fly_string_node_t* uncle = grandparent->left;
@@ -88,15 +88,15 @@ static void __fix_insertion(fly_string_node_t* root, fly_string_node_t* node) {
             } else {
                 if (node->parent->left == node) {
                     node = node->parent;
-                    __rotate_right(&root, node);
+                    __rotate_right(interner, node);
                 }
                 node->parent->color = fly_string_node_black;
                 grandparent->color = fly_string_node_red;
-                __rotate_left(&root, grandparent);
+                __rotate_left(interner, grandparent);
             }
         }
     }
-    root->color = fly_string_node_black;
+    interner->root->color = fly_string_node_black;
 }
 
 lu_string_t* fly_string_insert(struct string_interner* interner, char* str,
@@ -149,7 +149,7 @@ lu_string_t* fly_string_insert(struct string_interner* interner, char* str,
     new_node->parent = parent;
     interner->nstrings++;
     if (new_node->parent->parent) {
-        __fix_insertion(interner->root, new_node);
+        __fix_insertion(interner, new_node);
     }
     return new_node->str;
 }
