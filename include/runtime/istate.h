@@ -5,6 +5,7 @@
 #include "parser/ast.h"
 #include "runtime/heap.h"
 #include "runtime/object.h"
+#include "runtime/objects/function.h"
 
 typedef enum signal_kind {
     signal_none,
@@ -29,6 +30,7 @@ typedef struct scope {
 typedef struct call_frame {
     lu_object_t* self;
     struct call_frame* parent;
+    lu_function_object_t* function;
     lu_object_t* return_value;
 } call_frame_t;
 

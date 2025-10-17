@@ -90,6 +90,7 @@ static inline lu_object_t* get_variable(lu_istate_t* state, lu_object_t* name) {
 }
 
 static signal_kind_t eval_stmts(lu_istate_t* state, ast_node_t** stmts);
+static signal_kind_t eval_stmt(lu_istate_t* state, ast_node_t* stmt);
 
 static inline bool is_truthy(lu_object_t* value) {
     if (value->type == Integer_type) {
@@ -102,6 +103,24 @@ static inline bool is_truthy(lu_object_t* value) {
         return ((lu_string_t*)value)->length != 0;
     }
     return false;
+}
+
+lu_object_t* eval_call(lu_istate_t* state, lu_argument_t* args, uint8_t argc,
+                       lu_function_object_t* function, lu_object_t* this) {
+    call_frame_t* frame = push_call_frame(state->context_stack);
+    frame->function = function;
+    frame->self = this;
+
+    begin_scope(state);
+    for (uint8_t i = 0; i < argc; i++) {
+        set_variable(state, args[i].name, args[i].value);
+    }
+    signal_kind_t sig = eval_stmt(state, function->body);
+    frame = pop_call_frame(state->context_stack);
+    lu_object_t* ret_val = frame->return_value;
+    free(frame);
+    arrfree(args);
+    return ret_val;
 }
 
 static lu_object_t* lu_binop(lu_istate_t* state, lu_object_t* a, lu_object_t* b,
@@ -238,7 +257,6 @@ static lu_object_t* eval_expr(lu_istate_t* state, ast_node_t* expr) {
             //     ((lu_error_t*)state->error)->span = expr->span;
             //     ((lu_error_t*)state->error)->line = expr->span.line;
             // }
-
             return res;
         }
         case ast_node_kind_assign: {
@@ -247,6 +265,37 @@ static lu_object_t* eval_expr(lu_istate_t* state, ast_node_t* expr) {
                 intern_identifier(state, &expr->data.binop.lhs->span);
             set_variable(state, (lu_object_t*)name, value);
             return value;
+        }
+        case ast_node_kind_call: {
+            const ast_call_t* call = &expr->data.call;
+            lu_argument_t* args = nullptr;
+
+            lu_string_t* callee_name =
+                intern_identifier(state, &call->callee->span);
+
+            lu_object_t* callee = get_variable(state, callee_name);
+
+            if (callee->type != Function_type) {
+                lu_error_t* error =
+                    lu_error_from_str(state, "uncallable object");
+                error->span = call->callee->span;
+                error->line = call->callee->span.line;
+                state->error = error;
+                state->op_result = op_result_raised_error;
+                return nullptr;
+            }
+
+            for (uint8_t i = 0; i < call->argc; i++) {
+                lu_argument_t arg;
+                arg.name = intern_identifier(
+                    state, &((lu_function_object_t*)callee)->params[i]->span);
+                // TODO: check for error
+                arg.value = eval_expr(state, call->args[i]);
+                arrput(args, arg);
+            }
+
+            return eval_call(state, args, call->argc,
+                             (lu_function_object_t*)callee, callee);
         }
         default: {
             break;
