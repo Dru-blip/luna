@@ -12,6 +12,23 @@
 
 lu_type_t* Str_type = nullptr;
 
+#define FNV_OFFSET 14695981039346656037UL
+#define FNV_PRIME 1099511628211UL
+
+static uint64_t hash_key(const char* key, size_t len) {
+    uint64_t hash = FNV_OFFSET;
+    for (size_t i = 0; i < len; i++) {
+        hash ^= (uint64_t)(unsigned char)key[i];
+        hash *= FNV_PRIME;
+    }
+    return hash;
+}
+
+size_t str_hash(lu_object_t* self) {
+    lu_string_t* sa = (lu_string_t*)self;
+    return hash_key(sa->data.str, sa->length);
+}
+
 lu_type_t* lu_string_type_object_new(lu_istate_t* state) {
     lu_type_t* type = heap_allocate_object(state->heap, sizeof(lu_type_t));
     type->name = "str";
@@ -35,6 +52,8 @@ lu_type_t* lu_string_type_object_new(lu_istate_t* state) {
 
     type->binop_slots[binary_op_add] = lu_string_concat;
     type->binop_slots[binary_op_eq] = lu_string_eq;
+
+    type->hashfn=str_hash;
 
     Str_type = type;
     return type;

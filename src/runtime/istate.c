@@ -70,7 +70,7 @@ static execution_context_t* create_execution_context(
     execution_context_t* ctx = malloc(sizeof(execution_context_t));
     ctx->call_stack = nullptr;
     ctx->prev = prev;
-    ctx->scope = new_scope(state->heap, nullptr);
+    ctx->scope = new_scope(state, nullptr);
     return ctx;
 }
 

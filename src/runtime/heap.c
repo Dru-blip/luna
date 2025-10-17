@@ -32,6 +32,7 @@ static void collect_roots(heap_t* heap, lu_gc_objectset_t* roots) {
     if (heap->istate->builtins) {
         lu_gc_objectset_insert(roots, heap->istate->builtins);
     }
+
     if (heap->istate->module_cache) {
         lu_gc_objectset_insert(roots, heap->istate->module_cache);
     }

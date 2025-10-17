@@ -17,6 +17,9 @@ static void parse_param_list(parser_t* parser, ast_node_t*** params);
 static ast_node_t* parse_expression(parser_t* parser, int8_t mbp);
 
 static operator_t operators[] = {
+    {operator_kind_assign, token_kind_equal, 1, 1, assign_op_simple,
+     ast_node_kind_assign},
+
     {operator_kind_infix, token_kind_pipe_pipe, 15, 16, binary_op_lor,
      ast_node_kind_binop},
     {operator_kind_infix, token_kind_ampersand_ampersand, 18, 19,
@@ -120,6 +123,11 @@ static ast_node_t* parse_primary_expression(parser_t* parser) {
             ast_node_t* node =
                 make_node(parser, ast_node_kind_bool, &token->span);
             node->data.int_val = token->kind == token_kind_keyword_true;
+            return node;
+        }
+        case token_kind_identifier: {
+            ast_node_t* node =
+                make_node(parser, ast_node_kind_identifier, &token->span);
             return node;
         }
         default: {
@@ -249,7 +257,7 @@ static ast_node_t* parse_if_stmt(parser_t* parser) {
 }
 
 static ast_node_t* parse_stmt(parser_t* parser) {
-    const token_t* token = parser->cur_token;
+    token_t* token = parser->cur_token;
     switch (token->kind) {
         case token_kind_keyword_return: {
             return parse_return(parser);
@@ -261,12 +269,11 @@ static ast_node_t* parse_stmt(parser_t* parser) {
             return parse_if_stmt(parser);
         }
         default: {
-            // const uint32_t token_index = parser->pos;
-            // ast_node_t* expr = parse_expression(parser, 0);
-            // ast_node_t* node =
-            //     make_node(parser, ast_node_kind_expr_stmt, token_index);
-            // node->data.node = expr;
-            // return node;
+            ast_node_t* expr = parse_expression(parser, 0);
+            ast_node_t* node =
+                make_node(parser, ast_node_kind_expr_stmt, &token->span);
+            node->data.node = expr;
+            return node;
         }
     }
 }

@@ -12,7 +12,10 @@ typedef enum ast_node_kind {
     ast_node_kind_bool,
     ast_node_kind_unop,
     ast_node_kind_binop,
+    ast_node_kind_assign,
+    ast_node_kind_identifier,
 
+    ast_node_kind_expr_stmt,
     ast_node_kind_return,
     ast_node_kind_block,
     ast_node_kind_if_stmt,

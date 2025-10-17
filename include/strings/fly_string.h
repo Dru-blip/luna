@@ -10,6 +10,9 @@ typedef enum {
     fly_string_node_black,
 } fly_string_node_color;
 
+// Instead of red-black trees hashmap may provide better performance
+// since we dont care about the order.
+// rb trees are not simple to implementation
 typedef struct fly_string_node {
     struct fly_string_node *left, *right, *parent;
     lu_string_t* str;

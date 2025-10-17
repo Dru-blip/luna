@@ -57,7 +57,7 @@ typedef struct lu_istate {
 
 lu_istate_t* lu_istate_new();
 void lu_istate_destroy(lu_istate_t* state);
-scope_t* new_scope(heap_t* heap, scope_t* parent);
+scope_t* new_scope(lu_istate_t* state, scope_t* parent);
 scope_t* new_scope_with(heap_t* heap, scope_t* parent, lu_object_t* values);
 call_frame_t* push_call_frame(execution_context_t* ctx);
 call_frame_t* pop_call_frame(execution_context_t* ctx);

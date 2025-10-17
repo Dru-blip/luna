@@ -2,17 +2,21 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "operator.h"
 #include "parser/ast.h"
+#include "parser/tokenizer.h"
 #include "runtime/heap.h"
 #include "runtime/istate.h"
 #include "runtime/luerrors.h"
 #include "runtime/object.h"
 #include "runtime/objects/boolean.h"
+#include "runtime/objects/hashmap.h"
 #include "runtime/objects/integer.h"
 #include "runtime/objects/strobj.h"
 #include "stb_ds.h"
+#include "strings/interner.h"
 
 call_frame_t* push_call_frame(execution_context_t* ctx) {
     call_frame_t* frame = calloc(1, sizeof(call_frame_t));
@@ -30,9 +34,9 @@ call_frame_t* pop_call_frame(execution_context_t* ctx) {
     return frame;
 }
 
-scope_t* new_scope(heap_t* heap, scope_t* parent) {
+scope_t* new_scope(lu_istate_t* state, scope_t* parent) {
     scope_t* scope = calloc(1, sizeof(scope_t));
-    scope->values = heap_allocate_object(heap, sizeof(lu_object_t));
+    scope->values = lu_hashmap_new(state);
     scope->depth = parent ? parent->depth + 1 : 0;
     scope->parent = parent;
     return scope;
@@ -42,13 +46,11 @@ scope_t* new_scope_with(heap_t* heap, scope_t* parent, lu_object_t* values) {
     scope_t* scope = calloc(1, sizeof(scope_t));
     scope->values = values;
     scope->parent = parent;
-
     return scope;
 }
 
 static void begin_scope(lu_istate_t* state) {
-    state->context_stack->scope =
-        new_scope(state->heap, state->context_stack->scope);
+    state->context_stack->scope = new_scope(state, state->context_stack->scope);
 }
 
 static void end_scope(lu_istate_t* state) {
@@ -56,6 +58,22 @@ static void end_scope(lu_istate_t* state) {
     state->context_stack->scope = scope->parent;
     state->context_stack->scope->depth--;
     free(scope);
+}
+
+static inline void set_variable(lu_istate_t* state, lu_object_t* name,
+                                lu_object_t* value) {
+    scope_t* scope = state->context_stack->scope;
+    lu_hashmap_put(state, (lu_hashmap_t*)scope->values, name, value);
+}
+
+static inline lu_object_t* get_variable(lu_istate_t* state, lu_object_t* name) {
+    scope_t* scope = state->context_stack->scope;
+    while (scope) {
+        lu_object_t* val = lu_hashmap_get((lu_hashmap_t*)scope->values, name);
+        if (val) return val;
+        scope = scope->parent;
+    }
+    return nullptr;
 }
 
 static signal_kind_t eval_stmts(lu_istate_t* state, ast_node_t** stmts);
@@ -147,6 +165,15 @@ static lu_object_t* lu_binop(lu_istate_t* state, lu_object_t* a, lu_object_t* b,
     return res;
 }
 
+lu_string_t* intern_identifier(lu_istate_t* state, span_t* span) {
+    const size_t len = span->end - span->start;
+    char* buffer = malloc(len);
+    memcpy(buffer, state->context_stack->program.source + span->start, len);
+    lu_string_t* str = lu_intern_string(state->string_pool, buffer, len);
+    free(buffer);
+    return str;
+}
+
 static lu_object_t* eval_expr(lu_istate_t* state, ast_node_t* expr) {
     switch (expr->kind) {
         case ast_node_kind_int: {
@@ -155,8 +182,30 @@ static lu_object_t* eval_expr(lu_istate_t* state, ast_node_t* expr) {
         case ast_node_kind_bool: {
             return expr->data.int_val ? state->true_obj : state->false_obj;
         }
+        case ast_node_kind_identifier: {
+            lu_object_t* obj = get_variable(
+                state, (lu_object_t*)intern_identifier(state, &expr->span));
+            if (!obj) {
+                state->error =
+                    lu_error_from_str(state, "undeclared identifier");
+                ((lu_error_t*)state->error)->span = expr->span;
+                ((lu_error_t*)state->error)->line = expr->span.line;
+                state->op_result = op_result_raised_error;
+            }
+            return obj;
+        }
         case ast_node_kind_unop: {
             lu_object_t* argument = eval_expr(state, expr->data.unop.argument);
+            unary_func f = argument->type->unop_slots[expr->data.unop.op];
+            if (!f) {
+                state->error = lu_error_from_str(
+                    state, "cannot perform unary () on types");
+                ((lu_error_t*)state->error)->span = expr->span;
+                ((lu_error_t*)state->error)->line = expr->span.line;
+                state->op_result = op_result_raised_error;
+                return nullptr;
+            }
+            return f(state, argument);
         }
         case ast_node_kind_binop: {
             lu_object_t* lhs = eval_expr(state, expr->data.binop.lhs);
@@ -178,6 +227,13 @@ static lu_object_t* eval_expr(lu_istate_t* state, ast_node_t* expr) {
             }
 
             return res;
+        }
+        case ast_node_kind_assign: {
+            lu_object_t* value = eval_expr(state, expr->data.binop.rhs);
+            lu_string_t* name =
+                intern_identifier(state, &expr->data.binop.lhs->span);
+            set_variable(state, (lu_object_t*)name, value);
+            return value;
         }
         default: {
             break;
@@ -210,6 +266,12 @@ static signal_kind_t eval_stmt(lu_istate_t* state, ast_node_t* stmt) {
                 return eval_stmt(state, stmt->data.if_stmt.alternate);
             }
             break;
+        }
+        case ast_node_kind_expr_stmt: {
+            lu_object_t* res = eval_expr(state, stmt->data.node);
+            if (state->op_result == op_result_raised_error) {
+                return signal_error;
+            }
         }
         default: {
             break;
