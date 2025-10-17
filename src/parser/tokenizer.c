@@ -245,6 +245,16 @@ static token_t next_token(tokenizer_t* t) {
             kind = token_kind_pipe;
             break;
         }
+        case ',': {
+            advance(t);
+            kind = token_kind_comma;
+            break;
+        }
+        case '.': {
+            advance(t);
+            kind = token_kind_dot;
+            break;
+        }
         default:
             if (isdigit(c)) {
                 while (isdigit(current(t))) advance(t);

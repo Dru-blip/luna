@@ -10,6 +10,7 @@
 #include "runtime/heap.h"
 #include "runtime/object.h"
 #include "runtime/objects/boolean.h"
+#include "runtime/objects/function.h"
 #include "runtime/objects/hashmap.h"
 #include "runtime/objects/integer.h"
 #include "runtime/objects/strobj.h"
@@ -41,6 +42,7 @@ static void init_builtin_type_objects(lu_istate_t* state) {
     lu_type_t* bool_type_obj = lu_bool_type_object_new(state);
 
     lu_type_t* hashmap_type_obj = lu_hashmap_type_object_new(state);
+    lu_function_object_type_new(state);
 }
 
 lu_istate_t* lu_istate_new() {

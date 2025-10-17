@@ -12,6 +12,7 @@
 #include "runtime/luerrors.h"
 #include "runtime/object.h"
 #include "runtime/objects/boolean.h"
+#include "runtime/objects/function.h"
 #include "runtime/objects/hashmap.h"
 #include "runtime/objects/integer.h"
 #include "runtime/objects/strobj.h"
@@ -255,6 +256,15 @@ static lu_object_t* eval_expr(lu_istate_t* state, ast_node_t* expr) {
 
 static signal_kind_t eval_stmt(lu_istate_t* state, ast_node_t* stmt) {
     switch (stmt->kind) {
+        case ast_node_kind_fn_decl: {
+            ast_fn_decl_t* fndecl = &stmt->data.fn_decl;
+            lu_function_object_t* func_obj =
+                lu_function_create(state, fndecl->params, fndecl->body);
+            lu_string_t* name = intern_identifier(state, &fndecl->name_span);
+            func_obj->name = name;
+            set_variable(state, (lu_object_t*)name, (lu_object_t*)func_obj);
+            break;
+        }
         case ast_node_kind_return: {
             state->context_stack->call_stack->return_value =
                 eval_expr(state, stmt->data.node);

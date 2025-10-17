@@ -15,6 +15,8 @@ typedef enum ast_node_kind {
     ast_node_kind_assign,
     ast_node_kind_identifier,
 
+    ast_node_kind_param,
+
     ast_node_kind_expr_stmt,
     ast_node_kind_return,
     ast_node_kind_block,
@@ -24,6 +26,7 @@ typedef enum ast_node_kind {
     ast_node_kind_loop_stmt,
     ast_node_kind_while_stmt,
     ast_node_kind_for_stmt,
+    ast_node_kind_fn_decl,
 } ast_node_kind_t;
 
 typedef struct ast_pair {
@@ -56,6 +59,12 @@ typedef struct ast_for_stmt {
     ast_node_t* body;
 } ast_for_stmt_t;
 
+typedef struct ast_fn_decl {
+    span_t name_span;
+    ast_node_t** params;
+    ast_node_t* body;
+} ast_fn_decl_t;
+
 typedef union ast_node_data {
     int64_t int_val;
     char* id;
@@ -66,6 +75,7 @@ typedef union ast_node_data {
     ast_if_stmt_t if_stmt;
     ast_node_t** list;
     ast_for_stmt_t for_stmt;
+    ast_fn_decl_t fn_decl;
 } ast_node_data_t;
 
 struct ast_node {

@@ -71,6 +71,8 @@ typedef enum token_kind {
     token_kind_keyword_break,
     token_kind_keyword_continue,
 
+    token_kind_keyword_fn,
+
     token_kind_eof,
 } token_kind_t;
 
@@ -129,6 +131,7 @@ static const char* token_kind_labels[] = {
     "for",       // token_kind_keyword_for
     "break",     // token_kind_keyword_break
     "continue",  // token_kind_keyword_continue
+    "fn",        // token_kind_keyword_fn
 
     "eof",  // token_kind_eof
 };
@@ -169,6 +172,7 @@ static keyword_t keywords[] = {
     {"for", token_kind_keyword_for},
     {"break", token_kind_keyword_break},
     {"continue", token_kind_keyword_continue},
+    {"fn", token_kind_keyword_fn},
 };
 
 token_t* tokenize(const char* source);

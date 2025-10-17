@@ -314,6 +314,35 @@ static ast_node_t* parse_for_stmt(parser_t* parser) {
     return node;
 }
 
+static void parse_param_list(parser_t* parser, ast_node_t*** params) {
+    parse_expected(parser, token_kind_lparen);
+    while (!check(parser, token_kind_rparen)) {
+        token_t* param_id = parse_expected(parser, token_kind_identifier);
+        ast_node_t* param =
+            make_node(parser, ast_node_kind_param, &param_id->span);
+        if (check(parser, token_kind_comma)) {
+            parser_advance(parser);
+        }
+        arrput(*params, param);
+    }
+    parse_expected(parser, token_kind_rparen);
+}
+
+static ast_node_t* parse_fn_decl(parser_t* parser) {
+    token_t* token = parser_eat(parser);
+    token_t* id = parse_expected(parser, token_kind_identifier);
+    ast_node_t** params = nullptr;
+    parse_param_list(parser, &params);
+    ast_node_t* body = parse_stmt(parser);
+    ast_node_t* node = make_node(parser, ast_node_kind_fn_decl, &id->span);
+    node->data.fn_decl = (ast_fn_decl_t){
+        .name_span = id->span,
+        .params = params,
+        .body = body,
+    };
+    return node;
+}
+
 static ast_node_t* parse_stmt(parser_t* parser) {
     token_t* token = parser->cur_token;
     switch (token->kind) {
@@ -340,6 +369,9 @@ static ast_node_t* parse_stmt(parser_t* parser) {
         }
         case token_kind_keyword_for: {
             return parse_for_stmt(parser);
+        }
+        case token_kind_keyword_fn: {
+            return parse_fn_decl(parser);
         }
         default: {
             ast_node_t* expr = parse_expression(parser, 0);
