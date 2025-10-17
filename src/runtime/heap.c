@@ -137,6 +137,7 @@ static lu_object_t* block_allocate_object(heap_block_t* block) {
 #ifdef DEBUG
 
 #endif
+    obj->type = nullptr;
     obj->state = obj_state_alive;
     obj->is_marked = false;
     return obj;
@@ -173,6 +174,7 @@ lu_object_t* heap_allocate_object(heap_t* heap, size_t size) {
         if (size > block->cell_size) continue;
         lu_object_t* obj = block_allocate_object(block);
         if (obj) {
+            obj->type = Base_type;
             heap->bytes_allocated_since_last_gc += size;
             return obj;
         }
@@ -182,6 +184,7 @@ lu_object_t* heap_allocate_object(heap_t* heap, size_t size) {
     arrput(heap->blocks, block);
     heap->nblocks++;
     lu_object_t* obj = block_allocate_object(block);
+    obj->type = Base_type;
     heap->bytes_allocated_since_last_gc += size;
     return obj;
 }

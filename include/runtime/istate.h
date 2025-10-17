@@ -21,7 +21,7 @@ typedef enum op_result_kind {
 } op_result_kind_t;
 
 typedef struct scope {
-    lu_object_t* values;
+    struct lu_hashmap* values;
     struct scope* parent;
     size_t depth;
 } scope_t;

@@ -1,15 +1,64 @@
 #include "runtime/objects/hashmap.h"
 
 #include "runtime/heap.h"
+#include "runtime/object.h"
 #include "stb_ds.h"
+#include "strings/interner.h"
 
 #define LU_HASHMAP_LOAD_FACTOR 0.75f
+
+lu_type_t* Hashmap_type = nullptr;
+lu_type_t* Hashmap_entry_type = nullptr;
+
+static void hashmap_visit(lu_object_t* obj, struct lu_gc_objectset* livecells) {
+    lu_gc_objectset_insert(livecells, obj->type);
+    lu_hashmap_iter_t iter;
+    lu_hashmap_t* map = (lu_hashmap_t*)obj;
+    lu_hashmap_iter_init(&iter, map);
+    lu_hashmap_entry_t* entry;
+    while ((entry = lu_hashmap_iter_next(&iter))) {
+        lu_gc_objectset_insert(livecells, entry);
+        lu_gc_objectset_insert(livecells, entry->key);
+        lu_gc_objectset_insert(livecells, entry->value);
+    }
+}
+
+static void hashmap_finalize(lu_object_t* obj) {
+    lu_hashmap_t* map = (lu_hashmap_t*)obj;
+    arrfree(map->entries);
+}
+
+lu_type_t* lu_hashmap_type_object_new(lu_istate_t* state) {
+    lu_type_t* type = heap_allocate_object(state->heap, sizeof(lu_type_t));
+    type->name = "hash";
+
+    type->name_strobj = lu_intern_string(state->string_pool, "hash", 4);
+
+    type->finalize = hashmap_finalize;
+    type->visit = hashmap_visit;
+    type->type = Base_type;
+
+    Hashmap_type = type;
+
+    lu_type_t* entry_type =
+        heap_allocate_object(state->heap, sizeof(lu_type_t));
+    entry_type->name = "hash_entry";
+
+    entry_type->name_strobj =
+        lu_intern_string(state->string_pool, "hash_entry", 9);
+    entry_type->finalize = object_default_finalize;
+    entry_type->visit = object_default_visit;
+    Hashmap_entry_type = entry_type;
+
+    return type;
+}
 
 lu_hashmap_t* lu_hashmap_new(lu_istate_t* state) {
     lu_hashmap_t* map = heap_allocate_object(state->heap, sizeof(lu_hashmap_t));
     map->capacity = 16;
     map->size = 0;
     map->entries = nullptr;
+    map->type = Hashmap_type;
     arrsetlen(map->entries, map->capacity);
     memset(map->entries, 0, sizeof(lu_hashmap_entry_t*) * map->capacity);
     return map;
@@ -67,6 +116,7 @@ static lu_hashmap_entry_t* lu_hashmap_add_entry(lu_istate_t* state,
     new_entry->hash = hash;
     new_entry->prev_entry = NULL;
     new_entry->next_entry = chain;
+    new_entry->type = Hashmap_entry_type;
 
     while (chain) {
         // TODO: implement object comparison

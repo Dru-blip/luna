@@ -63,7 +63,19 @@ static void end_scope(lu_istate_t* state) {
 static inline void set_variable(lu_istate_t* state, lu_object_t* name,
                                 lu_object_t* value) {
     scope_t* scope = state->context_stack->scope;
-    lu_hashmap_put(state, (lu_hashmap_t*)scope->values, name, value);
+    while (scope) {
+        if (lu_hashmap_get(scope->values, name)) {
+            break;
+        }
+        scope = scope->parent;
+    }
+    if (scope) {
+        lu_hashmap_put(state, (lu_hashmap_t*)scope->values, name, value);
+    } else {
+        lu_hashmap_put(state,
+                       (lu_hashmap_t*)state->context_stack->scope->values, name,
+                       value);
+    }
 }
 
 static inline lu_object_t* get_variable(lu_istate_t* state, lu_object_t* name) {
@@ -221,10 +233,10 @@ static lu_object_t* eval_expr(lu_istate_t* state, ast_node_t* expr) {
             // Check for error
             lu_object_t* res = lu_binop(state, lhs, rhs, expr->data.binop.op);
 
-            if (state->error) {
-                ((lu_error_t*)state->error)->span = expr->span;
-                ((lu_error_t*)state->error)->line = expr->span.line;
-            }
+            // if (state->error) {
+            //     ((lu_error_t*)state->error)->span = expr->span;
+            //     ((lu_error_t*)state->error)->line = expr->span.line;
+            // }
 
             return res;
         }
@@ -267,11 +279,64 @@ static signal_kind_t eval_stmt(lu_istate_t* state, ast_node_t* stmt) {
             }
             break;
         }
+        case ast_node_kind_break_stmt: {
+            return signal_break;
+        }
+        case ast_node_kind_continue_stmt: {
+            return signal_continue;
+        }
+        case ast_node_kind_loop_stmt: {
+            begin_scope(state);
+        loop_start:
+            signal_kind_t sig = eval_stmt(state, stmt->data.node);
+            if (sig == signal_break) goto loop_end;
+            if (sig == signal_continue) goto loop_start;
+            if (sig == signal_return) return signal_return;
+            goto loop_start;
+        loop_end:
+            end_scope(state);
+        }
+        case ast_node_kind_while_stmt: {
+            const ast_pair_t* pair = &stmt->data.pair;
+        w_loop_start:
+            lu_object_t* cond = eval_expr(state, pair->fst);
+            if (!is_truthy(cond)) {
+                goto w_loop_end;
+            }
+            signal_kind_t sig = eval_stmt(state, pair->snd);
+            if (sig == signal_break) goto w_loop_end;
+            if (sig == signal_continue) goto w_loop_start;
+            if (sig == signal_return) return signal_return;
+            goto w_loop_start;
+        w_loop_end:
+            break;
+        }
+        case ast_node_kind_for_stmt: {
+            const ast_for_stmt_t* for_stmt = &stmt->data.for_stmt;
+            begin_scope(state);
+            eval_stmt(state, for_stmt->init);
+        f_loop_start:
+            lu_object_t* cond = eval_expr(state, for_stmt->test);
+            if (!is_truthy(cond)) {
+                goto f_loop_end;
+            }
+            signal_kind_t sig = eval_stmt(state, for_stmt->body);
+            if (sig == signal_break) goto f_loop_end;
+            if (sig == signal_continue) goto f_loop_update;
+            if (sig == signal_return || sig == signal_error) return sig;
+        f_loop_update:
+            eval_expr(state, for_stmt->update);
+            goto f_loop_start;
+        f_loop_end:
+            end_scope(state);
+            break;
+        }
         case ast_node_kind_expr_stmt: {
             lu_object_t* res = eval_expr(state, stmt->data.node);
             if (state->op_result == op_result_raised_error) {
                 return signal_error;
             }
+            break;
         }
         default: {
             break;

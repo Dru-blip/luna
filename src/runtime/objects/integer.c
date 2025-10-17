@@ -71,6 +71,8 @@ lu_type_t* lu_integer_type_object_new(lu_istate_t* state) {
     type->finalize = object_default_finalize;
     type->visit = object_default_visit;
 
+    type->type = Base_type;
+
     Integer_type = type;
 
     return type;

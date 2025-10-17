@@ -1,4 +1,3 @@
-#include <threads.h>
 
 #include "runtime/eval.h"
 #include "runtime/istate.h"

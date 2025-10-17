@@ -3,3 +3,4 @@ builddir
 *.json
 .clangd
 .zed
+.vscode

@@ -55,6 +55,8 @@ lu_type_t* lu_bool_type_object_new(lu_istate_t* state) {
     type->finalize = object_default_finalize;
     type->visit = object_default_visit;
 
+    type->type = Base_type;
+
     Bool_type = type;
     return type;
 }

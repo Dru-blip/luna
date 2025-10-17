@@ -256,6 +256,64 @@ static ast_node_t* parse_if_stmt(parser_t* parser) {
     return node;
 }
 
+static ast_node_t* parse_break_stmt(parser_t* parser) {
+    token_t* token = parser_eat(parser);
+    ast_node_t* node =
+        make_node(parser, ast_node_kind_break_stmt, &token->span);
+    return node;
+}
+
+static ast_node_t* parse_continue_stmt(parser_t* parser) {
+    token_t* token = parser_eat(parser);
+    ast_node_t* node =
+        make_node(parser, ast_node_kind_continue_stmt, &token->span);
+    return node;
+}
+
+static ast_node_t* parse_loop_stmt(parser_t* parser) {
+    token_t* token = parser_eat(parser);
+    ast_node_t* body = parse_stmt(parser);
+    ast_node_t* node = make_node(parser, ast_node_kind_loop_stmt, &token->span);
+    node->data.node = body;
+    return node;
+}
+
+static ast_node_t* parse_while_stmt(parser_t* parser) {
+    token_t* token = parser_eat(parser);
+    if (check(parser, token_kind_lparen)) {
+        parser_advance(parser);
+    }
+    ast_node_t* test = parse_expression(parser, 0);
+    if (check(parser, token_kind_rparen)) {
+        parser_advance(parser);
+    }
+    ast_node_t* body = parse_stmt(parser);
+    ast_node_t* node =
+        make_node(parser, ast_node_kind_while_stmt, &token->span);
+    node->data.pair = (ast_pair_t){.fst = test, .snd = body};
+    return node;
+}
+
+static ast_node_t* parse_for_stmt(parser_t* parser) {
+    token_t* token = parser_eat(parser);
+    parse_expected(parser, token_kind_lparen);
+    ast_node_t* init = parse_stmt(parser);
+    parse_expected(parser, token_kind_semicolon);
+    ast_node_t* test = parse_expression(parser, 0);
+    parse_expected(parser, token_kind_semicolon);
+    ast_node_t* update = parse_expression(parser, 0);
+    parse_expected(parser, token_kind_rparen);
+    ast_node_t* body = parse_stmt(parser);
+    ast_node_t* node = make_node(parser, ast_node_kind_for_stmt, &token->span);
+    node->data.for_stmt = (ast_for_stmt_t){
+        .init = init,
+        .test = test,
+        .update = update,
+        .body = body,
+    };
+    return node;
+}
+
 static ast_node_t* parse_stmt(parser_t* parser) {
     token_t* token = parser->cur_token;
     switch (token->kind) {
@@ -267,6 +325,21 @@ static ast_node_t* parse_stmt(parser_t* parser) {
         }
         case token_kind_keyword_if: {
             return parse_if_stmt(parser);
+        }
+        case token_kind_keyword_continue: {
+            return parse_continue_stmt(parser);
+        }
+        case token_kind_keyword_break: {
+            return parse_break_stmt(parser);
+        }
+        case token_kind_keyword_loop: {
+            return parse_loop_stmt(parser);
+        }
+        case token_kind_keyword_while: {
+            return parse_while_stmt(parser);
+        }
+        case token_kind_keyword_for: {
+            return parse_for_stmt(parser);
         }
         default: {
             ast_node_t* expr = parse_expression(parser, 0);

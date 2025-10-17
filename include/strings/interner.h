@@ -20,3 +20,4 @@ lu_string_t* lu_intern_string(string_interner_t* interner, char* str,
                               size_t str_len);
 lu_string_t* lu_intern_string_lookup(string_interner_t* interner, char* str,
                                      size_t str_len);
+void lu_string_interner_destroy(string_interner_t* interner);

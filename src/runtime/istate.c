@@ -4,11 +4,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "arena.h"
 #include "parser/parser.h"
 #include "runtime/eval.h"
 #include "runtime/heap.h"
 #include "runtime/object.h"
 #include "runtime/objects/boolean.h"
+#include "runtime/objects/hashmap.h"
 #include "runtime/objects/integer.h"
 #include "runtime/objects/strobj.h"
 #include "stb_ds.h"
@@ -33,13 +35,12 @@ static char* read_file(const char* filename) {
 static void init_builtin_type_objects(lu_istate_t* state) {
     lu_type_t* str_type_obj = lu_string_type_object_new(state);
     str_type_obj->name_strobj->type = str_type_obj;
-    arrput(state->type_registry, str_type_obj);
 
     lu_type_t* int_type_obj = lu_integer_type_object_new(state);
-    arrput(state->type_registry, int_type_obj);
 
     lu_type_t* bool_type_obj = lu_bool_type_object_new(state);
-    arrput(state->type_registry, bool_type_obj);
+
+    lu_type_t* hashmap_type_obj = lu_hashmap_type_object_new(state);
 }
 
 lu_istate_t* lu_istate_new() {
@@ -50,10 +51,17 @@ lu_istate_t* lu_istate_new() {
     state->string_pool = lu_string_interner_init(state->heap);
 
     state->type_registry = nullptr;
+
+    base_object_type_init(state);
     init_builtin_type_objects(state);
 
     state->false_obj = (lu_object_t*)lu_new_bool(state, false);
     state->true_obj = (lu_object_t*)lu_new_bool(state, true);
+
+    state->context_stack = nullptr;
+    state->builtins = nullptr;
+    state->error = nullptr;
+    state->module_cache = nullptr;
 
     return state;
 }
@@ -61,6 +69,7 @@ lu_istate_t* lu_istate_new() {
 void lu_istate_destroy(lu_istate_t* state) {
     // TODO: destroy string pool and other arenas
     // collect_garbage(state->heap);
+    lu_string_interner_destroy(state->string_pool);
     heap_destroy(state->heap);
     free(state);
 }
@@ -77,6 +86,9 @@ static execution_context_t* create_execution_context(
 static void delete_execution_context(lu_istate_t* state) {
     execution_context_t* ctx = state->context_stack;
     state->context_stack = ctx->prev;
+    arrfree(ctx->program.tokens);
+    free(ctx->program.source);
+    arena_destroy(&ctx->program.allocator);
     free(ctx->scope);
     free(ctx);
 }

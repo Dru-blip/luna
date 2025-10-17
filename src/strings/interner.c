@@ -27,3 +27,9 @@ lu_string_t* lu_intern_string_lookup(string_interner_t* interner, char* str,
     //
     return fly_string_lookup(interner->root, str, str_len);
 }
+
+void lu_string_interner_destroy(string_interner_t* interner) {
+    arena_destroy(&interner->node_arena);
+    arena_destroy(&interner->string_arena);
+    free(interner);
+}

@@ -68,3 +68,7 @@ void object_default_visit(lu_object_t* self,
         state->op_result = op_result_not_implemented;               \
         return nullptr;                                             \
     }
+
+extern lu_type_t* Base_type;
+
+void base_object_type_init(struct lu_istate*);

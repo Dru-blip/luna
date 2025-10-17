@@ -42,10 +42,6 @@ lu_type_t* lu_string_type_object_new(lu_istate_t* state) {
     //  segfault,when garbage collection is triggered or interpreter or anyother
     //  system that is trying to access the string type object  before it is
     //  fully initialized.
-    //
-    // Workaround:
-    // this string object type is set for name_strobj in istate.c (line:34) in
-    // init_builtin_type_objects()
     type->name_strobj = lu_intern_string(state->string_pool, "str", 3);
     type->finalize = object_default_finalize;
     type->visit = object_default_visit;
@@ -53,7 +49,8 @@ lu_type_t* lu_string_type_object_new(lu_istate_t* state) {
     type->binop_slots[binary_op_add] = lu_string_concat;
     type->binop_slots[binary_op_eq] = lu_string_eq;
 
-    type->hashfn=str_hash;
+    type->hashfn = str_hash;
+    type->type = Base_type;
 
     Str_type = type;
     return type;
@@ -64,6 +61,7 @@ lu_string_t* lu_new_string(lu_istate_t* state, string_view_t* view) {
         heap_allocate_object(state->heap, sizeof(lu_string_t));
     new_string->length = view->len;
     new_string->data = *view;
+    new_string->type = Str_type;
     return new_string;
 }
 
