@@ -16,6 +16,7 @@ typedef enum ast_node_kind {
     ast_node_kind_identifier,
 
     ast_node_kind_param,
+    ast_node_kind_call,
 
     ast_node_kind_expr_stmt,
     ast_node_kind_return,
@@ -46,6 +47,12 @@ typedef struct ast_binop {
     ast_node_t* rhs;
 } ast_binop_t;
 
+typedef struct ast_call {
+    uint8_t argc;
+    ast_node_t* callee;
+    ast_node_t** args;
+} ast_call_t;
+
 typedef struct ast_if_stmt {
     ast_node_t* test;
     ast_node_t* consequent;
@@ -72,6 +79,7 @@ typedef union ast_node_data {
     ast_pair_t pair;
     ast_unop_t unop;
     ast_binop_t binop;
+    ast_call_t call;
     ast_if_stmt_t if_stmt;
     ast_node_t** list;
     ast_for_stmt_t for_stmt;

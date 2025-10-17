@@ -54,6 +54,9 @@ static operator_t operators[] = {
      ast_node_kind_binop},
     {operator_kind_infix, token_kind_modulus, 55, 56, binary_op_mod,
      ast_node_kind_binop},
+
+    {operator_kind_postfix, token_kind_lparen, 99, 100, postfix_call,
+     ast_node_kind_call},
 };
 
 static const uint32_t operator_table_len =
@@ -172,6 +175,35 @@ static ast_node_t* parse_prefix_expression(parser_t* parser) {
     }
 }
 
+static void parse_call_args(parser_t* parser, uint8_t* argc,
+                            ast_node_t*** args) {
+    while (!check(parser, token_kind_rparen)) {
+        ast_node_t* arg = parse_expression(parser, 0);
+        if (check(parser, token_kind_comma)) {
+            parser_advance(parser);
+        }
+        arrput(*args, arg);
+        (*argc)++;
+    }
+    parser_advance(parser);
+}
+
+static ast_node_t* parse_postfix_expression(parser_t* parser, postfix_op_t op,
+                                            token_t* token, ast_node_t* lhs) {
+    if (op == postfix_call) {
+        ast_node_t** args = nullptr;
+        uint8_t argc = 0;
+        parse_call_args(parser, &argc, &args);
+        ast_node_t* call = make_node(parser, ast_node_kind_call, &token->span);
+        call->data.call = (ast_call_t){
+            .callee = lhs,
+            .argc = argc,
+            .args = args,
+        };
+        return call;
+    }
+};
+
 static ast_node_t* parse_expression(parser_t* parser, int8_t mbp) {
     ast_node_t* lhs = parse_prefix_expression(parser);
     while (true) {
@@ -181,6 +213,10 @@ static ast_node_t* parse_expression(parser_t* parser, int8_t mbp) {
 
         if (op->lbp < mbp) break;
         parser_advance(parser);
+        if (op->kind == operator_kind_postfix) {
+            lhs = parse_postfix_expression(parser, op->op, token, lhs);
+            continue;
+        }
         ast_node_t* rhs = parse_expression(parser, op->rbp);
         ast_node_t* bin = make_node(parser, op->node_kind, &token->span);
         bin->data.binop = (ast_binop_t){
