@@ -13,6 +13,7 @@
 #include "runtime/objects/function.h"
 #include "runtime/objects/hashmap.h"
 #include "runtime/objects/integer.h"
+#include "runtime/objects/native_function.h"
 #include "runtime/objects/strobj.h"
 #include "stb_ds.h"
 #include "strings/interner.h"
@@ -31,6 +32,18 @@ static char* read_file(const char* filename) {
     fread(buffer, 1, len, f);
     fclose(f);
     return buffer;
+}
+
+static lu_object_t* lu_print_fn(lu_istate_t* state, lu_object_t* self,
+                                lu_argument_t* args) {
+    //
+    size_t argc = arrlen(args);
+    for (size_t i = 0; i < argc; i++) {
+        lu_object_t* arg = args[i].value;
+        printf("object<%p>\n", arg);
+    }
+
+    return nullptr;
 }
 
 static void init_builtin_type_objects(lu_istate_t* state) {
@@ -61,7 +74,13 @@ lu_istate_t* lu_istate_new() {
     state->true_obj = (lu_object_t*)lu_new_bool(state, true);
 
     state->context_stack = nullptr;
-    state->builtins = nullptr;
+    state->builtins = lu_hashmap_new(state);
+
+    lu_hashmap_put(
+        state, state->builtins,
+        (lu_object_t*)lu_intern_string(state->string_pool, "print", 5),
+        (lu_object_t*)lu_native_function_create(state, lu_print_fn));
+
     state->error = nullptr;
     state->module_cache = nullptr;
 

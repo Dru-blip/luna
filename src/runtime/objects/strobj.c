@@ -33,7 +33,7 @@ lu_type_t* lu_string_type_object_new(lu_istate_t* state) {
     lu_type_t* type = heap_allocate_object(state->heap, sizeof(lu_type_t));
     type->name = "str";
 
-    // Segfault incoming thanks to my brilliance.
+    //  Segfault incoming.
     //  cause:
     //  to intern a string, the string type object must already exist, since
     //  interned strings are real string instances. But here we’re still

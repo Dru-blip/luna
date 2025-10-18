@@ -15,6 +15,7 @@
 #include "runtime/objects/function.h"
 #include "runtime/objects/hashmap.h"
 #include "runtime/objects/integer.h"
+#include "runtime/objects/native_function.h"
 #include "runtime/objects/strobj.h"
 #include "stb_ds.h"
 #include "strings/interner.h"
@@ -86,7 +87,8 @@ static inline lu_object_t* get_variable(lu_istate_t* state, lu_object_t* name) {
         if (val) return val;
         scope = scope->parent;
     }
-    return nullptr;
+
+    return lu_hashmap_get(state->builtins, name);
 }
 
 static signal_kind_t eval_stmts(lu_istate_t* state, ast_node_t** stmts);
@@ -116,6 +118,7 @@ lu_object_t* eval_call(lu_istate_t* state, lu_argument_t* args, uint8_t argc,
         set_variable(state, args[i].name, args[i].value);
     }
     signal_kind_t sig = eval_stmt(state, function->body);
+    end_scope(state);
     frame = pop_call_frame(state->context_stack);
     lu_object_t* ret_val = frame->return_value;
     free(frame);
@@ -167,7 +170,7 @@ static lu_object_t* lu_binop(lu_istate_t* state, lu_object_t* a, lu_object_t* b,
     }
 
     if (a->type != b->type && b->type->binop_slots[op_slot]) {
-        res = b->type->binop_slots[op_slot](state, a, b);
+        res = b->type->binop_slots[op_slot](state, b, a);
         if (state->op_result == op_result_raised_error) {
             return nullptr;
         }
@@ -193,7 +196,6 @@ static lu_object_t* lu_binop(lu_istate_t* state, lu_object_t* a, lu_object_t* b,
     lu_error_t* error = lu_error_from_str(state, buffer);
     state->error = error;
     free(buffer);
-
     return res;
 }
 
@@ -275,7 +277,18 @@ static lu_object_t* eval_expr(lu_istate_t* state, ast_node_t* expr) {
 
             lu_object_t* callee = get_variable(state, callee_name);
 
-            if (callee->type != Function_type) {
+            if (!callee) {
+                lu_error_t* error =
+                    lu_error_from_str(state, "undefined variable");
+                error->span = call->callee->span;
+                error->line = call->callee->span.line;
+                state->error = error;
+                state->op_result = op_result_raised_error;
+                return nullptr;
+            }
+
+            if (callee->type != Function_type &&
+                callee->type != Native_Function_type) {
                 lu_error_t* error =
                     lu_error_from_str(state, "uncallable object");
                 error->span = call->callee->span;
@@ -285,13 +298,24 @@ static lu_object_t* eval_expr(lu_istate_t* state, ast_node_t* expr) {
                 return nullptr;
             }
 
+            bool is_native = callee->type == Native_Function_type;
+
             for (uint8_t i = 0; i < call->argc; i++) {
                 lu_argument_t arg;
-                arg.name = intern_identifier(
-                    state, &((lu_function_object_t*)callee)->params[i]->span);
+                if (!is_native) {
+                    arg.name = intern_identifier(
+                        state,
+                        &((lu_function_object_t*)callee)->params[i]->span);
+                }
                 // TODO: check for error
                 arg.value = eval_expr(state, call->args[i]);
                 arrput(args, arg);
+            }
+
+            if (is_native) {
+                lu_native_function_object_t* native_func =
+                    (lu_native_function_object_t*)callee;
+                return native_func->func(state, native_func, args);
             }
 
             return eval_call(state, args, call->argc,
