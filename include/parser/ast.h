@@ -1,105 +1,106 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "arena.h"
 #include "tokenizer.h"
 
-typedef struct ast_node ast_node_t;
+struct ast_node;
 
-typedef enum ast_node_kind {
-    ast_node_kind_int,
-    ast_node_kind_bool,
-    ast_node_kind_unop,
-    ast_node_kind_binop,
-    ast_node_kind_assign,
-    ast_node_kind_identifier,
+enum ast_node_kind {
+    AST_NODE_INT,
+    AST_NODE_BOOL,
+    AST_NODE_UNOP,
+    AST_NODE_BINOP,
+    AST_NODE_ASSIGN,
+    AST_NODE_IDENTIFIER,
 
-    ast_node_kind_param,
-    ast_node_kind_call,
+    AST_NODE_PARAM,
+    AST_NODE_CALL,
 
-    ast_node_kind_expr_stmt,
-    ast_node_kind_return,
-    ast_node_kind_block,
-    ast_node_kind_if_stmt,
-    ast_node_kind_break_stmt,
-    ast_node_kind_continue_stmt,
-    ast_node_kind_loop_stmt,
-    ast_node_kind_while_stmt,
-    ast_node_kind_for_stmt,
-    ast_node_kind_fn_decl,
-} ast_node_kind_t;
-
-typedef struct ast_pair {
-    ast_node_t* fst;
-    ast_node_t* snd;
-} ast_pair_t;
-
-typedef struct ast_unop {
-    uint8_t op;
-    bool is_prefix;
-    ast_node_t* argument;
-} ast_unop_t;
-
-typedef struct ast_binop {
-    uint8_t op;
-    ast_node_t* lhs;
-    ast_node_t* rhs;
-} ast_binop_t;
-
-typedef struct ast_call {
-    uint8_t argc;
-    ast_node_t* callee;
-    ast_node_t** args;
-} ast_call_t;
-
-typedef struct ast_if_stmt {
-    ast_node_t* test;
-    ast_node_t* consequent;
-    ast_node_t* alternate;
-} ast_if_stmt_t;
-
-typedef struct ast_for_stmt {
-    ast_node_t* init;
-    ast_node_t* test;
-    ast_node_t* update;
-    ast_node_t* body;
-} ast_for_stmt_t;
-
-typedef struct ast_fn_decl {
-    span_t name_span;
-    ast_node_t** params;
-    ast_node_t* body;
-} ast_fn_decl_t;
-
-typedef union ast_node_data {
-    int64_t int_val;
-    char* id;
-    ast_node_t* node;
-    ast_pair_t pair;
-    ast_unop_t unop;
-    ast_binop_t binop;
-    ast_call_t call;
-    ast_if_stmt_t if_stmt;
-    ast_node_t** list;
-    ast_for_stmt_t for_stmt;
-    ast_fn_decl_t fn_decl;
-} ast_node_data_t;
-
-struct ast_node {
-    span_t span;
-    ast_node_kind_t kind;
-    ast_node_data_t data;
+    AST_NODE_EXPR_STMT,
+    AST_NODE_RETURN,
+    AST_NODE_BLOCK,
+    AST_NODE_IF_STMT,
+    AST_NODE_BREAK_STMT,
+    AST_NODE_CONTINUE_STMT,
+    AST_NODE_LOOP_STMT,
+    AST_NODE_WHILE_STMT,
+    AST_NODE_FOR_STMT,
+    AST_NODE_FN_DECL,
 };
 
-typedef struct ast_program {
+struct ast_pair {
+    struct ast_node* fst;
+    struct ast_node* snd;
+};
+
+struct ast_unop {
+    uint8_t op;
+    bool is_prefix;
+    struct ast_node* argument;
+};
+
+struct ast_binop {
+    uint8_t op;
+    struct ast_node* lhs;
+    struct ast_node* rhs;
+};
+
+struct ast_call {
+    uint8_t argc;
+    struct ast_node* callee;
+    struct ast_node** args;
+};
+
+struct ast_if_stmt {
+    struct ast_node* test;
+    struct ast_node* consequent;
+    struct ast_node* alternate;
+};
+
+struct ast_for_stmt {
+    struct ast_node* init;
+    struct ast_node* test;
+    struct ast_node* update;
+    struct ast_node* body;
+};
+
+struct ast_fn_decl {
+    struct span name_span;
+    struct ast_node** params;
+    struct ast_node* body;
+};
+
+union ast_node_data {
+    int64_t int_val;
+    char* id;
+    struct ast_node* node;
+    struct ast_pair pair;
+    struct ast_unop unop;
+    struct ast_binop binop;
+    struct ast_call call;
+    struct ast_if_stmt if_stmt;
+    struct ast_node** list;
+    struct ast_for_stmt for_stmt;
+    struct ast_fn_decl fn_decl;
+};
+
+struct ast_node {
+    struct span span;
+    enum ast_node_kind kind;
+    union ast_node_data data;
+};
+
+struct ast_program {
     const char* source;
     const char* filepath;
-    ast_node_t** nodes;
-    token_t* tokens;
-    arena_t allocator;
-} ast_program_t;
+    struct ast_node** nodes;
+    struct token* tokens;
+    struct arena allocator;
+};
 
-void dump_ast(const ast_program_t* program);
-void dump_nodes(const ast_node_t** nodes, uint32_t indent);
-void dump_node(const ast_node_t* node, uint32_t indent);
+void dump_ast(const struct ast_program* program);
+void dump_nodes(struct ast_node** nodes, uint32_t indent);
+void dump_node(const struct ast_node* node, uint32_t indent);

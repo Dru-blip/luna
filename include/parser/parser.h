@@ -6,28 +6,28 @@
 #include "ast.h"
 #include "tokenizer.h"
 
-typedef enum operator_kind {
-    operator_kind_infix,
-    operator_kind_assign,
-    operator_kind_postfix,
-} operator_kind_t;
+enum operator_kind {
+    OPERATOR_INFIX,
+    OPERATOR_ASSIGN,
+    OPERATOR_POSTFIX,
+};
 
-typedef struct operator{
-    operator_kind_t kind;
-    token_kind_t token_kind;
+struct operator{
+    enum operator_kind kind;
+    enum token_kind token_kind;
     int8_t lbp;
     int8_t rbp;
     uint8_t op;
-    ast_node_kind_t node_kind;
-}operator_t;
+    enum ast_node_kind node_kind;
+};
 
-typedef struct parser {
+struct parser {
     const char* source;
     const char* filename;
     uint32_t pos;
-    token_t* cur_token;
-    token_t* token_list;
-    arena_t allocator;
-} parser_t;
+    struct token* cur_token;
+    struct token* token_list;
+    struct arena allocator;
+};
 
-ast_program_t parse_program(const char* filename, const char* source);
+struct ast_program parse_program(const char* filename, const char* source);
