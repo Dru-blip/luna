@@ -260,7 +260,7 @@ static void dict_resize(struct lu_dict* dict, size_t capacity) {
 
 struct lu_value lu_dict_get(struct lu_dict* dict, struct lu_value key) {
     if (dict->capacity == 0) {
-        return LUVALUE_NULL;
+        return LUVALUE_UNDEFINED;
     }
     size_t hash = hash_value(key);
     size_t index = hash & (dict->capacity - 1);
@@ -272,7 +272,7 @@ struct lu_value lu_dict_get(struct lu_dict* dict, struct lu_value key) {
         }
         chain = chain->next;
     }
-    return LUVALUE_NULL;
+    return LUVALUE_UNDEFINED;
 }
 
 void lu_dict_put(struct lu_istate* state, struct lu_dict* dict,
@@ -343,7 +343,6 @@ struct lu_string* lu_string_new(struct lu_istate* state, char* str) {
 }
 
 // Error api
-
 struct lu_error* lu_error_new(struct lu_istate* state, const char* name,
                               const char* message, const char* traceback) {
     struct lu_error* err = (struct lu_error*)heap_allocate_object(

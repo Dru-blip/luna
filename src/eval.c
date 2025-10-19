@@ -123,6 +123,22 @@ static void end_scope(struct lu_istate* state) {
     free(scope);
 }
 
+static inline void set_variable(struct lu_istate* state, struct lu_value name,
+                                struct lu_value value) {
+    struct scope* scope = state->context_stack->scope;
+    while (scope) {
+        if (lu_dict_get(scope->symbols, name).type != VALUE_UNDEFINED) {
+            break;
+        }
+        scope = scope->parent;
+    }
+    if (scope) {
+        lu_dict_put(state, scope->symbols, name, value);
+    } else {
+        lu_dict_put(state, state->context_stack->scope->symbols, name, value);
+    }
+}
+
 static inline struct lu_klass* lu_get_class(struct lu_istate* state,
                                             struct lu_value* value) {
     // TODO: handle remaining cases
@@ -135,6 +151,16 @@ static inline struct lu_klass* lu_get_class(struct lu_istate* state,
         }
     }
     return nullptr;
+}
+
+struct lu_string* get_identifier(struct lu_istate* state, struct span* span) {
+    const size_t len = span->end - span->start;
+    char* buffer = malloc(len + 1);
+    memcpy(buffer, state->context_stack->program.source + span->start, len);
+    buffer[len] = '\0';
+    struct lu_string* str = lu_string_new(state, buffer);
+    free(buffer);
+    return str;
 }
 
 static enum signal_kind eval_stmts(struct lu_istate* state,
@@ -213,6 +239,16 @@ static struct lu_value eval_expr(struct lu_istate* state,
             args[0].value = lhs;
             args[1].value = rhs;
             return method->native_func(state, method, args);
+        }
+        case AST_NODE_ASSIGN: {
+            struct lu_value value = eval_expr(state, expr->data.binop.rhs);
+            if (state->op_result == OP_RESULT_RAISED_ERROR) {
+                return LUVALUE_NULL;
+            }
+            struct lu_string* name =
+                get_identifier(state, &expr->data.binop.lhs->span);
+            set_variable(state, LUVALUE_OBJ(name), value);
+            return value;
         }
         default: {
             break;
