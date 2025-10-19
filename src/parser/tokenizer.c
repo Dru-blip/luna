@@ -1,4 +1,4 @@
-#include "parser/tokenizer.h"
+#include "tokenizer.h"
 
 #include <ctype.h>
 #include <stdio.h>

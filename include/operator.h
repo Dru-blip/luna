@@ -43,13 +43,13 @@ enum postfix_op {
 };
 
 static const char* binary_op_labels[] = {
-    "+",  "-",  "*", "/",  "%",
+    "add",  "sub", "mul", "div", "mod",
 
-    ">",  ">=", "<", "<=",
+    "gt",   "gte", "lt",  "lte",
 
-    "==", "!=",
+    "eq",   "neq",
 
-    "<<", ">>",
+    "shl",  "shr",
 
-    "&&", "||",
+    "land", "lor",
 };

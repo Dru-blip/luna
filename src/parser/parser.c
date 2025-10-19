@@ -1,14 +1,14 @@
-#include "parser/parser.h"
+#include "parser.h"
 
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "arena.h"
+#include "ast.h"
 #include "operator.h"
-#include "parser/ast.h"
-#include "parser/tokenizer.h"
 #include "stb_ds.h"
+#include "tokenizer.h"
 
 static struct ast_node* parse_stmt(struct parser* parser);
 static void parse_param_list(struct parser* parser, struct ast_node*** params);
