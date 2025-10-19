@@ -53,7 +53,7 @@ struct argument {
 };
 
 typedef void (*finalize_func_t)(struct lu_object*);
-typedef struct lu_value (*native_func_t)(struct lu_istate*, struct lu_value*,
+typedef struct lu_value (*native_func_t)(struct lu_istate*, struct lu_object*,
                                          struct argument*);
 
 struct lu_klass {
@@ -185,3 +185,6 @@ static inline struct lu_value luvalue_false() {
 }
 
 bool lu_value_equal(struct lu_value a, struct lu_value b);
+
+struct lu_value lu_raise_error(struct lu_istate* state, const char* name,
+                               const char* message);

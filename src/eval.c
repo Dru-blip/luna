@@ -178,10 +178,11 @@ static struct lu_value eval_expr(struct lu_istate* state,
                 return LUVALUE_NULL;
             }
 
-            struct argument arg;
+            struct argument args[2];
             struct lu_function* method = method_val.obj;
-            arg.value = rhs;
-            return method->native_func(state, &lhs, &arg);
+            args[0].value = lhs;
+            args[1].value = rhs;
+            return method->native_func(state, method, args);
         }
         default: {
             break;

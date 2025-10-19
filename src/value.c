@@ -52,6 +52,8 @@ void sb_null_terminate(struct string_buffer* sb) {
     sb->data[sb->len] = '\0';
 }
 
+//
+
 void lu_init_core_klasses(struct lu_istate* state) {
     state->base_object = lu_klass_new(state, "Object");
     state->base_class =
@@ -73,6 +75,13 @@ void lu_init_core_klasses(struct lu_istate* state) {
     state->int_class->methods = lu_dict_new(state);
     state->str_class->methods = lu_dict_new(state);
     state->error_class->methods = lu_dict_new(state);
+
+    state->base_object->name = lu_string_new(state, "Object");
+    state->base_class->name = lu_string_new(state, "Class");
+    state->int_class->name = lu_string_new(state, "Int");
+    state->str_class->name = lu_string_new(state, "Str");
+    state->function_class->name = lu_string_new(state, "Function");
+    state->error_class->name = lu_string_new(state, "Error");
 
     lu_integer_bind_methods(state);
 }
@@ -324,7 +333,7 @@ struct lu_string* lu_string_new(struct lu_istate* state, char* str) {
     string->type = OBJECT_STRING;
     string->klass = state->str_class;
     string->length = strlen(str);
-    string->data = str;
+    string->data = strdup(str);
     string->hash = str_hash(string);
     return string;
 }
@@ -368,4 +377,11 @@ struct lu_error* lu_error_new_printf(struct lu_istate* state, const char* name,
     free(buf);
 
     return e;
+}
+
+struct lu_value lu_raise_error(struct lu_istate* state, const char* name,
+                               const char* message) {
+    state->exception = lu_error_new(state, name, message, NULL);
+    state->op_result = OP_RESULT_RAISED_ERROR;
+    return LUVALUE_NULL;
 }
