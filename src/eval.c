@@ -153,22 +153,34 @@ static struct lu_value eval_expr(struct lu_istate* state,
         }
         case AST_NODE_BINOP: {
             struct lu_value lhs = eval_expr(state, expr->data.binop.lhs);
+            if (state->op_result == OP_RESULT_RAISED_ERROR) {
+                return LUVALUE_NULL;
+            }
             struct lu_value rhs = eval_expr(state, expr->data.binop.rhs);
-
+            if (state->op_result == OP_RESULT_RAISED_ERROR) {
+                return LUVALUE_NULL;
+            }
             struct lu_klass* klass = lu_get_class(state, &lhs);
-
             struct lu_value method_val =
                 lu_dict_get(klass->methods,
-                            LUVALUE_OBJ(lu_string_new(
+                            LUVALUE_OBJ((struct lu_object*)lu_string_new(
                                 state, binary_op_labels[expr->data.binop.op])));
             if (method_val.type == VALUE_NULL) {
+                state->op_result = OP_RESULT_RAISED_ERROR;
+                state->exception = lu_error_new_printf(
+                    state, "TypeError",
+                    "Unsupported operation '%s' on type '%s'",
+                    binary_op_labels[expr->data.binop.op], klass->dbg_name);
+                // state->exception = lu_error_new(
+                //     state, "TypeError",
+                //     "Unsupported operation '%s' on type '%s'", nullptr);
+
                 return LUVALUE_NULL;
             }
 
             struct argument arg;
             struct lu_function* method = method_val.obj;
             arg.value = rhs;
-
             return method->native_func(state, &lhs, &arg);
         }
         default: {
@@ -182,7 +194,6 @@ static enum signal_kind eval_stmt(struct lu_istate* state,
     switch (stmt->kind) {
         case AST_NODE_EXPR_STMT: {
             struct lu_value res = eval_expr(state, stmt->data.node);
-            printf("%ld\n", res.integer);
             if (state->op_result == OP_RESULT_RAISED_ERROR) {
                 return SIGNAL_ERROR;
             }
@@ -210,6 +221,7 @@ void lu_eval_program(struct lu_istate* state) {
     enum signal_kind signal =
         eval_stmts(state, state->context_stack->program.nodes);
     if (signal == SIGNAL_ERROR) {
+        printf("%s\n", state->exception->message->data);
         // printf("Error: %s at line %ld\n", err->message, err->line);
     }
 }

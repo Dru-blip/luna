@@ -49,9 +49,11 @@ struct lu_istate {
     struct lu_klass* str_class;
     struct lu_klass* dict_class;
     struct lu_klass* function_class;
+    struct lu_klass* error_class;
     struct heap* heap;
     struct execution_context* context_stack;
     enum op_result_kind op_result;
+    struct lu_error* exception;
 };
 
 struct lu_istate* lu_istate_new(void);

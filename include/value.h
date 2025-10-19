@@ -28,6 +28,7 @@ enum lu_object_type {
     OBJECT_KLASS,
     OBJECT_DICT,
     OBJECT_FUNC,
+    OBJECT_ERROR,
 };
 
 enum lu_object_state {
@@ -63,6 +64,11 @@ struct lu_klass {
     char* dbg_name;
 };
 
+struct string_buffer {
+    size_t capacity, len;
+    char* data;
+};
+
 struct lu_string {
     LUNA_OBJECT_HEADER;
     size_t length;
@@ -94,6 +100,13 @@ struct lu_function {
     native_func_t native_func;
 };
 
+struct lu_error {
+    LUNA_OBJECT_HEADER;
+    struct lu_string* name;
+    struct lu_string* message;
+    struct lu_string* traceback;
+};
+
 struct lu_istate;
 
 static inline void lu_klass_default_finalize(struct lu_object* obj) {}
@@ -104,6 +117,13 @@ struct lu_klass* lu_klass_new_with_super(struct lu_istate* state,
                                          const char* name,
                                          struct lu_klass* super);
 // string creation
+
+void sb_init(struct string_buffer* sb);
+void sb_append_bytes(struct string_buffer* sb, const void* src, size_t len);
+void sb_append_str(struct string_buffer* sb, const char* str, size_t str_len);
+void sb_append_char(struct string_buffer* sb, char c);
+void sb_append_double(struct string_buffer* sb, double value);
+void sb_null_terminate(struct string_buffer* sb);
 
 struct lu_string* lu_string_new(struct lu_istate* state, char* str);
 
@@ -122,8 +142,15 @@ void lu_bind_function(struct lu_istate* state, struct lu_klass* klass,
                       char* name, struct lu_function* func);
 
 // Integer class methods
-
 void lu_integer_bind_methods(struct lu_istate* state);
+
+// Error api
+struct lu_error* lu_error_new(struct lu_istate* state, const char* name,
+                              const char* message, const char* traceback);
+
+struct lu_error* lu_error_new_printf(struct lu_istate* state, const char* name,
+                                     const char* fmt, ...);
+void lu_error_bind_methods(struct lu_istate* state);
 
 // utilities
 #define LUVALUE_NULL ((struct lu_value){.type = VALUE_NULL})

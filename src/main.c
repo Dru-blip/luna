@@ -1,6 +1,5 @@
-
-
 #include "eval.h"
+
 int main(int argc, char* argv[]) {
     //
     struct lu_istate* state = lu_istate_new();

@@ -1,6 +1,8 @@
 #include "value.h"
 
+#include <stdarg.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -9,6 +11,46 @@
 
 #define LU_DICT_LOAD_FACTOR 0.7
 #define LU_DICT_MIN_CAPACITY 16
+
+void sb_init(struct string_buffer* sb) {
+    sb->capacity = 128;
+    sb->len = 0;
+    sb->data = malloc(sb->capacity);
+}
+
+static void sb_grow(struct string_buffer* sb, size_t extra) {
+    size_t required = sb->len + extra;
+    if (required > sb->capacity) {
+        while (sb->capacity < required) sb->capacity *= 2;
+        // TODO: maybe check for allocation failure.
+        sb->data = realloc(sb->data, sb->capacity);
+    }
+}
+
+void sb_append_bytes(struct string_buffer* sb, const void* src, size_t len) {
+    sb_grow(sb, len);
+    memcpy(sb->data + sb->len, src, len);
+    sb->len += len;
+}
+
+void sb_append_str(struct string_buffer* sb, const char* str, size_t str_len) {
+    sb_append_bytes(sb, str, str_len);
+}
+
+void sb_append_char(struct string_buffer* sb, char c) {
+    sb_append_bytes(sb, &c, 1);
+}
+
+void sb_append_double(struct string_buffer* sb, double value) {
+    char buffer[64];
+    int written = snprintf(buffer, sizeof(buffer), "%g", value);
+    if (written > 0) sb_append_bytes(sb, buffer, written);
+}
+
+void sb_null_terminate(struct string_buffer* sb) {
+    sb_grow(sb, 1);
+    sb->data[sb->len] = '\0';
+}
 
 void lu_init_core_klasses(struct lu_istate* state) {
     state->base_object = lu_klass_new(state, "Object");
@@ -22,11 +64,15 @@ void lu_init_core_klasses(struct lu_istate* state) {
     state->function_class =
         lu_klass_new_with_super(state, "Function", state->base_class);
 
+    state->error_class =
+        lu_klass_new_with_super(state, "Error", state->base_class);
+
     state->base_object->methods = lu_dict_new(state);
     state->base_class->methods = lu_dict_new(state);
     state->dict_class->methods = lu_dict_new(state);
     state->int_class->methods = lu_dict_new(state);
     state->str_class->methods = lu_dict_new(state);
+    state->error_class->methods = lu_dict_new(state);
 
     lu_integer_bind_methods(state);
 }
@@ -281,4 +327,45 @@ struct lu_string* lu_string_new(struct lu_istate* state, char* str) {
     string->data = str;
     string->hash = str_hash(string);
     return string;
+}
+
+// Error api
+
+struct lu_error* lu_error_new(struct lu_istate* state, const char* name,
+                              const char* message, const char* traceback) {
+    struct lu_error* err = (struct lu_error*)heap_allocate_object(
+        state->heap, sizeof(struct lu_error));
+
+    err->name = name ? lu_string_new(state, strdup(name)) : nullptr;
+    err->message = message ? lu_string_new(state, strdup(message)) : nullptr;
+    err->traceback =
+        traceback ? lu_string_new(state, strdup(traceback)) : nullptr;
+
+    return err;
+}
+
+struct lu_error* lu_error_new_printf(struct lu_istate* state, const char* name,
+                                     const char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+
+    va_list ap_copy;
+    va_copy(ap_copy, ap);
+
+    int needed = vsnprintf(NULL, 0, fmt, ap_copy);
+    va_end(ap_copy);
+
+    char* buf = malloc((size_t)needed + 1);
+    if (!buf) {
+        va_end(ap);
+        return NULL;
+    }
+
+    vsnprintf(buf, (size_t)needed + 1, fmt, ap);
+    va_end(ap);
+
+    struct lu_error* e = lu_error_new(state, name, buf, NULL);
+    free(buf);
+
+    return e;
 }
