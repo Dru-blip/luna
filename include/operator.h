@@ -53,3 +53,9 @@ static const char* binary_op_labels[] = {
 
     "land", "lor",
 };
+
+static const char* unary_op_labels[] = {
+    "plus",
+    "negate",
+    "lnot",
+};

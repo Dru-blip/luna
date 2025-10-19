@@ -241,8 +241,12 @@ static void dict_resize(struct lu_dict* dict, size_t capacity) {
 
     if (dict->capacity > 0) {
         for (size_t i = 0; i < dict->capacity; i++) {
-            struct lu_dict_entry* entry = dict->entries[i];
-            dict_add_entry(new_entries, new_capacity, entry->key, entry->value);
+            struct lu_dict_entry* chain = dict->entries[i];
+            while (chain) {
+                dict_add_entry(new_entries, new_capacity, chain->key,
+                               chain->value);
+                chain = chain->next;
+            }
         }
     }
 

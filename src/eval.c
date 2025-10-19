@@ -98,7 +98,7 @@ struct call_frame* pop_call_frame(struct execution_context* ctx) {
 
 struct scope* new_scope(struct lu_istate* state, struct scope* parent) {
     struct scope* scope = calloc(1, sizeof(struct scope));
-    // scope->values = lu_hashmap_new(state);
+    scope->symbols = lu_dict_new(state);
     scope->depth = parent ? parent->depth + 1 : 0;
     scope->parent = parent;
     return scope;
@@ -151,6 +151,39 @@ static struct lu_value eval_expr(struct lu_istate* state,
         case AST_NODE_BOOL: {
             return expr->data.int_val ? LUVALUE_TRUE : LUVALUE_FALSE;
         }
+        case AST_NODE_UNOP: {
+            struct lu_value argument =
+                eval_expr(state, expr->data.unop.argument);
+
+            if (state->op_result == OP_RESULT_RAISED_ERROR) {
+                return LUVALUE_NULL;
+            }
+
+            struct lu_klass* klass = lu_get_class(state, &argument);
+            if (!klass) {
+                // TODO: handle other klasses
+            }
+
+            struct lu_value method_val =
+                lu_dict_get(klass->methods,
+                            LUVALUE_OBJ((struct lu_object*)lu_string_new(
+                                state, unary_op_labels[expr->data.unop.op])));
+
+            if (method_val.type == VALUE_NULL) {
+                state->op_result = OP_RESULT_RAISED_ERROR;
+                state->exception = lu_error_new_printf(
+                    state, "TypeError",
+                    "Unsupported operation '%s' on type '%s'",
+                    unary_op_labels[expr->data.unop.op], klass->dbg_name);
+
+                return LUVALUE_NULL;
+            }
+
+            struct argument arg;
+            struct lu_function* method = method_val.obj;
+            arg.value = argument;
+            return method->native_func(state, method, &arg);
+        }
         case AST_NODE_BINOP: {
             struct lu_value lhs = eval_expr(state, expr->data.binop.lhs);
             if (state->op_result == OP_RESULT_RAISED_ERROR) {
@@ -171,9 +204,6 @@ static struct lu_value eval_expr(struct lu_istate* state,
                     state, "TypeError",
                     "Unsupported operation '%s' on type '%s'",
                     binary_op_labels[expr->data.binop.op], klass->dbg_name);
-                // state->exception = lu_error_new(
-                //     state, "TypeError",
-                //     "Unsupported operation '%s' on type '%s'", nullptr);
 
                 return LUVALUE_NULL;
             }

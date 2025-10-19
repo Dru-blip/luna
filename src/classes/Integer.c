@@ -52,6 +52,16 @@ LU_INT_COMPARE(lu_int_gte, >=);
 LU_INT_COMPARE(lu_int_eq, ==);
 LU_INT_COMPARE(lu_int_neq, !=);
 
+struct lu_value lu_int_negate(struct lu_istate* state, struct lu_object* self,
+                              struct argument* args) {
+    return LUVALUE_INT(-args[0].value.integer);
+}
+
+struct lu_value lu_int_lnot(struct lu_istate* state, struct lu_object* self,
+                            struct argument* args) {
+    return args[0].value.integer ? LUVALUE_FALSE : LUVALUE_TRUE;
+}
+
 struct lu_value lu_int_to_str(struct lu_istate* state, struct lu_object* self,
                               struct argument* args) {
     //
@@ -95,4 +105,10 @@ void lu_integer_bind_methods(struct lu_istate* state) {
 
     lu_bind_function(state, state->int_class, "to_str",
                      lu_native_function_new(state, lu_int_to_str));
+
+    lu_bind_function(state, state->int_class, "negate",
+                     lu_native_function_new(state, lu_int_negate));
+
+    lu_bind_function(state, state->int_class, "lnot",
+                     lu_native_function_new(state, lu_int_lnot));
 }
