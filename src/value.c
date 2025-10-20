@@ -5,61 +5,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "eval.h"
 #include "heap.h"
 
-#define LU_DICT_LOAD_FACTOR 0.7
-#define LU_DICT_MIN_CAPACITY 16
-
-// void sb_init(struct string_buffer* sb) {
-//     sb->capacity = 128;
-//     sb->len = 0;
-//     sb->data = malloc(sb->capacity);
-// }
-
-// static void sb_grow(struct string_buffer* sb, size_t extra) {
-//     size_t required = sb->len + extra;
-//     if (required > sb->capacity) {
-//         while (sb->capacity < required) sb->capacity *= 2;
-//         // TODO: maybe check for allocation failure.
-//         sb->data = realloc(sb->data, sb->capacity);
-//     }
-// }
-
-// void sb_append_bytes(struct string_buffer* sb, const void* src, size_t len) {
-//     sb_grow(sb, len);
-//     memcpy(sb->data + sb->len, src, len);
-//     sb->len += len;
-// }
-
-// void sb_append_str(struct string_buffer* sb, const char* str, size_t str_len) {
-//     sb_append_bytes(sb, str, str_len);
-// }
-
-// void sb_append_char(struct string_buffer* sb, char c) {
-//     sb_append_bytes(sb, &c, 1);
-// }
-
-// void sb_append_double(struct string_buffer* sb, double value) {
-//     char buffer[64];
-//     int written = snprintf(buffer, sizeof(buffer), "%g", value);
-//     if (written > 0) sb_append_bytes(sb, buffer, written);
-// }
-
-// void sb_null_terminate(struct string_buffer* sb) {
-//     sb_grow(sb, 1);
-//     sb->data[sb->len] = '\0';
-// }
-
-// //
-
-// bool lu_value_equal(struct lu_value a, struct lu_value b) {
-//     if (a.type != b.type) return false;
-//     if (a.type == VALUE_INTEGER) return a.integer == b.integer;
-//     if (a.type != VALUE_OBJECT && b.type != VALUE_OBJECT) return false;
-//     return a.obj == b.obj;
-// }
+#define LU_PROPERTY_MAP_LOAD_FACTOR 0.7
+#define LU_PROPERTY_MAP_MIN_CAPACITY 16
 
 // // Dict implementation
 // #define FNV_OFFSET 14695981039346656037UL
@@ -105,135 +57,133 @@
 //     }
 // }
 
-// static size_t hash_value(struct lu_value value) {
-//     switch (value.type) {
-//         case VALUE_TRUE: {
-//             return 1;
-//         }
-//         case VALUE_NULL: {
-//             return 2;
-//         }
-//         case VALUE_INTEGER: {
-//             return hash_integer(value.integer);
-//         }
-//         case VALUE_OBJECT: {
-//             return hash_object(value.obj);
-//         }
-//         default: {
-//             return 0;
-//         }
-//     }
-// }
+static void lu_object_finalize(struct lu_object* obj) {
+    lu_property_map_deinit(&obj->properties);
+}
 
-// struct lu_dict* lu_dict_new(struct lu_istate* state) {
-//     struct lu_dict* dict =
-//         heap_allocate_object(state->heap, sizeof(struct lu_dict));
-//     dict->capacity = 0;
-//     dict->size = 0;
-//     dict->entries = nullptr;
-//     return dict;
-// }
+static void lu_object_visit(struct lu_object* obj) {}
 
-// static bool dict_add_entry(struct lu_dict_entry** entries, size_t capacity,
-//                            struct lu_value key, struct lu_value value) {
-//     size_t hash = hash_value(key);
-//     size_t index = hash & (capacity - 1);
+static struct lu_object_vtable lu_object_default_vtable = {
+    .finalize = lu_object_finalize,
+    .visit = lu_object_visit,
+};
 
-//     struct lu_dict_entry* chain = entries[index];
-//     while (chain) {
-//         if (lu_value_equal(chain->key, key)) {
-//             chain->value = value;
-//             return false;
-//         }
-//         chain = chain->next;
-//     }
+bool lu_string_equal(struct lu_string* a, struct lu_string* b) {
+    if (a == b) return true;
+    if (a->length != b->length) return false;
 
-//     struct lu_dict_entry* new_entry = malloc(sizeof(struct lu_dict_entry));
-//     new_entry->key = key;
-//     new_entry->value = value;
-//     new_entry->next = new_entry->prev = nullptr;
+    if (a->type == STRING_SMALL && b->type == STRING_SMALL) {
+        return memcmp(a->Sms, b->Sms, a->length) == 0;
+    }
 
-//     if (entries[index]) {
-//         new_entry->next = entries[index];
-//         entries[index]->prev = new_entry;
-//     }
-//     entries[index] = new_entry;
+    return strcmp(a->data, b->data);
+}
 
-//     return true;
-// }
+void lu_property_map_init(struct property_map* map, size_t capacity) {
+    map->capacity = capacity;
+    map->size = 0;
+    map->entries = calloc(capacity, sizeof(struct property_map_entry));
 
-// static void dict_resize(struct lu_dict* dict, size_t capacity) {
-//     size_t new_capacity = capacity;
-//     struct lu_dict_entry** new_entries =
-//         calloc(new_capacity, sizeof(struct lu_dict_entry*));
+    for (size_t i = 0; i < capacity; i++) {
+        map->entries[i].occupied = false;
+    }
+}
 
-//     if (dict->capacity > 0) {
-//         for (size_t i = 0; i < dict->capacity; i++) {
-//             struct lu_dict_entry* chain = dict->entries[i];
-//             while (chain) {
-//                 dict_add_entry(new_entries, new_capacity, chain->key,
-//                                chain->value);
-//                 chain = chain->next;
-//             }
-//         }
-//     }
+void lu_property_map_deinit(struct property_map* map) {
+    map->size = 0;
+    map->capacity = 0;
+    free(map->entries);
+}
 
-//     if (dict->entries) {
-//         free(dict->entries);
-//     }
+static bool lu_property_map_add_entry(struct property_map_entry* entries,
+                                      size_t capacity, struct lu_string* key,
+                                      struct lu_value value) {
+    size_t index = key->hash & (capacity - 1);
 
-//     dict->entries = new_entries;
-//     dict->capacity = new_capacity;
-// }
+    size_t current_psl = 0;
+    struct property_map_entry entry = {
+        .key = key, .value = value, .occupied = true};
 
-// struct lu_value lu_dict_get(struct lu_dict* dict, struct lu_value key) {
-//     if (dict->capacity == 0) {
-//         return LUVALUE_UNDEFINED;
-//     }
-//     size_t hash = hash_value(key);
-//     size_t index = hash & (dict->capacity - 1);
+    while (true) {
+        if (!entries[index].occupied) {
+            entries[index] = entry;
+            return true;
+        }
 
-//     struct lu_dict_entry* chain = dict->entries[index];
-//     while (chain) {
-//         if (lu_value_equal(chain->key, key)) {
-//             return chain->value;
-//         }
-//         chain = chain->next;
-//     }
-//     return LUVALUE_UNDEFINED;
-// }
+        struct property_map_entry c_entry = entries[index];
 
-// void lu_dict_put(struct lu_istate* state, struct lu_dict* dict,
-//                  struct lu_value key, struct lu_value value) {
-//     if (((float)(dict->size + 1) / dict->capacity) >= LU_DICT_LOAD_FACTOR) {
-//         size_t new_capacity = dict->capacity * 2 > LU_DICT_MIN_CAPACITY
-//                                   ? dict->capacity * 2
-//                                   : LU_DICT_MIN_CAPACITY;
-//         dict_resize(dict, new_capacity);
-//     }
+        if (lu_string_equal(entry.key, c_entry.key)) {
+            entries[index].value = value;
+            return false;
+        }
 
-//     if (dict_add_entry(dict->entries, dict->capacity, key, value)) {
-//         dict->size++;
-//     };
-// }
+        if (c_entry.psl > current_psl) {
+            struct property_map_entry tmp = c_entry;
+            entry.psl = current_psl;
+            entries[index] = entry;
+            entry = tmp;
+            current_psl = entry.psl;
+        }
 
-// struct lu_value lu_dict_remove(struct lu_dict* dict, struct lu_value key) {
-//     size_t hash = hash_value(key);
-//     size_t index = hash & (dict->capacity - 1);
+        index = (index + 1) & (capacity - 1);
+        current_psl++;
+    }
+}
 
-//     struct lu_dict_entry* chain = dict->entries[index];
+static void property_map_resize(struct property_map* map, size_t capacity) {
+    size_t new_capacity = capacity;
+    struct property_map_entry* new_entries =
+        calloc(new_capacity, sizeof(struct property_map_entry));
 
-//     while (chain) {
-//         if (lu_value_equal(chain->key, key)) {
-//             struct lu_value value = chain->value;
-//             struct lu_dict_entry* prev = chain->prev;
-//             prev->next = chain->next;
-//             prev->next->prev = prev;
-//             free(chain);
-//             dict->size--;
-//             return value;
-//         }
-//         chain = chain->next;
-//     }
-//     return LUVALUE_NULL;
-// }
+    for (size_t i = 0; i < map->capacity; i++) {
+        struct property_map_entry* entry = &map->entries[i];
+        if (entry->occupied) {
+            lu_property_map_add_entry(new_entries, new_capacity, entry->key,
+                                      entry->value);
+        }
+    }
+
+    free(map->entries);
+    map->entries = new_entries;
+    map->capacity = new_capacity;
+}
+
+void lu_property_map_set(struct property_map* map, struct lu_string* key,
+                         struct lu_value value) {
+    if (((float)(map->size + 1) / map->capacity) >=
+        LU_PROPERTY_MAP_LOAD_FACTOR) {
+        size_t new_capacity = map->capacity * 2;
+        property_map_resize(map, new_capacity);
+    }
+    if (lu_property_map_add_entry(map->entries, map->capacity, key, value)) {
+        map->size++;
+    };
+}
+struct lu_value lu_property_map_get(struct property_map* map,
+                                    struct lu_string* key) {
+    size_t index = (key->hash) & (map->capacity - 1);
+    size_t current_psl = 0;
+
+    while (map->entries[index].occupied) {
+        struct property_map_entry* entry = &map->entries[index];
+        if (lu_string_equal(entry->key, key)) {
+            return map->entries[index].value;
+        }
+        if (current_psl > entry->psl) {
+            return lu_value_none();
+        }
+        current_psl++;
+        index = (index + 1) % map->capacity;
+    }
+
+    return lu_value_none();
+}
+void lu_property_map_remove(struct property_map* map, struct lu_string* key) {}
+
+struct lu_object* lu_object_new(struct lu_istate* state) {
+    struct lu_object* obj =
+        heap_allocate_object(state->heap, sizeof(struct lu_object));
+    lu_property_map_init(&obj->properties, 4);
+    obj->vtable = &lu_object_default_vtable;
+    return obj;
+}
