@@ -19,6 +19,8 @@ enum ast_node_kind {
     AST_NODE_PARAM,
     AST_NODE_CALL,
 
+    AST_NODE_MEMBER_EXPR,
+
     AST_NODE_EXPR_STMT,
     AST_NODE_RETURN,
     AST_NODE_BLOCK,
@@ -54,6 +56,12 @@ struct ast_call {
     struct ast_node** args;
 };
 
+struct ast_member_expr {
+    bool is_computed;
+    struct ast_node* object;
+    struct span property_name;
+};
+
 struct ast_if_stmt {
     struct ast_node* test;
     struct ast_node* consequent;
@@ -81,6 +89,7 @@ union ast_node_data {
     struct ast_unop unop;
     struct ast_binop binop;
     struct ast_call call;
+    struct ast_member_expr member_expr;
     struct ast_if_stmt if_stmt;
     struct ast_node** list;
     struct ast_for_stmt for_stmt;

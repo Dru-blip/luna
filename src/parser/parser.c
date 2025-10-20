@@ -39,6 +39,7 @@ static struct operator operators[] = {
     {OPERATOR_INFIX, TOKEN_MODULUS, 55, 56, OP_MOD, AST_NODE_BINOP},
 
     {OPERATOR_POSTFIX, TOKEN_LPAREN, 99, 100, OP_CALL, AST_NODE_CALL},
+    {OPERATOR_POSTFIX, TOKEN_DOT, 99, 100, OP_MEMBER, AST_NODE_MEMBER_EXPR},
 };
 
 static const uint32_t operator_table_len =
@@ -186,6 +187,18 @@ static struct ast_node* parse_postfix_expression(struct parser* parser,
         };
         return call;
     }
+    if (op == OP_MEMBER) {
+        struct token* property_token = parse_expected(parser, TOKEN_IDENTIFIER);
+        struct ast_node* member_expr =
+            make_node(parser, AST_NODE_MEMBER_EXPR, &token->span);
+        member_expr->data.member_expr = (struct ast_member_expr){
+            .is_computed = false,
+            .object = lhs,
+            .property_name = property_token->span,
+        };
+        return member_expr;
+    }
+
     return lhs;
 }
 
@@ -325,7 +338,7 @@ static struct ast_node* parse_fn_decl(struct parser* parser) {
     struct ast_node** params = nullptr;
     parse_param_list(parser, &params);
     struct ast_node* body = parse_stmt(parser);
-    struct ast_node* node = make_node(parser, AST_NODE_FN_DECL, &id->span);
+    struct ast_node* node = make_node(parser, AST_NODE_FN_DECL, &token->span);
     node->data.fn_decl = (struct ast_fn_decl){
         .name_span = id->span,
         .params = params,

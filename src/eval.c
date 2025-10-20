@@ -34,8 +34,6 @@ struct lu_istate* lu_istate_new() {
     state->heap = heap_create(state);
     state->context_stack = nullptr;
 
-    lu_init_core_klasses(state);
-
     return state;
 }
 
@@ -98,7 +96,7 @@ struct call_frame* pop_call_frame(struct execution_context* ctx) {
 
 struct scope* new_scope(struct lu_istate* state, struct scope* parent) {
     struct scope* scope = calloc(1, sizeof(struct scope));
-    scope->symbols = lu_dict_new(state);
+    // scope->symbols = lu_dict_new(state);
     scope->depth = parent ? parent->depth + 1 : 0;
     scope->parent = parent;
     return scope;
@@ -123,132 +121,180 @@ static void end_scope(struct lu_istate* state) {
     free(scope);
 }
 
-static inline void set_variable(struct lu_istate* state, struct lu_value name,
-                                struct lu_value value) {
-    struct scope* scope = state->context_stack->scope;
-    while (scope) {
-        if (lu_dict_get(scope->symbols, name).type != VALUE_UNDEFINED) {
-            break;
-        }
-        scope = scope->parent;
-    }
-    if (scope) {
-        lu_dict_put(state, scope->symbols, name, value);
-    } else {
-        lu_dict_put(state, state->context_stack->scope->symbols, name, value);
-    }
-}
-
-static inline struct lu_klass* lu_get_class(struct lu_istate* state,
-                                            struct lu_value* value) {
-    // TODO: handle remaining cases
-    switch (value->type) {
-        case VALUE_INTEGER: {
-            return state->int_class;
-        }
-        case VALUE_OBJECT: {
-            return value->obj->klass;
-        }
-    }
-    return nullptr;
-}
-
-struct lu_string* get_identifier(struct lu_istate* state, struct span* span) {
-    const size_t len = span->end - span->start;
-    char* buffer = malloc(len + 1);
-    memcpy(buffer, state->context_stack->program.source + span->start, len);
-    buffer[len] = '\0';
-    struct lu_string* str = lu_string_new(state, buffer);
-    free(buffer);
-    return str;
-}
-
 static enum signal_kind eval_stmts(struct lu_istate* state,
                                    struct ast_node** stmts);
 static enum signal_kind eval_stmt(struct lu_istate* state,
                                   struct ast_node* stmt);
 
+typedef struct lu_value (*binaryfunc)(struct lu_istate* state, struct lu_value*,
+                                      struct lu_value*);
+typedef struct lu_value (*coerce_fn)(struct lu_value*);
+typedef struct lu_value (*unaryfunc)(struct lu_value*);
+
+struct type_promotion {
+    enum lu_value_type result_type;
+    coerce_fn coerce_lhs;
+    coerce_fn coerce_rhs;
+};
+
+struct lu_value coerce_identity(struct lu_value* v) { return *v; }
+struct lu_value coerce_bool_to_int(struct lu_value* v) {
+    return (struct lu_value){.type = VALUE_INTEGER, .integer = v->integer};
+}
+
+#define DEFINE_BINOP(TYPE, NAME, RESULT_TYPE, OP)                          \
+    struct lu_value lu_##TYPE##_##NAME(                                    \
+        struct lu_istate* state, struct lu_value* a, struct lu_value* b) { \
+        return (struct lu_value){.type = RESULT_TYPE,                      \
+                                 .integer = a->integer OP b->integer};     \
+    }
+
+DEFINE_BINOP(int, add, VALUE_INTEGER, +)
+DEFINE_BINOP(int, sub, VALUE_INTEGER, -)
+DEFINE_BINOP(int, mul, VALUE_INTEGER, *)
+
+DEFINE_BINOP(int, lt, VALUE_BOOL, <)
+DEFINE_BINOP(int, lte, VALUE_BOOL, <=)
+DEFINE_BINOP(int, gt, VALUE_BOOL, >)
+DEFINE_BINOP(int, gte, VALUE_BOOL, >=)
+DEFINE_BINOP(int, eq, VALUE_BOOL, ==);
+DEFINE_BINOP(int, neq, VALUE_BOOL, !=)
+DEFINE_BINOP(int, and, VALUE_BOOL, &&);
+DEFINE_BINOP(int, or, VALUE_BOOL, ||);
+
+DEFINE_BINOP(bool, add, VALUE_INTEGER, +)
+DEFINE_BINOP(bool, sub, VALUE_INTEGER, -)
+DEFINE_BINOP(bool, mul, VALUE_INTEGER, *)
+
+DEFINE_BINOP(bool, lt, VALUE_BOOL, <)
+DEFINE_BINOP(bool, lte, VALUE_BOOL, <=)
+DEFINE_BINOP(bool, gt, VALUE_BOOL, >)
+DEFINE_BINOP(bool, gte, VALUE_BOOL, >=)
+DEFINE_BINOP(bool, eq, VALUE_BOOL, ==)
+DEFINE_BINOP(bool, neq, VALUE_BOOL, !=)
+DEFINE_BINOP(bool, and, VALUE_BOOL, &&);
+DEFINE_BINOP(bool, or, VALUE_BOOL, ||);
+
+#define INVALID_PROMOTION      \
+    {                          \
+        .result_type = -1,     \
+        .coerce_lhs = nullptr, \
+        .coerce_rhs = nullptr, \
+    }
+
+struct type_promotion type_promotion_table[5][5] = {
+    [VALUE_BOOL] =
+        {
+            [VALUE_BOOL] =
+                {
+                    .result_type = VALUE_BOOL,
+                    .coerce_lhs = coerce_bool_to_int,
+                    .coerce_rhs = coerce_bool_to_int,
+                },
+            [VALUE_INTEGER] =
+                {
+                    .result_type = VALUE_INTEGER,
+                    .coerce_lhs = coerce_bool_to_int,
+                    .coerce_rhs = coerce_identity,
+                },
+            [VALUE_NONE] = INVALID_PROMOTION,
+            [VALUE_OBJECT] = INVALID_PROMOTION,
+        },
+
+    [VALUE_INTEGER] =
+        {
+            [VALUE_BOOL] =
+                {
+                    .result_type = VALUE_INTEGER,
+                    .coerce_lhs = coerce_identity,
+                    .coerce_rhs = coerce_bool_to_int,
+                },
+            [VALUE_INTEGER] =
+                {
+                    .result_type = VALUE_INTEGER,
+                    .coerce_lhs = coerce_identity,
+                    .coerce_rhs = coerce_identity,
+                },
+            [VALUE_NONE] = INVALID_PROMOTION,
+            [VALUE_OBJECT] = INVALID_PROMOTION,
+        },
+
+    [VALUE_NONE] =
+        {
+            [VALUE_INTEGER] = INVALID_PROMOTION,
+            [VALUE_BOOL] = INVALID_PROMOTION,
+            [VALUE_NONE] = {.result_type = VALUE_NONE,
+                            .coerce_lhs = coerce_identity,
+                            .coerce_rhs = coerce_identity},
+            [VALUE_OBJECT] = INVALID_PROMOTION,
+        },
+};
+
+static binaryfunc binop_dispatch_table[5][15] = {
+    [VALUE_INTEGER] =
+        {
+            [OP_ADD] = &lu_int_add,
+            [OP_SUB] = &lu_int_sub,
+            [OP_MUL] = &lu_int_mul,
+
+            [OP_LT] = &lu_int_lt,
+            [OP_GT] = &lu_int_gt,
+            [OP_LTE] = &lu_int_lte,
+            [OP_GTE] = &lu_int_gte,
+            [OP_EQ] = &lu_int_eq,
+            [OP_NEQ] = &lu_int_neq,
+            [OP_LAND] = &lu_int_and,
+            [OP_LOR] = &lu_int_or,
+
+        },
+    [VALUE_BOOL] =
+        {
+            [OP_ADD] = &lu_bool_add,
+            [OP_SUB] = &lu_bool_sub,
+            [OP_MUL] = &lu_bool_mul,
+
+            [OP_LT] = &lu_bool_lt,
+            [OP_GT] = &lu_bool_gt,
+            [OP_LTE] = &lu_bool_lte,
+            [OP_GTE] = &lu_bool_gte,
+            [OP_EQ] = &lu_bool_eq,
+            [OP_NEQ] = &lu_bool_neq,
+            [OP_LAND] = &lu_bool_and,
+            [OP_LOR] = &lu_bool_or,
+        },
+};
+
 static struct lu_value eval_expr(struct lu_istate* state,
                                  struct ast_node* expr) {
     switch (expr->kind) {
         case AST_NODE_INT: {
-            return LUVALUE_INT(expr->data.int_val);
+            return (struct lu_value){.type = VALUE_INTEGER,
+                                     .integer = expr->data.int_val};
         }
         case AST_NODE_BOOL: {
-            return expr->data.int_val ? LUVALUE_TRUE : LUVALUE_FALSE;
-        }
-        case AST_NODE_UNOP: {
-            struct lu_value argument =
-                eval_expr(state, expr->data.unop.argument);
-
-            if (state->op_result == OP_RESULT_RAISED_ERROR) {
-                return LUVALUE_NULL;
-            }
-
-            struct lu_klass* klass = lu_get_class(state, &argument);
-            if (!klass) {
-                // TODO: handle other klasses
-            }
-
-            struct lu_value method_val =
-                lu_dict_get(klass->methods,
-                            LUVALUE_OBJ((struct lu_object*)lu_string_new(
-                                state, unary_op_labels[expr->data.unop.op])));
-
-            if (method_val.type == VALUE_NULL) {
-                state->op_result = OP_RESULT_RAISED_ERROR;
-                state->exception = lu_error_new_printf(
-                    state, "TypeError",
-                    "Unsupported operation '%s' on type '%s'",
-                    unary_op_labels[expr->data.unop.op], klass->dbg_name);
-
-                return LUVALUE_NULL;
-            }
-
-            struct argument arg;
-            struct lu_function* method = method_val.obj;
-            arg.value = argument;
-            return method->native_func(state, method, &arg);
+            return (struct lu_value){.type = VALUE_BOOL,
+                                     .integer = expr->data.int_val};
         }
         case AST_NODE_BINOP: {
             struct lu_value lhs = eval_expr(state, expr->data.binop.lhs);
             if (state->op_result == OP_RESULT_RAISED_ERROR) {
-                return LUVALUE_NULL;
+                return lhs;
             }
             struct lu_value rhs = eval_expr(state, expr->data.binop.rhs);
             if (state->op_result == OP_RESULT_RAISED_ERROR) {
-                return LUVALUE_NULL;
-            }
-            struct lu_klass* klass = lu_get_class(state, &lhs);
-            struct lu_value method_val =
-                lu_dict_get(klass->methods,
-                            LUVALUE_OBJ((struct lu_object*)lu_string_new(
-                                state, binary_op_labels[expr->data.binop.op])));
-            if (method_val.type == VALUE_NULL) {
-                state->op_result = OP_RESULT_RAISED_ERROR;
-                state->exception = lu_error_new_printf(
-                    state, "TypeError",
-                    "Unsupported operation '%s' on type '%s'",
-                    binary_op_labels[expr->data.binop.op], klass->dbg_name);
-
-                return LUVALUE_NULL;
+                return rhs;
             }
 
-            struct argument args[2];
-            struct lu_function* method = method_val.obj;
-            args[0].value = lhs;
-            args[1].value = rhs;
-            return method->native_func(state, method, args);
-        }
-        case AST_NODE_ASSIGN: {
-            struct lu_value value = eval_expr(state, expr->data.binop.rhs);
-            if (state->op_result == OP_RESULT_RAISED_ERROR) {
-                return LUVALUE_NULL;
+            if (lhs.type == rhs.type) {
+                binaryfunc func =
+                    binop_dispatch_table[lhs.type][expr->data.binop.op];
+
+                if (!func) {
+                    state->op_result = OP_RESULT_RAISED_ERROR;
+                    return (struct lu_value){.type = VALUE_NONE};
+                }
+                return func(state, &lhs, &rhs);
             }
-            struct lu_string* name =
-                get_identifier(state, &expr->data.binop.lhs->span);
-            set_variable(state, LUVALUE_OBJ(name), value);
-            return value;
         }
         default: {
             break;
@@ -288,7 +334,7 @@ void lu_eval_program(struct lu_istate* state) {
     enum signal_kind signal =
         eval_stmts(state, state->context_stack->program.nodes);
     if (signal == SIGNAL_ERROR) {
-        printf("%s\n", state->exception->message->data);
+        // printf("%s\n", state->exception->message->data);
         // printf("Error: %s at line %ld\n", err->message, err->line);
     }
 }
