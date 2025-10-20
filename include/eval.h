@@ -5,6 +5,7 @@
 #include "ast.h"
 #include "heap.h"
 #include "value.h"
+#include "string_interner.h"
 
 enum signal_kind {
     SIGNAL_NONE,
@@ -46,6 +47,7 @@ struct lu_istate {
     struct heap* heap;
     struct execution_context* context_stack;
     enum op_result_kind op_result;
+    struct string_interner string_pool;
 };
 
 struct lu_istate* lu_istate_new(void);

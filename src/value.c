@@ -13,23 +13,6 @@
 #define LU_PROPERTY_MAP_LOAD_FACTOR 0.7
 #define LU_PROPERTY_MAP_MIN_CAPACITY 16
 
-// // Dict implementation
-// #define FNV_OFFSET 14695981039346656037UL
-// #define FNV_PRIME 1099511628211UL
-
-// static uint64_t hash_key(const char* key, size_t len) {
-//     uint64_t hash = FNV_OFFSET;
-//     for (size_t i = 0; i < len; i++) {
-//         hash ^= (uint64_t)(unsigned char)key[i];
-//         hash *= FNV_PRIME;
-//     }
-//     return hash;
-// }
-
-// size_t str_hash(struct lu_string* self) {
-//     return hash_key(self->data, self->length);
-// }
-
 // static size_t hash_integer(int64_t key) {
 //     uint64_t k = (uint64_t)key;
 
@@ -57,20 +40,22 @@
 //     }
 // }
 
-static void lu_object_finalize(struct lu_object* obj) {
+static void lu_object_finalize(struct lu_object *obj) {
     lu_property_map_deinit(&obj->properties);
 }
 
-static void lu_object_visit(struct lu_object* obj) {}
+static void lu_object_visit(struct lu_object *obj) {}
 
 static struct lu_object_vtable lu_object_default_vtable = {
     .finalize = lu_object_finalize,
     .visit = lu_object_visit,
 };
 
-bool lu_string_equal(struct lu_string* a, struct lu_string* b) {
-    if (a == b) return true;
-    if (a->length != b->length) return false;
+bool lu_string_equal(struct lu_string *a, struct lu_string *b) {
+    if (a == b)
+        return true;
+    if (a->length != b->length)
+        return false;
 
     if (a->type == STRING_SMALL && b->type == STRING_SMALL) {
         return memcmp(a->Sms, b->Sms, a->length) == 0;
@@ -79,7 +64,7 @@ bool lu_string_equal(struct lu_string* a, struct lu_string* b) {
     return strcmp(a->data, b->data);
 }
 
-void lu_property_map_init(struct property_map* map, size_t capacity) {
+void lu_property_map_init(struct property_map *map, size_t capacity) {
     map->capacity = capacity;
     map->size = 0;
     map->entries = calloc(capacity, sizeof(struct property_map_entry));
@@ -89,14 +74,14 @@ void lu_property_map_init(struct property_map* map, size_t capacity) {
     }
 }
 
-void lu_property_map_deinit(struct property_map* map) {
+void lu_property_map_deinit(struct property_map *map) {
     map->size = 0;
     map->capacity = 0;
     free(map->entries);
 }
 
-static bool lu_property_map_add_entry(struct property_map_entry* entries,
-                                      size_t capacity, struct lu_string* key,
+static bool lu_property_map_add_entry(struct property_map_entry *entries,
+                                      size_t capacity, struct lu_string *key,
                                       struct lu_value value) {
     size_t index = key->hash & (capacity - 1);
 
@@ -130,13 +115,13 @@ static bool lu_property_map_add_entry(struct property_map_entry* entries,
     }
 }
 
-static void property_map_resize(struct property_map* map, size_t capacity) {
+static void property_map_resize(struct property_map *map, size_t capacity) {
     size_t new_capacity = capacity;
-    struct property_map_entry* new_entries =
+    struct property_map_entry *new_entries =
         calloc(new_capacity, sizeof(struct property_map_entry));
 
     for (size_t i = 0; i < map->capacity; i++) {
-        struct property_map_entry* entry = &map->entries[i];
+        struct property_map_entry *entry = &map->entries[i];
         if (entry->occupied) {
             lu_property_map_add_entry(new_entries, new_capacity, entry->key,
                                       entry->value);
@@ -148,7 +133,7 @@ static void property_map_resize(struct property_map* map, size_t capacity) {
     map->capacity = new_capacity;
 }
 
-void lu_property_map_set(struct property_map* map, struct lu_string* key,
+void lu_property_map_set(struct property_map *map, struct lu_string *key,
                          struct lu_value value) {
     if (((float)(map->size + 1) / map->capacity) >=
         LU_PROPERTY_MAP_LOAD_FACTOR) {
@@ -159,13 +144,14 @@ void lu_property_map_set(struct property_map* map, struct lu_string* key,
         map->size++;
     };
 }
-struct lu_value lu_property_map_get(struct property_map* map,
-                                    struct lu_string* key) {
+
+struct lu_value lu_property_map_get(struct property_map *map,
+                                    struct lu_string *key) {
     size_t index = (key->hash) & (map->capacity - 1);
     size_t current_psl = 0;
 
     while (map->entries[index].occupied) {
-        struct property_map_entry* entry = &map->entries[index];
+        struct property_map_entry *entry = &map->entries[index];
         if (lu_string_equal(entry->key, key)) {
             return map->entries[index].value;
         }
@@ -178,12 +164,31 @@ struct lu_value lu_property_map_get(struct property_map* map,
 
     return lu_value_none();
 }
-void lu_property_map_remove(struct property_map* map, struct lu_string* key) {}
+void lu_property_map_remove(struct property_map *map, struct lu_string *key) {}
 
-struct lu_object* lu_object_new(struct lu_istate* state) {
-    struct lu_object* obj =
+struct lu_object *lu_object_new(struct lu_istate *state) {
+    struct lu_object *obj =
         heap_allocate_object(state->heap, sizeof(struct lu_object));
     lu_property_map_init(&obj->properties, 4);
     obj->vtable = &lu_object_default_vtable;
     return obj;
+}
+
+struct lu_object *lu_object_new_sized(struct lu_istate *state, size_t size) {
+    struct lu_object *obj = heap_allocate_object(state->heap, size);
+    lu_property_map_init(&obj->properties, 4);
+    obj->vtable = &lu_object_default_vtable;
+    return obj;
+}
+
+struct lu_string *lu_small_string_new(struct lu_istate *state, char *data,
+                                      size_t length, size_t hash) {
+    struct lu_string *str = heap_allocate_object(
+        state->heap, sizeof(struct lu_string) + length + 1);
+    str->type = STRING_SMALL_INTERNED;
+    str->hash = hash;
+    str->length = length;
+    memcpy(str->Sms, data, length);
+    str->Sms[length] = '\0';
+    return str;
 }
