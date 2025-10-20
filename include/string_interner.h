@@ -36,6 +36,6 @@ void string_map_init(struct string_map *map);
 struct lu_string *string_map_put(struct string_interner *interner,
                                  struct string_map *map, char *key,
                                  size_t key_len);
-struct lu_string *lu_string_intern(struct string_interner *interner, char *str);
+struct lu_string *lu_intern_string(struct string_interner *interner, char *str);
 
 struct string_block *string_block_new(char* data,size_t length);

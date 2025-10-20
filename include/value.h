@@ -75,6 +75,13 @@ struct lu_string {
     char Sms[];
 };
 
+#define lu_value_none() ((struct lu_value){VALUE_NONE})
+#define lu_value_undefined() ((struct lu_value){VALUE_UNDEFINED})
+#define lu_value_int(v) ((struct lu_value){.type = VALUE_INTEGER, .integer = v})
+#define lu_value_bool(v) ((struct lu_value){.type = VALUE_BOOL, .integer = v})
+#define lu_value_object(v)                                                     \
+    ((struct lu_value){.type = VALUE_OBJECT, .object = v})
+
 #define FNV_OFFSET 14695981039346656037UL
 #define FNV_PRIME 1099511628211UL
 
@@ -96,10 +103,8 @@ struct lu_value lu_property_map_get(struct property_map *map,
                                     struct lu_string *key);
 void lu_property_map_remove(struct property_map *map, struct lu_string *key);
 
-#define lu_value_none() ((struct lu_value){VALUE_NONE})
 struct lu_object *lu_object_new(struct lu_istate *state);
 struct lu_object *lu_object_new_sized(struct lu_istate *state, size_t size);
-struct lu_string *lu_string_new(struct lu_istate *state,
-                                enum lu_string_type type, char *data);
+struct lu_string *lu_string_new(struct lu_istate *state, char *data);
 struct lu_string *lu_small_string_new(struct lu_istate *state, char *data,
                                       size_t length, size_t hash);

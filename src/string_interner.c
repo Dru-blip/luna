@@ -92,14 +92,13 @@ struct lu_string *string_map_put(struct string_interner *interner,
     return string;
 }
 
-struct lu_string *lu_string_intern(struct string_interner *interner,
+struct lu_string *lu_intern_string(struct string_interner *interner,
                                    char *str) {
     // TODO: add checks for strings with length more than 20.
     return string_map_put(interner, &interner->strings, str, strlen(str));
 }
 
-struct lu_string *lu_string_new(struct lu_istate *state,
-                                enum lu_string_type type, char *data) {
+struct lu_string *lu_string_new(struct lu_istate *state, char *data) {
     size_t len = strlen(data);
     size_t hash = hash_str(data, len);
 

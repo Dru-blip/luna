@@ -183,8 +183,8 @@ struct lu_object *lu_object_new_sized(struct lu_istate *state, size_t size) {
 
 struct lu_string *lu_small_string_new(struct lu_istate *state, char *data,
                                       size_t length, size_t hash) {
-    struct lu_string *str = heap_allocate_object(
-        state->heap, sizeof(struct lu_string) + length + 1);
+    struct lu_string *str =
+        lu_object_new_sized(state, sizeof(struct lu_string) + length + 1);
     str->type = STRING_SMALL_INTERNED;
     str->hash = hash;
     str->length = length;
