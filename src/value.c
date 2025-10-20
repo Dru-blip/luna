@@ -9,6 +9,7 @@
 
 #include "eval.h"
 #include "heap.h"
+#include "string_interner.h"
 
 #define LU_PROPERTY_MAP_LOAD_FACTOR 0.7
 #define LU_PROPERTY_MAP_MIN_CAPACITY 16
@@ -46,7 +47,37 @@ static void lu_object_finalize(struct lu_object *obj) {
 
 static void lu_object_visit(struct lu_object *obj) {}
 
+static void lu_string_finalize(struct lu_object *obj) {
+    struct lu_string *str = (struct lu_string *)obj;
+    if (str->type == STRING_SIMPLE) {
+        struct string_block *block = str->block;
+        struct string_block *prev = block->prev;
+
+        prev->next = block->next;
+        prev->next->prev = prev;
+
+        free(block);
+    }
+    lu_object_finalize(obj);
+}
+
 static struct lu_object_vtable lu_object_default_vtable = {
+    .is_function = false,
+    .is_string = false,
+    .finalize = lu_object_finalize,
+    .visit = lu_object_visit,
+};
+
+static struct lu_object_vtable lu_string_vtable = {
+    .is_function = false,
+    .is_string = true,
+    .finalize = lu_string_finalize,
+    .visit = lu_object_visit,
+};
+
+static struct lu_object_vtable lu_function_vtable = {
+    .is_function = true,
+    .is_string = false,
     .finalize = lu_object_finalize,
     .visit = lu_object_visit,
 };
@@ -57,11 +88,13 @@ bool lu_string_equal(struct lu_string *a, struct lu_string *b) {
     if (a->length != b->length)
         return false;
 
-    if (a->type == STRING_SMALL && b->type == STRING_SMALL) {
+    if ((a->type == STRING_SMALL_INTERNED &&
+         b->type == STRING_SMALL_INTERNED) ||
+        (a->type == STRING_SMALL && b->type == STRING_SMALL)) {
         return memcmp(a->Sms, b->Sms, a->length) == 0;
     }
 
-    return strcmp(a->data, b->data);
+    return strncmp(a->block->data, b->block->data, a->length) == 0;
 }
 
 void lu_property_map_init(struct property_map *map, size_t capacity) {
@@ -156,13 +189,13 @@ struct lu_value lu_property_map_get(struct property_map *map,
             return map->entries[index].value;
         }
         if (current_psl > entry->psl) {
-            return lu_value_none();
+            return lu_value_undefined();
         }
         current_psl++;
         index = (index + 1) % map->capacity;
     }
 
-    return lu_value_none();
+    return lu_value_undefined();
 }
 void lu_property_map_remove(struct property_map *map, struct lu_string *key) {}
 
@@ -188,7 +221,56 @@ struct lu_string *lu_small_string_new(struct lu_istate *state, char *data,
     str->type = STRING_SMALL_INTERNED;
     str->hash = hash;
     str->length = length;
+    str->vtable = &lu_string_vtable;
     memcpy(str->Sms, data, length);
     str->Sms[length] = '\0';
     return str;
+}
+
+struct lu_string *lu_string_new(struct lu_istate *state, char *data) {
+    size_t len = strlen(data);
+    size_t hash = hash_str(data, len);
+
+    struct string_block *block = string_block_new(data, len);
+
+    block->prev = state->string_pool.last_block;
+    state->string_pool.last_block = block;
+    block->prev->next = block;
+
+    struct lu_string *str =
+        lu_object_new_sized(state, sizeof(struct lu_string));
+    str->type = STRING_SIMPLE;
+    str->vtable = &lu_string_vtable;
+    str->hash = hash;
+    str->length = len;
+    str->block = block;
+    return str;
+}
+
+struct lu_function *lu_function_new(struct lu_istate *state,
+                                    struct lu_string *name,
+                                    struct ast_node **params,
+                                    struct ast_node *body) {
+    struct lu_function *func =
+        lu_object_new_sized(state, sizeof(struct lu_function));
+    func->type = FUNCTION_USER;
+    func->name = name;
+    func->body = body;
+    func->params = params;
+    func->vtable = &lu_function_vtable;
+
+    return func;
+}
+
+struct lu_function *lu_native_function_new(struct lu_istate *state,
+                                           struct lu_string *name,
+                                           native_func_t native_func) {
+    struct lu_function *func =
+        lu_object_new_sized(state, sizeof(struct lu_function));
+    func->type = FUNCTION_NATIVE;
+    func->name = name;
+    func->func = native_func;
+    func->vtable = &lu_function_vtable;
+
+    return func;
 }

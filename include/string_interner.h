@@ -24,7 +24,9 @@ struct string_map {
 };
 
 struct string_interner {
-    struct string_block *string_blocks;
+    struct string_block *first_block;
+    struct string_block *last_block;
+
     struct string_map strings;
     struct arena string_map_arena;
     struct lu_istate *state;
@@ -36,6 +38,5 @@ void string_map_init(struct string_map *map);
 struct lu_string *string_map_put(struct string_interner *interner,
                                  struct string_map *map, char *key,
                                  size_t key_len);
-struct lu_string *lu_intern_string(struct string_interner *interner, char *str);
-
-struct string_block *string_block_new(char* data,size_t length);
+struct lu_string *lu_intern_string(struct lu_istate *state, char *str);
+struct string_block *string_block_new(char *data, size_t length);

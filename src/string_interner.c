@@ -9,8 +9,16 @@
 
 #include "value.h"
 
+static struct string_block sentinel = {
+    .data = "",
+    .length = 0,
+    .next = &sentinel,
+    .prev = &sentinel,
+};
+
 void string_interner_init(struct lu_istate *state) {
-    state->string_pool.string_blocks = nullptr;
+    state->string_pool.first_block = &sentinel;
+    state->string_pool.last_block = &sentinel;
     state->string_pool.state = state;
     string_map_init(&state->string_pool.strings);
     arena_init(&state->string_pool.string_map_arena);
@@ -92,34 +100,15 @@ struct lu_string *string_map_put(struct string_interner *interner,
     return string;
 }
 
-struct lu_string *lu_intern_string(struct string_interner *interner,
-                                   char *str) {
+struct lu_string *lu_intern_string(struct lu_istate *state, char *str) {
     // TODO: add checks for strings with length more than 20.
-    return string_map_put(interner, &interner->strings, str, strlen(str));
-}
-
-struct lu_string *lu_string_new(struct lu_istate *state, char *data) {
-    size_t len = strlen(data);
-    size_t hash = hash_str(data, len);
-
-    struct string_block *block = string_block_new(data, len);
-    block->next = state->string_pool.string_blocks;
-    state->string_pool.string_blocks = block;
-    if (block->next) {
-        block->next->prev = block;
-    }
-    struct lu_string *str =
-        lu_object_new_sized(state, sizeof(struct lu_string));
-    str->type = STRING_SIMPLE;
-    str->hash = hash;
-    str->length = len;
-    str->block = block;
-    return str;
+    return string_map_put(&state->string_pool, &state->string_pool.strings, str,
+                          strlen(str));
 }
 
 struct string_block *string_block_new(char *data, size_t length) {
     struct string_block *block =
-        malloc(sizeof(struct string_block) + length + 1);
+        calloc(1, sizeof(struct string_block) + length + 1);
     block->length = length;
     memcpy(block->data, data, length);
     block->data[length] = '\0';

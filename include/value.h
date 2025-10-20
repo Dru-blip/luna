@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "ast.h"
 #include "eval.h"
 #include "string_interner.h"
 
@@ -52,6 +53,8 @@ struct lu_object {
 };
 
 struct lu_object_vtable {
+    bool is_function;
+    bool is_string;
     void (*finalize)(struct lu_object *);
     void (*visit)(struct lu_object *);
 };
@@ -75,12 +78,82 @@ struct lu_string {
     char Sms[];
 };
 
+enum lu_function_type {
+    FUNCTION_USER,
+    FUNCTION_NATIVE,
+};
+
+struct argument {
+    struct lu_string *name;
+    struct lu_value value;
+};
+
+typedef struct lu_value (*native_func_t)(struct lu_istate *, struct argument *);
+
+struct lu_function {
+    LUNA_OBJECT_HEADER;
+    enum lu_function_type type;
+    struct lu_string *name;
+    union {
+        native_func_t func;
+        struct {
+            struct ast_node **params;
+            struct ast_node *body;
+        };
+    };
+};
+
+// all macros normally follows SCREAMING_SNAKE_CASE naming convention but these
+// are the only macro defs dont follow the convention.
+#define lu_cast(T, obj) ((T *)(obj))
 #define lu_value_none() ((struct lu_value){VALUE_NONE})
 #define lu_value_undefined() ((struct lu_value){VALUE_UNDEFINED})
 #define lu_value_int(v) ((struct lu_value){.type = VALUE_INTEGER, .integer = v})
 #define lu_value_bool(v) ((struct lu_value){.type = VALUE_BOOL, .integer = v})
 #define lu_value_object(v)                                                     \
     ((struct lu_value){.type = VALUE_OBJECT, .object = v})
+
+#define lu_is_bool(v) ((v).type == VALUE_BOOL)
+#define lu_is_none(v) ((v).type == VALUE_NONE)
+#define lu_is_undefined(v) ((v).type == VALUE_UNDEFINED)
+#define lu_is_int(v) ((v).type == VALUE_INTEGER)
+#define lu_is_object(v) ((v).type == VALUE_OBJECT)
+#define lu_is_function(v)                                                      \
+    (lu_is_object(v) && lu_as_object(v)->vtable->is_function)
+#define lu_is_string(v) (lu_is_object(v) && lu_as_object(v)->vtable->is_string)
+
+#define lu_as_function(v) ((struct lu_function *)lu_as_object(v))
+#define lu_as_object(v) ((v).object)
+#define lu_as_string(v) ((struct lu_string *)lu_as_object(v))
+
+#define lu_obj_get(obj, key) lu_property_map_get(&(obj)->properties, key)
+#define lu_obj_set(obj, key, value)                                            \
+    lu_property_map_set(&(obj)->properties, key, value)
+#define lu_obj_remove(obj, key) lu_property_map_remove(&(obj)->properties, key)
+
+static inline struct lu_value lu_bool(bool v) { return lu_value_bool(v); }
+static inline struct lu_value lu_int(int64_t v) { return lu_value_int(v); }
+static inline struct lu_value lu_none(void) { return lu_value_none(); }
+static inline struct lu_value lu_undefined(void) {
+    return lu_value_undefined();
+}
+
+static inline bool lu_value_equals(struct lu_value a, struct lu_value b) {
+    if (a.type != b.type)
+        return false;
+    switch (a.type) {
+    case VALUE_BOOL:
+    case VALUE_INTEGER:
+        return a.integer == b.integer;
+    case VALUE_NONE:
+    case VALUE_UNDEFINED:
+        return true;
+    case VALUE_OBJECT:
+        return a.object == b.object;
+    default:
+        return false;
+    }
+}
 
 #define FNV_OFFSET 14695981039346656037UL
 #define FNV_PRIME 1099511628211UL
@@ -95,6 +168,7 @@ static inline uint64_t hash_str(const char *key, size_t len) {
 }
 
 bool lu_string_equal(struct lu_string *a, struct lu_string *b);
+
 void lu_property_map_init(struct property_map *map, size_t capacity);
 void lu_property_map_deinit(struct property_map *map);
 void lu_property_map_set(struct property_map *map, struct lu_string *key,
@@ -108,3 +182,14 @@ struct lu_object *lu_object_new_sized(struct lu_istate *state, size_t size);
 struct lu_string *lu_string_new(struct lu_istate *state, char *data);
 struct lu_string *lu_small_string_new(struct lu_istate *state, char *data,
                                       size_t length, size_t hash);
+
+struct lu_function *lu_function_new(struct lu_istate *state,
+                                    struct lu_string *name,
+                                    struct ast_node **params,
+                                    struct ast_node *body);
+
+struct lu_function *lu_native_function_new(struct lu_istate *state,
+                                           struct lu_string *name,
+                                           native_func_t native_func);
+
+void lu_init_global_object(struct lu_istate *state);

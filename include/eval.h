@@ -45,6 +45,7 @@ struct execution_context {
 
 struct lu_istate {
     struct heap *heap;
+    struct lu_object *global_object;
     struct execution_context *context_stack;
     enum op_result_kind op_result;
     struct string_interner string_pool;

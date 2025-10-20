@@ -35,7 +35,8 @@ struct lu_istate *lu_istate_new() {
     state->heap = heap_create(state);
     state->context_stack = nullptr;
     string_interner_init(state);
-
+    state->global_object = lu_object_new(state);
+    lu_init_global_object(state);
     return state;
 }
 
@@ -271,32 +272,34 @@ static inline void set_variable(struct lu_istate *state, struct lu_string *name,
                                 struct lu_value value) {
     struct scope *scope = state->context_stack->scope;
     while (scope) {
-        if (lu_property_map_get(&scope->variables->properties, name).type !=
-            VALUE_UNDEFINED) {
+        if (!lu_is_undefined(lu_obj_get(scope->variables, name))) {
             break;
         }
         scope = scope->parent;
     }
     if (scope) {
-        lu_property_map_set(&scope->variables->properties, name, value);
+        lu_obj_set(scope->variables, name, value);
     } else {
-        lu_property_map_set(&state->context_stack->scope->variables->properties,
-                            name, value);
+        lu_obj_set(state->context_stack->scope->variables, name, value);
     }
 }
 
 static inline struct lu_value get_variable(struct lu_istate *state,
                                            struct lu_string *name) {
     struct scope *scope = state->context_stack->scope;
+    struct lu_value val = lu_value_none();
     while (scope) {
-        struct lu_value val =
-            lu_property_map_get(&scope->variables->properties, name);
-        if (val.type != VALUE_UNDEFINED) {
+        val = lu_obj_get(scope->variables, name);
+        if (!lu_is_undefined(val)) {
             return val;
         }
         scope = scope->parent;
     }
-    return lu_value_none();
+    val = lu_obj_get(state->global_object, name);
+    if (lu_is_undefined(val)) {
+        return lu_value_none();
+    }
+    return val;
 }
 
 struct lu_string *get_identifier(struct lu_istate *state, struct span *span) {
@@ -304,7 +307,7 @@ struct lu_string *get_identifier(struct lu_istate *state, struct span *span) {
     char *buffer = malloc(len + 1);
     memcpy(buffer, state->context_stack->program.source + span->start, len);
     buffer[len] = '\0';
-    struct lu_string *str = lu_intern_string(&state->string_pool, buffer);
+    struct lu_string *str = lu_intern_string(state, buffer);
     free(buffer);
     return str;
 }
@@ -321,7 +324,7 @@ static struct lu_value eval_expr(struct lu_istate *state,
     case AST_NODE_IDENTIFIER: {
         struct lu_string *name = get_identifier(state, &expr->span);
         struct lu_value value = get_variable(state, name);
-        if (value.type == VALUE_NONE) {
+        if (lu_is_none(value)) {
             state->op_result = OP_RESULT_RAISED_ERROR;
         }
         return value;
@@ -356,6 +359,19 @@ static struct lu_value eval_expr(struct lu_istate *state,
             get_identifier(state, &expr->data.binop.lhs->span);
         set_variable(state, name, value);
         return value;
+    }
+    case AST_NODE_CALL: {
+        struct lu_value calle = eval_expr(state, expr->data.call.callee);
+
+        if (!lu_is_function(calle)) {
+            state->op_result = OP_RESULT_RAISED_ERROR;
+            return lu_value_none();
+        }
+
+        struct lu_function *func = lu_as_function(calle);
+        struct argument arg;
+        struct lu_value res = func->func(state, &arg);
+        return res;
     }
     default: {
         break;
