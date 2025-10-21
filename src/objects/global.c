@@ -30,6 +30,31 @@ struct lu_value raise_func(struct lu_istate* state, struct argument* args) {
     return lu_value_none();
 }
 
+struct lu_value len(struct lu_istate* state, struct argument* args) {
+    struct lu_value arg = args[0].value;
+    switch (arg.type) {
+        case VALUE_BOOL: {
+            return lu_value_int(1);
+        }
+        case VALUE_INTEGER: {
+            // TODO: implement bit width
+            return arg;
+        }
+        case VALUE_OBJECT: {
+            if (lu_is_string(arg)) {
+                return lu_value_int(lu_as_string(arg)->length);
+            }
+            if (lu_is_array(arg)) {
+                return lu_value_int(lu_as_array(arg)->size);
+            }
+            return lu_value_int(lu_obj_size(lu_as_object(arg)));
+        }
+        default: {
+            return lu_value_int(0);
+        }
+    }
+}
+
 struct lu_value import_module(struct lu_istate* state, struct argument* args) {
     // TODO: handle package format (foo.bar)
     struct lu_value file_path_value = args[0].value;
@@ -51,7 +76,7 @@ struct lu_value import_module(struct lu_istate* state, struct argument* args) {
     }
 
     DIR* dir;
-    struct dirent* fil_info;
+    struct dirent* file_info;
 
     if ((dir = opendir(path)) == nullptr) {
         strbuf_appendf(&sb, "failed to read file: '%s'",
@@ -67,11 +92,11 @@ struct lu_value import_module(struct lu_istate* state, struct argument* args) {
              lu_string_get_cstring(lu_as_string(file_path_value)), "luna");
 
     char* path_buffer = nullptr;
-    while ((fil_info = readdir(dir)) != nullptr) {
-        if (strcmp(fil_info->d_name, file_path) == 0) {
+    while ((file_info = readdir(dir)) != nullptr) {
+        if (strcmp(file_info->d_name, file_path) == 0) {
             path_buffer = malloc(PATH_MAX + 256);
             snprintf(path_buffer, PATH_MAX + 256, "%s/%s", path,
-                     fil_info->d_name);
+                     file_info->d_name);
             break;
         }
     }
@@ -96,4 +121,5 @@ void lu_init_global_object(struct lu_istate* state) {
     lu_define_native(state, "print", print_func, UINT8_MAX);
     lu_define_native(state, "raise", raise_func, 0);
     lu_define_native(state, "import", import_module, 1);
+    lu_define_native(state, "len", len, 1);
 }

@@ -1,1 +1,3 @@
-a=[1,2,3]
+a="hello"
+b=len(a)
+print(b)

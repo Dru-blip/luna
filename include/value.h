@@ -70,6 +70,7 @@ struct lu_objectset_iter {
 struct lu_object_vtable {
     bool is_function;
     bool is_string;
+    bool is_array;
     void (*finalize)(struct lu_object*);
     void (*visit)(struct lu_object*, struct lu_objectset*);
 };
@@ -162,14 +163,17 @@ struct lu_array {
 #define lu_is_function(v) \
     (lu_is_object(v) && lu_as_object(v)->vtable->is_function)
 #define lu_is_string(v) (lu_is_object(v) && lu_as_object(v)->vtable->is_string)
+#define lu_is_array(v) (lu_is_object(v) && lu_as_object(v)->vtable->is_array)
 
 #define lu_as_function(v) ((struct lu_function*)lu_as_object(v))
 #define lu_as_object(v) ((v).object)
 #define lu_as_string(v) ((struct lu_string*)lu_as_object(v))
+#define lu_as_array(v) ((struct lu_array*)lu_as_object(v))
 
 #define lu_obj_get(obj, key) lu_property_map_get(&(obj)->properties, key)
 #define lu_obj_set(obj, key, value) \
     lu_property_map_set(&(obj)->properties, key, value)
+#define lu_obj_size(obj) (obj)->properties.size
 #define lu_obj_remove(obj, key) lu_property_map_remove(&(obj)->properties, key)
 
 static inline struct lu_value lu_bool(bool v) { return lu_value_bool(v); }
@@ -233,6 +237,9 @@ struct lu_function* lu_native_function_new(struct lu_istate* state,
                                            native_func_t native_func,
                                            size_t param_count);
 
+struct lu_array* lu_array_new(struct lu_istate* state);
+void lu_array_push(struct lu_array* array, struct lu_value value);
+
 void lu_raise_error(struct lu_istate* state, struct lu_string* message,
                     struct span* location);
 
@@ -241,10 +248,6 @@ void lu_init_global_object(struct lu_istate* state);
 struct lu_objectset* lu_objectset_new(size_t initial_capacity);
 bool lu_objectset_add(struct lu_objectset* set, struct lu_object* key);
 void lu_objectset_free(struct lu_objectset* set);
-
-// array api
-struct lu_array* lu_array_new(struct lu_istate* state);
-void lu_array_push(struct lu_array* array, struct lu_value value);
 
 static inline struct lu_objectset_iter lu_objectset_iter_new(
     struct lu_objectset* set) {

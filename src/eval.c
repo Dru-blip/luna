@@ -13,6 +13,7 @@
 #include "operator.h"
 #include "parser.h"
 #include "stb_ds.h"
+#include "strbuf.h"
 #include "string_interner.h"
 #include "value.h"
 
@@ -391,6 +392,7 @@ static struct lu_value eval_expr(struct lu_istate* state,
                     binop_dispatch_table[lhs.type][expr->data.binop.op];
 
                 if (!func) {
+                    // TODO:raise error.
                     state->op_result = OP_RESULT_RAISED_ERROR;
                     return lu_value_none();
                 }
@@ -426,6 +428,10 @@ static struct lu_value eval_expr(struct lu_istate* state,
                         get_identifier(state, &func->params[i]->span);
                 }
                 args[i].value = eval_expr(state, expr->data.call.args[i]);
+                if (state->op_result == OP_RESULT_RAISED_ERROR) {
+                    arena_reset(&state->args_buffer);
+                    return lu_value_none();
+                }
             }
 
             struct lu_value res = lu_value_none();
@@ -442,6 +448,34 @@ static struct lu_value eval_expr(struct lu_istate* state,
             }
             arena_reset(&state->args_buffer);
             return res;
+        }
+        case AST_NODE_MEMBER_EXPR: {
+            struct lu_value val =
+                eval_expr(state, expr->data.member_expr.object);
+            if (!lu_is_object(val)) {
+                lu_raise_error(
+                    state,
+                    lu_string_new(state,
+                                  "Invalid member access on non object value"),
+                    &expr->span);
+                return lu_value_none();
+            }
+            struct lu_string* prop_name =
+                get_identifier(state, &expr->data.member_expr.property_name);
+
+            struct lu_value prop = lu_obj_get(lu_as_object(val), prop_name);
+            if (lu_is_undefined(prop)) {
+                char buffer[256];
+                struct strbuf sb;
+                strbuf_init_static(&sb, buffer, sizeof(buffer));
+                strbuf_appendf(&sb, "Object has no property '%s'",
+                               lu_string_get_cstring(prop_name));
+                lu_raise_error(state, lu_string_new(state, buffer),
+                               &expr->span);
+                return lu_value_none();
+            }
+
+            return prop;
         }
         default: {
             break;

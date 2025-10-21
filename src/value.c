@@ -43,12 +43,13 @@
 //     }
 // }
 
-static void lu_object_finalize(struct lu_object* obj) {
-    lu_property_map_deinit(&obj->properties);
+static void lu_object_finalize(struct lu_object* self) {
+    lu_property_map_deinit(&self->properties);
 }
 
-static void lu_object_visit(struct lu_object* obj, struct lu_objectset* set) {
-    struct property_map_iter iter = property_map_iter_new(&obj->properties);
+static void lu_object_visit(struct lu_object* self, struct lu_objectset* set) {
+    // TODO: add worklist to visit child objects.
+    struct property_map_iter iter = property_map_iter_new(&self->properties);
     struct property_map_entry* entry;
     while ((entry = property_map_iter_next(&iter))) {
         lu_objectset_add(set, lu_cast(struct lu_object, entry->key));
@@ -58,13 +59,14 @@ static void lu_object_visit(struct lu_object* obj, struct lu_objectset* set) {
     }
 }
 
-static void lu_function_visit(struct lu_object* obj, struct lu_objectset* set) {
-    lu_objectset_add(set, lu_cast(struct lu_function, obj)->name);
-    lu_object_visit(obj, set);
+static void lu_function_visit(struct lu_object* self,
+                              struct lu_objectset* set) {
+    lu_objectset_add(set, lu_cast(struct lu_function, self)->name);
+    lu_object_visit(self, set);
 }
 
-static void lu_string_finalize(struct lu_object* obj) {
-    struct lu_string* str = (struct lu_string*)obj;
+static void lu_string_finalize(struct lu_object* self) {
+    struct lu_string* str = (struct lu_string*)self;
     if (str->type == STRING_SIMPLE) {
         struct string_block* block = str->block;
         struct string_block* prev = block->prev;
@@ -74,12 +76,29 @@ static void lu_string_finalize(struct lu_object* obj) {
 
         free(block);
     }
-    lu_object_finalize(obj);
+    lu_object_finalize(self);
+}
+
+static void lu_array_finalize(struct lu_object* self) {
+    struct lu_array* array = lu_cast(struct lu_array, self);
+    free(array->elements);
+    lu_object_finalize(self);
+}
+
+static void lu_array_visit(struct lu_object* self, struct lu_objectset* set) {
+    struct lu_array* array = lu_cast(struct lu_array, self);
+    for (size_t i = 0; i < array->size; i++) {
+        if (lu_is_object(array->elements[i])) {
+            lu_objectset_add(set, lu_as_object(array->elements[i]));
+        }
+    }
+    lu_object_visit(self, set);
 }
 
 static struct lu_object_vtable lu_object_default_vtable = {
     .is_function = false,
     .is_string = false,
+    .is_array = false,
     .finalize = lu_object_finalize,
     .visit = lu_object_visit,
 };
@@ -87,6 +106,7 @@ static struct lu_object_vtable lu_object_default_vtable = {
 static struct lu_object_vtable lu_string_vtable = {
     .is_function = false,
     .is_string = true,
+    .is_array = false,
     .finalize = lu_string_finalize,
     .visit = lu_object_visit,
 };
@@ -94,8 +114,17 @@ static struct lu_object_vtable lu_string_vtable = {
 static struct lu_object_vtable lu_function_vtable = {
     .is_function = true,
     .is_string = false,
+    .is_array = false,
     .finalize = lu_object_finalize,
-    .visit = lu_object_visit,
+    .visit = lu_function_visit,
+};
+
+static struct lu_object_vtable lu_array_vtable = {
+    .is_function = true,
+    .is_string = false,
+    .is_array = true,
+    .finalize = lu_array_finalize,
+    .visit = lu_array_visit,
 };
 
 bool lu_string_equal(struct lu_string* a, struct lu_string* b) {
@@ -238,6 +267,10 @@ struct lu_string* lu_small_string_new(struct lu_istate* state, char* data,
     str->vtable = &lu_string_vtable;
     memcpy(str->Sms, data, length);
     str->Sms[length] = '\0';
+    // DANGER: this causes infinite recursion.
+    // lu_obj_set(str, lu_intern_string(state, "length"), lu_value_int(length));
+    // intern_string -> lu_small_string_new -> lu_intern_string -> this loop
+    // continues and never ends
     return str;
 }
 
@@ -258,6 +291,7 @@ struct lu_string* lu_string_new(struct lu_istate* state, char* data) {
     str->hash = hash;
     str->length = len;
     str->block = block;
+    lu_obj_set(str, lu_intern_string(state, "length"), lu_value_int(len));
     return str;
 }
 
@@ -297,6 +331,7 @@ struct lu_array* lu_array_new(struct lu_istate* state) {
         lu_object_new_sized(state, sizeof(struct lu_array));
     array->capacity = 4;
     array->size = 0;
+    array->vtable = &lu_array_vtable;
     array->elements = calloc(array->capacity, sizeof(struct lu_value));
     return array;
 }
