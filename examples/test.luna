@@ -1,3 +1,2 @@
-
-
-raise()
+a=import("hello")
+print(a)

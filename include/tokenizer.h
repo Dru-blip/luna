@@ -44,6 +44,7 @@ enum token_kind {
 
     TOKEN_INTEGER,
     TOKEN_IDENTIFIER,
+    TOKEN_STRING,
 
     TOKEN_SEMICOLON,
     TOKEN_LPAREN,
@@ -110,6 +111,7 @@ static const char* token_labels[] = {
 
     "integer",     // TOKEN_INTEGER
     "identifier",  // TOKEN_IDENTIFIER
+    "string",      // TOKEN_STRING
 
     ";",  // TOKEN_SEMICOLON
     "(",  // TOKEN_LPAREN
@@ -171,3 +173,7 @@ static struct keyword keywords[] = {
 };
 
 struct token* tokenize(const char* source);
+
+#define SPAN_MERGE(a, b) \
+    ((struct span){      \
+        .line = (a).line, .col = (a).col, .start = (a).start, .end = (b).end})

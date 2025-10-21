@@ -49,6 +49,7 @@ struct execution_context {
 struct lu_istate {
     struct heap *heap;
     struct lu_object *global_object;
+    struct lu_object *module_cache;
     struct execution_context *context_stack;
     struct arena args_buffer;
     enum op_result_kind op_result;

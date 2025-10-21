@@ -120,6 +120,24 @@ struct lu_function {
     };
 };
 
+enum lu_module_type {
+    MODULE_USER,
+    MODULE_NATIVE,
+};
+
+struct lu_module {
+    LUNA_OBJECT_HEADER;
+    enum lu_module_type type;
+    union {
+        struct ast_program program;
+        void *module_handle;
+    };
+
+    struct lu_value exported;
+};
+
+typedef void (*module_init_func)(struct lu_istate *, struct lu_module *);
+
 // all macros normally follows SCREAMING_SNAKE_CASE naming convention but these
 // are the only macro defs dont follow the convention.
 #define lu_cast(T, obj) ((T *)(obj))
@@ -249,4 +267,16 @@ property_map_iter_next(struct property_map_iter *iter) {
             return entry;
     }
     return nullptr;
+}
+
+static inline char *lu_string_get_cstring(struct lu_string *str) {
+    if (str->type == STRING_SMALL_INTERNED || str->type == STRING_SMALL) {
+        return str->Sms;
+    }
+
+    if (str->type == STRING_SIMPLE || str->type == STRING_INTERNED) {
+        return str->block->data;
+    }
+
+    return str->data;
 }
