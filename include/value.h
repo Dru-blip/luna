@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "ast.h"
-#include "eval.h"
+
 #include "string_interner.h"
 
 enum lu_value_type {
@@ -110,6 +110,7 @@ struct lu_function {
     LUNA_OBJECT_HEADER;
     enum lu_function_type type;
     struct lu_string *name;
+    size_t param_count;
     union {
         native_func_t func;
         struct {
@@ -206,7 +207,11 @@ struct lu_function *lu_function_new(struct lu_istate *state,
 
 struct lu_function *lu_native_function_new(struct lu_istate *state,
                                            struct lu_string *name,
-                                           native_func_t native_func);
+                                           native_func_t native_func,
+                                           size_t param_count);
+
+void lu_raise_error(struct lu_istate *state, struct lu_string *message,
+                    struct span *location);
 
 void lu_init_global_object(struct lu_istate *state);
 

@@ -9,6 +9,8 @@
 
 #include "eval.h"
 #include "heap.h"
+#include "stb_ds.h"
+#include "strbuf.h"
 #include "string_interner.h"
 
 #define LU_PROPERTY_MAP_LOAD_FACTOR 0.7
@@ -54,6 +56,11 @@ static void lu_object_visit(struct lu_object *obj, struct lu_objectset *set) {
             lu_objectset_add(set, lu_as_object(entry->value));
         }
     }
+}
+
+static void lu_function_visit(struct lu_object *obj, struct lu_objectset *set) {
+    lu_objectset_add(set, lu_cast(struct lu_function, obj)->name);
+    lu_object_visit(obj, set);
 }
 
 static void lu_string_finalize(struct lu_object *obj) {
@@ -265,6 +272,7 @@ struct lu_function *lu_function_new(struct lu_istate *state,
     func->name = name;
     func->body = body;
     func->params = params;
+    func->param_count = params ? arrlen(params) : 0;
     func->vtable = &lu_function_vtable;
 
     return func;
@@ -272,15 +280,45 @@ struct lu_function *lu_function_new(struct lu_istate *state,
 
 struct lu_function *lu_native_function_new(struct lu_istate *state,
                                            struct lu_string *name,
-                                           native_func_t native_func) {
+                                           native_func_t native_func,
+                                           size_t param_count) {
     struct lu_function *func =
         lu_object_new_sized(state, sizeof(struct lu_function));
     func->type = FUNCTION_NATIVE;
     func->name = name;
     func->func = native_func;
+    func->param_count = param_count;
     func->vtable = &lu_function_vtable;
 
     return func;
+}
+
+void lu_raise_error(struct lu_istate *state, struct lu_string *message,
+                    struct span *location) {
+    struct lu_object *error = lu_object_new(state);
+
+    char buffer[1024];
+    struct strbuf s1;
+    strbuf_init_static(&s1, buffer, sizeof(buffer));
+
+    lu_obj_set(error, lu_intern_string(state, "message"),
+               lu_value_object(message));
+
+    // TODO: stack trace of multiple execution contexts.
+    // struct call_frame *frame = state->context_stack->call_stack;
+    // while (frame->parent) {
+    //     strbuf_appendf(&s1, "file %s line:%d col:%d\n",
+    //                    state->context_stack->filepath,
+    //                    frame->call_location.line, frame->call_location.col);
+    //     frame = frame->parent;
+    // }
+    strbuf_appendf(&s1, "in %s %d:%d", state->context_stack->filepath,
+                   location->line, location->col);
+    lu_obj_set(error, lu_intern_string(state, "traceback"),
+               lu_value_object(lu_string_new(state, buffer)));
+    state->error_location = *location;
+    state->op_result = OP_RESULT_RAISED_ERROR;
+    state->error = error;
 }
 
 // object set implementation

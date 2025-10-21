@@ -1,5 +1,6 @@
 #include "heap.h"
 
+#include "eval.h"
 #include <stdlib.h>
 
 #include "value.h"

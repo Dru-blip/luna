@@ -4,7 +4,7 @@ project('luna','c',
 
 includedir=include_directories('include')
 
-ds_srcs = ['src/stb_ds.c','src/arena.c']
+ds_srcs = ['src/stb_ds.c','src/arena.c','src/strbuf.c']
 parser_srcs=['src/parser/tokenizer.c','src/parser/parser.c','src/parser/ast.c']
 
 runtime_srcs=['src/eval.c','src/heap.c','src/value.c','src/string_interner.c','src/objects/global.c']

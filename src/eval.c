@@ -37,6 +37,7 @@ struct lu_istate *lu_istate_new() {
     string_interner_init(state);
     state->global_object = lu_object_new(state);
     lu_init_global_object(state);
+    arena_init(&state->args_buffer);
     return state;
 }
 
@@ -66,8 +67,7 @@ static void delete_execution_context(struct lu_istate *state) {
     free(ctx);
 }
 
-struct lu_object *lu_run_program(struct lu_istate *state,
-                                 const char *filepath) {
+struct lu_value lu_run_program(struct lu_istate *state, const char *filepath) {
     char *source = read_file(filepath);
     struct ast_program program = parse_program(filepath, source);
     state->context_stack =
@@ -77,7 +77,7 @@ struct lu_object *lu_run_program(struct lu_istate *state,
     struct call_frame *frame = push_call_frame(state->context_stack);
     lu_eval_program(state);
     frame = pop_call_frame(state->context_stack);
-    struct lu_object *result = frame->return_value;
+    struct lu_value result = frame->return_value;
     delete_execution_context(state);
     free(frame);
     return result;
@@ -87,7 +87,7 @@ struct call_frame *push_call_frame(struct execution_context *ctx) {
     struct call_frame *frame = calloc(1, sizeof(struct call_frame));
     frame->parent = ctx->call_stack;
     ctx->call_stack = frame;
-    frame->return_value = nullptr;
+    frame->return_value = lu_value_none();
     ctx->frame_count++;
     return frame;
 }
@@ -288,7 +288,7 @@ static inline void set_variable(struct lu_istate *state, struct lu_string *name,
 static inline struct lu_value get_variable(struct lu_istate *state,
                                            struct lu_string *name) {
     struct scope *scope = state->context_stack->scope;
-    struct lu_value val = lu_value_none();
+    struct lu_value val = lu_value_undefined();
     while (scope) {
         val = lu_obj_get(scope->variables, name);
         if (!lu_is_undefined(val)) {
@@ -298,7 +298,7 @@ static inline struct lu_value get_variable(struct lu_istate *state,
     }
     val = lu_obj_get(state->global_object, name);
     if (lu_is_undefined(val)) {
-        return lu_value_none();
+        return val;
     }
     return val;
 }
@@ -313,6 +313,26 @@ struct lu_string *get_identifier(struct lu_istate *state, struct span *span) {
     return str;
 }
 
+static void eval_call(struct lu_istate *state, struct span *call_location,
+                      struct lu_function *func, struct argument *args,
+                      struct lu_value *result) {
+    // Implementation of eval_call function
+    struct call_frame *frame = push_call_frame(state->context_stack);
+    frame->function = func;
+    frame->self = func;
+    frame->call_location = *call_location;
+
+    begin_scope(state);
+    for (uint8_t i = 0; i < func->param_count; i++) {
+        set_variable(state, args[i].name, args[i].value);
+    }
+    enum signal_kind sig = eval_stmt(state, func->body);
+    end_scope(state);
+    frame = pop_call_frame(state->context_stack);
+    *result = frame->return_value;
+    free(frame);
+}
+
 static struct lu_value eval_expr(struct lu_istate *state,
                                  struct ast_node *expr) {
     switch (expr->kind) {
@@ -325,8 +345,10 @@ static struct lu_value eval_expr(struct lu_istate *state,
     case AST_NODE_IDENTIFIER: {
         struct lu_string *name = get_identifier(state, &expr->span);
         struct lu_value value = get_variable(state, name);
-        if (lu_is_none(value)) {
-            state->op_result = OP_RESULT_RAISED_ERROR;
+        if (lu_is_undefined(value)) {
+            lu_raise_error(state,
+                           lu_string_new(state, "Undeclared indentifier"),
+                           &expr->span);
         }
         return value;
     }
@@ -362,16 +384,36 @@ static struct lu_value eval_expr(struct lu_istate *state,
         return value;
     }
     case AST_NODE_CALL: {
-        struct lu_value calle = eval_expr(state, expr->data.call.callee);
+        struct lu_value callee = eval_expr(state, expr->data.call.callee);
 
-        if (!lu_is_function(calle)) {
+        if (!lu_is_function(callee)) {
             state->op_result = OP_RESULT_RAISED_ERROR;
             return lu_value_none();
         }
 
-        struct lu_function *func = lu_as_function(calle);
-        struct argument arg;
-        struct lu_value res = func->func(state, &arg);
+        struct lu_function *func = lu_as_function(callee);
+        struct argument *args = arena_alloc(
+            &state->args_buffer, sizeof(struct argument) * func->param_count);
+
+        for (uint32_t i = 0; i < expr->data.call.argc; ++i) {
+            if (func->type == FUNCTION_USER) {
+                args[i].name = get_identifier(state, &func->params[i]->span);
+            }
+            args[i].value = eval_expr(state, expr->data.call.args[i]);
+        }
+
+        struct lu_value res = lu_value_none();
+        if (func->type == FUNCTION_NATIVE) {
+            struct call_frame *frame = push_call_frame(state->context_stack);
+            frame->function = func;
+            frame->self = func;
+            frame->call_location = expr->span;
+            res = func->func(state, args);
+            pop_call_frame(state->context_stack);
+        } else {
+            eval_call(state, &expr->span, func, args, &res);
+        }
+        arena_reset(&state->args_buffer);
         return res;
     }
     default: {
@@ -383,6 +425,21 @@ static struct lu_value eval_expr(struct lu_istate *state,
 static enum signal_kind eval_stmt(struct lu_istate *state,
                                   struct ast_node *stmt) {
     switch (stmt->kind) {
+    case AST_NODE_FN_DECL: {
+        struct ast_fn_decl *fndecl = &stmt->data.fn_decl;
+
+        struct lu_string *name = get_identifier(state, &fndecl->name_span);
+        struct lu_function *func_obj =
+            lu_function_new(state, name, fndecl->params, fndecl->body);
+        set_variable(state, name, lu_value_object(func_obj));
+        break;
+    }
+    case AST_NODE_BLOCK: {
+        begin_scope(state);
+        enum signal_kind sig = eval_stmts(state, stmt->data.list);
+        end_scope(state);
+        return sig;
+    }
     case AST_NODE_EXPR_STMT: {
         struct lu_value res = eval_expr(state, stmt->data.node);
         if (state->op_result == OP_RESULT_RAISED_ERROR) {
@@ -395,6 +452,7 @@ static enum signal_kind eval_stmt(struct lu_istate *state,
         if (state->op_result == OP_RESULT_RAISED_ERROR) {
             return SIGNAL_ERROR;
         }
+        state->context_stack->call_stack->return_value = res;
         return SIGNAL_RETURN;
     }
     default: {
@@ -420,8 +478,15 @@ void lu_eval_program(struct lu_istate *state) {
     enum signal_kind signal =
         eval_stmts(state, state->context_stack->program.nodes);
     if (signal == SIGNAL_ERROR) {
-        printf("error occurred \n");
-        // printf("%s\n", state->exception->message->data);
-        // printf("Error: %s at line %ld\n", err->message, err->line);
+        if (state->error) {
+            struct lu_string *str = lu_as_string(
+                lu_obj_get(state->error, lu_intern_string(state, "message")));
+            struct lu_string *traceback = lu_as_string(
+                lu_obj_get(state->error, lu_intern_string(state, "traceback")));
+            printf("Error: %s\n", str->block->data);
+            if (traceback) {
+                printf("%s\n", traceback->block->data);
+            }
+        }
     }
 }

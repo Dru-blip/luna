@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "arena.h"
 #include "ast.h"
 #include "heap.h"
 #include "string_interner.h"
@@ -30,7 +31,9 @@ struct scope {
 struct call_frame {
     struct lu_object *self;
     struct call_frame *parent;
-    struct lu_value *return_value;
+    struct lu_function *function;
+    struct lu_value return_value;
+    struct span call_location;
 };
 
 struct execution_context {
@@ -47,8 +50,11 @@ struct lu_istate {
     struct heap *heap;
     struct lu_object *global_object;
     struct execution_context *context_stack;
+    struct arena args_buffer;
     enum op_result_kind op_result;
     struct string_interner string_pool;
+    struct lu_object *error;
+    struct span error_location;
 };
 
 struct lu_istate *lu_istate_new(void);
@@ -61,6 +67,6 @@ struct call_frame *push_call_frame(struct execution_context *ctx);
 struct call_frame *pop_call_frame(struct execution_context *ctx);
 
 void lu_eval_program(struct lu_istate *state);
-struct lu_object *lu_call_function(struct lu_istate *state,
-                                   struct lu_object *self);
-struct lu_object *lu_run_program(struct lu_istate *state, const char *filepath);
+struct lu_value lu_call_function(struct lu_istate *state,
+                                 struct lu_object *self);
+struct lu_value lu_run_program(struct lu_istate *state, const char *filepath);
