@@ -41,6 +41,7 @@ struct lu_istate *lu_istate_new() {
 }
 
 void lu_istate_destroy(struct lu_istate *state) {
+    string_interner_destroy(&state->string_pool);
     heap_destroy(state->heap);
     free(state);
 }
@@ -388,6 +389,13 @@ static enum signal_kind eval_stmt(struct lu_istate *state,
             return SIGNAL_ERROR;
         }
         break;
+    }
+    case AST_NODE_RETURN: {
+        struct lu_value res = eval_expr(state, stmt->data.node);
+        if (state->op_result == OP_RESULT_RAISED_ERROR) {
+            return SIGNAL_ERROR;
+        }
+        return SIGNAL_RETURN;
     }
     default: {
         break;

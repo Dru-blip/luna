@@ -24,6 +24,10 @@ void string_interner_init(struct lu_istate *state) {
     arena_init(&state->string_pool.string_map_arena);
 }
 
+void string_interner_destroy(struct string_interner *interner) {
+    arena_destroy(&interner->string_map_arena);
+}
+
 void string_map_init(struct string_map *map) {
     map->capacity = 4;
     map->size = 0;

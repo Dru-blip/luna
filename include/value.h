@@ -36,6 +36,11 @@ struct property_map {
     struct property_map_entry *entries;
 };
 
+struct property_map_iter {
+    struct property_map *map;
+    size_t index;
+};
+
 enum lu_object_state {
     OBJECT_STATE_DEAD,
     OBJECT_STATE_ALIVE,
@@ -52,11 +57,22 @@ struct lu_object {
     LUNA_OBJECT_HEADER;
 };
 
+struct lu_objectset {
+    struct lu_object **entries;
+    size_t capacity;
+    size_t size;
+};
+
+struct lu_objectset_iter {
+    struct lu_objectset *set;
+    size_t index;
+};
+
 struct lu_object_vtable {
     bool is_function;
     bool is_string;
     void (*finalize)(struct lu_object *);
-    void (*visit)(struct lu_object *);
+    void (*visit)(struct lu_object *, struct lu_objectset *);
 };
 
 enum lu_string_type {
@@ -193,3 +209,39 @@ struct lu_function *lu_native_function_new(struct lu_istate *state,
                                            native_func_t native_func);
 
 void lu_init_global_object(struct lu_istate *state);
+
+struct lu_objectset *lu_objectset_new(size_t initial_capacity);
+bool lu_objectset_add(struct lu_objectset *set, struct lu_object *key);
+void lu_objectset_free(struct lu_objectset *set);
+
+static inline struct lu_objectset_iter
+lu_objectset_iter_new(struct lu_objectset *set) {
+    struct lu_objectset_iter iter = {set, 0};
+    return iter;
+}
+
+static inline struct lu_object *
+lu_objectset_iter_next(struct lu_objectset_iter *iter) {
+    while (iter->index < iter->set->capacity) {
+        struct lu_object *key = iter->set->entries[iter->index++];
+        if (key)
+            return key;
+    }
+    return nullptr;
+}
+
+static inline struct property_map_iter
+property_map_iter_new(struct property_map *map) {
+    struct property_map_iter iter = {map, 0};
+    return iter;
+}
+
+static inline struct property_map_entry *
+property_map_iter_next(struct property_map_iter *iter) {
+    while (iter->index < iter->map->capacity) {
+        struct property_map_entry *entry = &iter->map->entries[iter->index++];
+        if (entry->occupied)
+            return entry;
+    }
+    return nullptr;
+}

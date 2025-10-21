@@ -33,6 +33,8 @@ struct string_interner {
 };
 
 void string_interner_init(struct lu_istate *state);
+void string_interner_destroy(struct string_interner *interner);
+
 void string_map_init(struct string_map *map);
 
 struct lu_string *string_map_put(struct string_interner *interner,

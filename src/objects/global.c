@@ -5,7 +5,7 @@
 
 #define lu_define_native(state, name_str, func)                                \
     do {                                                                       \
-        struct lu_string *fname = lu_string_new(state, (char *)(name_str));    \
+        struct lu_string *fname = lu_intern_string(state, (char *)(name_str)); \
         struct lu_function *fobj = lu_native_function_new(state, fname, func); \
         lu_obj_set((state)->global_object, fname,                              \
                    lu_value_object((struct lu_object *)fobj));                 \

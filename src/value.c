@@ -45,7 +45,16 @@ static void lu_object_finalize(struct lu_object *obj) {
     lu_property_map_deinit(&obj->properties);
 }
 
-static void lu_object_visit(struct lu_object *obj) {}
+static void lu_object_visit(struct lu_object *obj, struct lu_objectset *set) {
+    struct property_map_iter iter = property_map_iter_new(&obj->properties);
+    struct property_map_entry *entry;
+    while ((entry = property_map_iter_next(&iter))) {
+        lu_objectset_add(set, lu_cast(struct lu_object, entry->key));
+        if (lu_is_object(entry->value)) {
+            lu_objectset_add(set, lu_as_object(entry->value));
+        }
+    }
+}
 
 static void lu_string_finalize(struct lu_object *obj) {
     struct lu_string *str = (struct lu_string *)obj;
@@ -94,17 +103,16 @@ bool lu_string_equal(struct lu_string *a, struct lu_string *b) {
         return memcmp(a->Sms, b->Sms, a->length) == 0;
     }
 
-    return strncmp(a->block->data, b->block->data, a->length) == 0;
+    if (a->type == STRING_SIMPLE && b->type == STRING_SIMPLE)
+        return memcmp(a->block->data, b->block->data, a->length) == 0;
+
+    return strncmp(a->data, b->data, a->length) == 0;
 }
 
 void lu_property_map_init(struct property_map *map, size_t capacity) {
     map->capacity = capacity;
     map->size = 0;
     map->entries = calloc(capacity, sizeof(struct property_map_entry));
-
-    for (size_t i = 0; i < capacity; i++) {
-        map->entries[i].occupied = false;
-    }
 }
 
 void lu_property_map_deinit(struct property_map *map) {
@@ -273,4 +281,76 @@ struct lu_function *lu_native_function_new(struct lu_istate *state,
     func->vtable = &lu_function_vtable;
 
     return func;
+}
+
+// object set implementation
+struct lu_objectset *lu_objectset_new(size_t initial_capacity) {
+    struct lu_objectset *set = calloc(1, sizeof(*set));
+    set->entries = calloc(initial_capacity, sizeof(struct lu_object *));
+    set->capacity = initial_capacity;
+    return set;
+}
+
+uint64_t lu_ptr_hash(void *k) {
+    uintptr_t key = (uintptr_t)k;
+    key = (~key) + (key << 21);
+    key = key ^ (key >> 24);
+    key = (key + (key << 3)) + (key << 8);
+    key = key ^ (key >> 14);
+    key = (key + (key << 2)) + (key << 4);
+    key = key ^ (key >> 28);
+    key = key + (key << 31);
+    return key;
+}
+
+static void lu_objectset_resize(struct lu_objectset *set, size_t new_cap) {
+    struct lu_object **old_entries = set->entries;
+    size_t old_cap = set->capacity;
+
+    set->entries = calloc(new_cap, sizeof(struct lu_object *));
+    set->capacity = new_cap;
+    set->size = 0;
+
+    for (size_t i = 0; i < old_cap; i++) {
+        struct lu_object *key = old_entries[i];
+        if (key) {
+            size_t mask = new_cap - 1;
+            size_t idx = lu_ptr_hash(key) & mask;
+            while (set->entries[idx])
+                idx = (idx + 1) & mask;
+            set->entries[idx] = key;
+            set->size++;
+        }
+    }
+
+    free(old_entries);
+}
+
+bool lu_objectset_add(struct lu_objectset *set, struct lu_object *key) {
+    if (!key)
+        return false;
+    if (((float)(set->size + 1) / set->capacity) >= LU_PROPERTY_MAP_LOAD_FACTOR)
+        lu_objectset_resize(set, set->capacity * 2);
+
+    size_t mask = set->capacity - 1;
+    size_t index = lu_ptr_hash(key) & mask;
+
+    for (;;) {
+        void *existing = set->entries[index];
+        if (existing == nullptr) {
+            set->entries[index] = key;
+            set->size++;
+            return true;
+        }
+        if (existing == key)
+            return false;
+        index = (index + 1) & mask;
+    }
+}
+
+void lu_objectset_free(struct lu_objectset *set) {
+    if (!set)
+        return;
+    free(set->entries);
+    free(set);
 }
