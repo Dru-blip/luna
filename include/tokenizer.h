@@ -10,6 +10,10 @@ struct span {
     uint32_t end;
 };
 
+#define SPAN_MERGE(a, b) \
+    ((struct span){      \
+        .line = (a).line, .col = (a).col, .start = (a).start, .end = (b).end})
+
 enum token_kind {
     TOKEN_PLUS,
     TOKEN_PLUS_EQUAL,
@@ -173,7 +177,3 @@ static struct keyword keywords[] = {
 };
 
 struct token* tokenize(const char* source);
-
-#define SPAN_MERGE(a, b) \
-    ((struct span){      \
-        .line = (a).line, .col = (a).col, .start = (a).start, .end = (b).end})

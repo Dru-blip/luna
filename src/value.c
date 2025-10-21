@@ -212,7 +212,7 @@ struct lu_value lu_property_map_get(struct property_map* map,
 }
 void lu_property_map_remove(struct property_map* map, struct lu_string* key) {}
 
-struct lu_object* lu_object_new(struct lu_istate* state) {
+inline struct lu_object* lu_object_new(struct lu_istate* state) {
     struct lu_object* obj =
         heap_allocate_object(state->heap, sizeof(struct lu_object));
     lu_property_map_init(&obj->properties, 4);
@@ -220,7 +220,8 @@ struct lu_object* lu_object_new(struct lu_istate* state) {
     return obj;
 }
 
-struct lu_object* lu_object_new_sized(struct lu_istate* state, size_t size) {
+inline struct lu_object* lu_object_new_sized(struct lu_istate* state,
+                                             size_t size) {
     struct lu_object* obj = heap_allocate_object(state->heap, size);
     lu_property_map_init(&obj->properties, 4);
     obj->vtable = &lu_object_default_vtable;
@@ -289,6 +290,24 @@ struct lu_function* lu_native_function_new(struct lu_istate* state,
     func->vtable = &lu_function_vtable;
 
     return func;
+}
+
+struct lu_array* lu_array_new(struct lu_istate* state) {
+    struct lu_array* array =
+        lu_object_new_sized(state, sizeof(struct lu_array));
+    array->capacity = 4;
+    array->size = 0;
+    array->elements = calloc(array->capacity, sizeof(struct lu_value));
+    return array;
+}
+
+void lu_array_push(struct lu_array* array, struct lu_value value) {
+    if (array->size + 1 >= array->capacity) {
+        array->capacity *= 2;
+        array->elements =
+            realloc(array->elements, array->capacity * sizeof(struct lu_value));
+    }
+    array->elements[array->size++] = value;
 }
 
 void lu_raise_error(struct lu_istate* state, struct lu_string* message,

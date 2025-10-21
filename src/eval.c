@@ -362,6 +362,20 @@ static struct lu_value eval_expr(struct lu_istate* state,
             }
             return value;
         }
+        case AST_NODE_ARRAY_EXPR: {
+            struct lu_array* array = lu_array_new(state);
+            const size_t len = arrlen(expr->data.list);
+            for (size_t i = 0; i < len; ++i) {
+                struct lu_value elem = eval_expr(state, expr->data.list[i]);
+                if (state->op_result == OP_RESULT_RAISED_ERROR) {
+                    goto ret;
+                }
+                lu_array_push(array, elem);
+            }
+
+        ret:
+            return lu_value_object(array);
+        }
         case AST_NODE_BINOP: {
             struct lu_value lhs = eval_expr(state, expr->data.binop.lhs);
             if (state->op_result == OP_RESULT_RAISED_ERROR) {

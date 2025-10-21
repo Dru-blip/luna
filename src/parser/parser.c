@@ -158,6 +158,23 @@ static struct ast_node* parse_prefix_expression(struct parser* parser) {
             };
             return node;
         }
+        case TOKEN_LBRACKET: {
+            struct token* token = parser_eat(parser);
+            struct ast_node** elements = nullptr;
+            while (!check(parser, TOKEN_RBRACKET)) {
+                struct ast_node* element = parse_expression(parser, 0);
+                if (check(parser, TOKEN_COMMA)) {
+                    parser_advance(parser);
+                }
+                arrput(elements, element);
+            }
+            struct ast_node* node =
+                make_node(parser, AST_NODE_ARRAY_EXPR,
+                          SPAN_MERGE(token->span, parser->cur_token->span));
+            parse_expected(parser, TOKEN_RBRACKET);
+            node->data.list = elements;
+            return node;
+        }
         default: {
             return parse_primary_expression(parser);
         }
@@ -171,8 +188,8 @@ static void parse_call_args(struct parser* parser, uint8_t* argc,
         if (check(parser, TOKEN_COMMA)) {
             parser_advance(parser);
         }
-        arrput( *args, arg);
-        ( *argc)++;
+        arrput(*args, arg);
+        (*argc)++;
     }
 }
 
