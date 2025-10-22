@@ -59,7 +59,7 @@ struct lu_value len(struct lu_istate* state, struct argument* args) {
             return lu_value_int(1);
         }
         case VALUE_INTEGER: {
-            // TODO: implement bit width
+            // TODO: implement digit count
             return arg;
         }
         case VALUE_OBJECT: {

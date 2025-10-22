@@ -411,6 +411,13 @@ static struct lu_value eval_expr(struct lu_istate* state,
             }
             return lu_value_object(obj);
         }
+        case AST_NODE_FN_EXPR: {
+            const struct ast_fn_decl* fn_expr = &expr->data.fn_decl;
+            struct lu_function* func_obj =
+                lu_function_new(state, lu_intern_string(state, "anonymous"),
+                                fn_expr->params, fn_expr->body);
+            return lu_value_object(func_obj);
+        }
         case AST_NODE_BINOP: {
             struct lu_value lhs = eval_expr(state, expr->data.binop.lhs);
             if (state->op_result == OP_RESULT_RAISED_ERROR) {

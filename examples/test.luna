@@ -1,1 +1,9 @@
-a={name}
+a={
+    name:"john",
+    call:fn(){
+        print("hello")
+    }
+}
+
+
+a.call()

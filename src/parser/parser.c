@@ -210,6 +210,19 @@ static struct ast_node* parse_prefix_expression(struct parser* parser) {
             node->data.list = properties;
             return node;
         }
+        case TOKEN_KEYWORD_FN: {
+            token = parser_eat(parser);
+            struct ast_node** params = nullptr;
+            parse_param_list(parser, &params);
+            struct ast_node* body = parse_stmt(parser);
+            struct ast_node* node = make_node(
+                parser, AST_NODE_FN_EXPR, SPAN_MERGE(token->span, body->span));
+            node->data.fn_decl = (struct ast_fn_decl){
+                .params = params,
+                .body = body,
+            };
+            return node;
+        }
         default: {
             return parse_primary_expression(parser);
         }
