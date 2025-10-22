@@ -1,7 +1,7 @@
 a={
     name:"john",
     call:fn(){
-        print("hello")
+        print(self.name)
     }
 }
 

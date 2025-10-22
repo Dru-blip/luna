@@ -316,15 +316,17 @@ struct lu_string* get_identifier(struct lu_istate* state, struct span* span) {
     return str;
 }
 
+// DANGER: find a workaround for self
+static struct lu_object* self = nullptr;
+
 static void eval_call(struct lu_istate* state, struct span* call_location,
                       struct lu_function* func, struct argument* args,
                       struct lu_value* result) {
     // Implementation of eval_call function
     struct call_frame* frame = push_call_frame(state->context_stack);
     frame->function = func;
-    frame->self = func;
+    frame->self = self ? self : lu_cast(struct lu_object, func);
     frame->call_location = *call_location;
-
     begin_scope(state);
     for (uint8_t i = 0; i < func->param_count; i++) {
         set_variable(state, args[i].name, args[i].value);
@@ -418,6 +420,10 @@ static struct lu_value eval_expr(struct lu_istate* state,
                                 fn_expr->params, fn_expr->body);
             return lu_value_object(func_obj);
         }
+        case AST_NODE_SELF_EXPR: {
+            struct lu_object* s = state->context_stack->call_stack->self;
+            return s ? lu_value_object(s) : lu_value_none();
+        }
         case AST_NODE_BINOP: {
             struct lu_value lhs = eval_expr(state, expr->data.binop.lhs);
             if (state->op_result == OP_RESULT_RAISED_ERROR) {
@@ -451,8 +457,9 @@ static struct lu_value eval_expr(struct lu_istate* state,
             return value;
         }
         case AST_NODE_CALL: {
-            struct lu_value callee = eval_expr(state, expr->data.call.callee);
-
+            struct lu_value callee;
+            struct ast_call* call = &expr->data.call;
+            callee = eval_expr(state, call->callee);
             if (!lu_is_function(callee)) {
                 state->op_result = OP_RESULT_RAISED_ERROR;
                 return lu_value_none();
@@ -463,12 +470,12 @@ static struct lu_value eval_expr(struct lu_istate* state,
                 arena_alloc(&state->args_buffer,
                             sizeof(struct argument) * func->param_count);
 
-            for (uint32_t i = 0; i < expr->data.call.argc; ++i) {
+            for (uint32_t i = 0; i < call->argc; ++i) {
                 if (func->type == FUNCTION_USER) {
                     args[i].name =
                         get_identifier(state, &func->params[i]->span);
                 }
-                args[i].value = eval_expr(state, expr->data.call.args[i]);
+                args[i].value = eval_expr(state, call->args[i]);
                 if (state->op_result == OP_RESULT_RAISED_ERROR) {
                     arena_reset(&state->args_buffer);
                     return lu_value_none();
@@ -480,8 +487,8 @@ static struct lu_value eval_expr(struct lu_istate* state,
                 struct call_frame* frame =
                     push_call_frame(state->context_stack);
                 frame->function = func;
-                frame->self = func;
                 frame->call_location = expr->span;
+                frame->self = self ? self : lu_cast(struct lu_object, func);
                 res = func->func(state, args);
                 pop_call_frame(state->context_stack);
             } else {
@@ -515,7 +522,7 @@ static struct lu_value eval_expr(struct lu_istate* state,
                                &expr->span);
                 return lu_value_none();
             }
-
+            self = lu_as_object(val);
             return prop;
         }
         case AST_NODE_COMPUTED_MEMBER_EXPR: {
@@ -531,6 +538,7 @@ static struct lu_value eval_expr(struct lu_istate* state,
                     &expr->span);
                 return lu_value_none();
             }
+            self = lu_as_object(val);
             struct lu_value prop = eval_expr(state, expr->data.pair.snd);
             if (state->op_result == OP_RESULT_RAISED_ERROR) {
                 return lu_value_none();

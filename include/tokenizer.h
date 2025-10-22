@@ -78,6 +78,7 @@ enum token_kind {
     TOKEN_KEYWORD_CONTINUE,
 
     TOKEN_KEYWORD_FN,
+    TOKEN_KEYWORD_SELF,
 
     TOKEN_EOF,
 };
@@ -140,6 +141,7 @@ static const char* token_labels[] = {
     "break",     // TOKEN_KEYWORD_BREAK
     "continue",  // TOKEN_KEYWORD_CONTINUE
     "fn",        // TOKEN_KEYWORD_FN
+    "self",      // TOKEN_KEYWORD_SELF
 
     "eof",  // TOKEN_EOF
 };
@@ -175,7 +177,7 @@ static struct keyword keywords[] = {
     {"else", TOKEN_KEYWORD_ELSE},     {"loop", TOKEN_KEYWORD_LOOP},
     {"while", TOKEN_KEYWORD_WHILE},   {"for", TOKEN_KEYWORD_FOR},
     {"break", TOKEN_KEYWORD_BREAK},   {"continue", TOKEN_KEYWORD_CONTINUE},
-    {"fn", TOKEN_KEYWORD_FN},
+    {"fn", TOKEN_KEYWORD_FN},         {"self", TOKEN_KEYWORD_SELF},
 };
 
 struct token* tokenize(const char* source);
