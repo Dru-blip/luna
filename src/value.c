@@ -7,6 +7,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "ast.h"
 #include "eval.h"
 #include "heap.h"
 #include "stb_ds.h"
@@ -103,6 +104,15 @@ static void lu_array_visit(struct lu_object* self, struct lu_objectset* set) {
     lu_object_visit(self, set);
 }
 
+static void lu_module_visit(struct lu_object* self, struct lu_objectset* set) {
+    struct lu_module* module = lu_cast(struct lu_module, self);
+    lu_objectset_add(set, module->name);
+    if (lu_is_object(module->exported)) {
+        lu_objectset_add(set, lu_as_object(module->exported));
+    }
+    lu_object_visit(self, set);
+}
+
 static struct lu_object_vtable lu_object_default_vtable = {
     .is_function = false,
     .is_string = false,
@@ -133,6 +143,14 @@ static struct lu_object_vtable lu_array_vtable = {
     .is_array = true,
     .finalize = lu_array_finalize,
     .visit = lu_array_visit,
+};
+
+static struct lu_object_vtable lu_module_vtable = {
+    .is_function = false,
+    .is_string = false,
+    .is_array = false,
+    .finalize = lu_object_finalize,
+    .visit = lu_module_visit,
 };
 
 bool lu_string_equal(struct lu_string* a, struct lu_string* b) {
@@ -314,6 +332,7 @@ struct lu_string* lu_string_new(struct lu_istate* state, char* data) {
 
 struct lu_function* lu_function_new(struct lu_istate* state,
                                     struct lu_string* name,
+                                    struct lu_module* module,
                                     struct ast_node** params,
                                     struct ast_node* body) {
     struct lu_function* func =
@@ -321,6 +340,7 @@ struct lu_function* lu_function_new(struct lu_istate* state,
     func->type = FUNCTION_USER;
     func->name = name;
     func->body = body;
+    func->module = module;
     func->params = params;
     func->param_count = params ? arrlen(params) : 0;
     func->vtable = &lu_function_vtable;
@@ -369,6 +389,19 @@ struct lu_value lu_array_get(struct lu_array* array, size_t index) {
     return array->elements[index];
 }
 
+struct lu_module* lu_module_new(struct lu_istate* state, struct lu_string* name,
+                                struct ast_program* program) {
+    //
+    struct lu_module* mod =
+        lu_object_new_sized(state, sizeof(struct lu_module));
+    mod->program = *program;
+    mod->name = name;
+    mod->vtable = &lu_module_vtable;
+    mod->exported = lu_value_undefined();
+
+    return mod;
+}
+
 void lu_raise_error(struct lu_istate* state, struct lu_string* message,
                     struct span* location) {
     struct lu_object* error = lu_object_new(state);
@@ -381,7 +414,8 @@ void lu_raise_error(struct lu_istate* state, struct lu_string* message,
                lu_value_object(message));
 
     const char* line_start =
-        state->context_stack->program.source + location->start;
+        state->context_stack->call_stack->module->program.source +
+        location->start;
     int line_length = location->end - location->start;
 
     strbuf_append(&sb, "  | \n");
@@ -396,8 +430,10 @@ void lu_raise_error(struct lu_istate* state, struct lu_string* message,
     }
     strbuf_append(&sb, "\n");
 
-    strbuf_appendf(&sb, "in %s:%d:%d", state->context_stack->filepath,
-                   location->line, location->col);
+    strbuf_appendf(
+        &sb, "in %s:%d:%d",
+        lu_string_get_cstring(state->context_stack->call_stack->module->name),
+        location->line, location->col);
 
     lu_obj_set(error, lu_intern_string(state, "traceback"),
                lu_value_object(lu_string_new(state, buffer)));

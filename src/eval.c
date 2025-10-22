@@ -41,6 +41,7 @@ struct lu_istate* lu_istate_new() {
     state->global_object = lu_object_new(state);
     state->module_cache = lu_object_new(state);
     lu_init_global_object(state);
+    state->running_module = nullptr;
     arena_init(&state->args_buffer);
     return state;
 }
@@ -63,9 +64,9 @@ static struct execution_context* create_execution_context(
 static void delete_execution_context(struct lu_istate* state) {
     struct execution_context* ctx = state->context_stack;
     state->context_stack = ctx->prev;
-    arrfree(ctx->program.tokens);
-    free(ctx->program.source);
-    arena_destroy(&ctx->program.allocator);
+    // arrfree(ctx->program.tokens);
+    // free(ctx->program.source);
+    // arena_destroy(&ctx->program.allocator);
     free(ctx->scope);
     free(ctx);
 }
@@ -77,12 +78,20 @@ struct lu_value lu_run_program(struct lu_istate* state, const char* filepath) {
         create_execution_context(state, state->context_stack);
     state->context_stack->filepath = filepath;
     state->context_stack->program = program;
+    struct lu_module* module =
+        lu_module_new(state, lu_string_new(state, filepath), &program);
     struct call_frame* frame = push_call_frame(state->context_stack);
+    struct lu_module* prev_module = state->running_module;
+    frame->module = module;
+    state->running_module = module;
     lu_eval_program(state);
     frame = pop_call_frame(state->context_stack);
     struct lu_value result = frame->return_value;
+    module->exported = result;
+    lu_obj_set(state->module_cache, module->name, lu_value_object(module));
     delete_execution_context(state);
     free(frame);
+    state->running_module = prev_module;
     return result;
 }
 
@@ -90,6 +99,7 @@ struct call_frame* push_call_frame(struct execution_context* ctx) {
     struct call_frame* frame = calloc(1, sizeof(struct call_frame));
     frame->parent = ctx->call_stack;
     ctx->call_stack = frame;
+    frame->self = nullptr;
     frame->return_value = lu_value_none();
     ctx->frame_count++;
     return frame;
@@ -308,30 +318,32 @@ static inline struct lu_value get_variable(struct lu_istate* state,
 
 struct lu_string* get_identifier(struct lu_istate* state, struct span* span) {
     const size_t len = span->end - span->start;
-    char* buffer = malloc(len + 1);
-    memcpy(buffer, state->context_stack->program.source + span->start, len);
+    char* buffer = arena_alloc(&state->args_buffer, len + 1);
+    memcpy(
+        buffer,
+        state->context_stack->call_stack->module->program.source + span->start,
+        len);
     buffer[len] = '\0';
     struct lu_string* str = lu_intern_string(state, buffer);
-    free(buffer);
+    arena_reset(&state->args_buffer);
     return str;
 }
 
-// DANGER: find a workaround for self
-static struct lu_object* self = nullptr;
-
-static void eval_call(struct lu_istate* state, struct span* call_location,
-                      struct lu_function* func, struct argument* args,
-                      struct lu_value* result) {
+static void eval_call(struct lu_istate* state, struct lu_object* self,
+                      struct span* call_location, struct lu_function* func,
+                      struct argument* args, struct lu_value* result) {
     // Implementation of eval_call function
     struct call_frame* frame = push_call_frame(state->context_stack);
     frame->function = func;
-    frame->self = self ? self : lu_cast(struct lu_object, func);
+    frame->self = self;
     frame->call_location = *call_location;
+    frame->module = func->module;
+    struct ast_node body = *func->body;
     begin_scope(state);
     for (uint8_t i = 0; i < func->param_count; i++) {
         set_variable(state, args[i].name, args[i].value);
     }
-    enum signal_kind sig = eval_stmt(state, func->body);
+    enum signal_kind sig = eval_stmt(state, &body);
     end_scope(state);
     frame = pop_call_frame(state->context_stack);
     *result = frame->return_value;
@@ -415,9 +427,9 @@ static struct lu_value eval_expr(struct lu_istate* state,
         }
         case AST_NODE_FN_EXPR: {
             const struct ast_fn_decl* fn_expr = &expr->data.fn_decl;
-            struct lu_function* func_obj =
-                lu_function_new(state, lu_intern_string(state, "anonymous"),
-                                fn_expr->params, fn_expr->body);
+            struct lu_function* func_obj = lu_function_new(
+                state, lu_intern_string(state, "anonymous"),
+                state->running_module, fn_expr->params, fn_expr->body);
             return lu_value_object(func_obj);
         }
         case AST_NODE_SELF_EXPR: {
@@ -458,17 +470,65 @@ static struct lu_value eval_expr(struct lu_istate* state,
         }
         case AST_NODE_CALL: {
             struct lu_value callee;
+            struct lu_value self = lu_value_undefined();
             struct ast_call* call = &expr->data.call;
+
+            // populate self object
+            switch (call->callee->kind) {
+                case AST_NODE_MEMBER_EXPR: {
+                    // Duplicate code inside member expression evaluation.
+                    // TODO: Refactor this code to avoid duplication.
+                    self =
+                        eval_expr(state, call->callee->data.member_expr.object);
+                    if (!lu_is_object(self)) {
+                        lu_raise_error(
+                            state,
+                            lu_string_new(
+                                state,
+                                "Invalid member access on non object value"),
+                            &expr->span);
+                        return lu_value_none();
+                    }
+                    break;
+                }
+                case AST_NODE_COMPUTED_MEMBER_EXPR: {
+                    // Duplicate code inside AST_NODE_COMPUTED_MEMBER_EXPR
+                    // evaluation
+                    // TODO: Refactor this code to avoid duplication.
+                    self = eval_expr(state, expr->data.pair.fst);
+                    if (state->op_result == OP_RESULT_RAISED_ERROR) {
+                        return lu_value_none();
+                    }
+                    if (!lu_is_object(self)) {
+                        lu_raise_error(
+                            state,
+                            lu_string_new(
+                                state,
+                                "Invalid member access on non object value"),
+                            &expr->span);
+                        return lu_value_none();
+                    }
+                    break;
+                }
+                default: {
+                    break;
+                }
+            }
+
             callee = eval_expr(state, call->callee);
+            if (state->op_result == OP_RESULT_RAISED_ERROR) {
+                return lu_value_none();
+            }
+
             if (!lu_is_function(callee)) {
+                // TODO: Raise errors for uncallable objects
                 state->op_result = OP_RESULT_RAISED_ERROR;
                 return lu_value_none();
             }
 
             struct lu_function* func = lu_as_function(callee);
-            struct argument* args =
-                arena_alloc(&state->args_buffer,
-                            sizeof(struct argument) * func->param_count);
+            struct argument* args = arena_alloc(
+                &state->args_buffer, sizeof(struct argument) * (call->argc));
 
             for (uint32_t i = 0; i < call->argc; ++i) {
                 if (func->type == FUNCTION_USER) {
@@ -482,17 +542,21 @@ static struct lu_value eval_expr(struct lu_istate* state,
                 }
             }
 
+            struct lu_object* self_obj = lu_is_undefined(self)
+                                             ? lu_cast(struct lu_object, func)
+                                             : lu_as_object(self);
             struct lu_value res = lu_value_none();
             if (func->type == FUNCTION_NATIVE) {
                 struct call_frame* frame =
                     push_call_frame(state->context_stack);
                 frame->function = func;
+                frame->arg_count = call->argc;
                 frame->call_location = expr->span;
-                frame->self = self ? self : lu_cast(struct lu_object, func);
+                frame->self = self_obj;
                 res = func->func(state, args);
                 pop_call_frame(state->context_stack);
             } else {
-                eval_call(state, &expr->span, func, args, &res);
+                eval_call(state, self_obj, &expr->span, func, args, &res);
             }
             arena_reset(&state->args_buffer);
             return res;
@@ -522,7 +586,6 @@ static struct lu_value eval_expr(struct lu_istate* state,
                                &expr->span);
                 return lu_value_none();
             }
-            self = lu_as_object(val);
             return prop;
         }
         case AST_NODE_COMPUTED_MEMBER_EXPR: {
@@ -538,7 +601,6 @@ static struct lu_value eval_expr(struct lu_istate* state,
                     &expr->span);
                 return lu_value_none();
             }
-            self = lu_as_object(val);
             struct lu_value prop = eval_expr(state, expr->data.pair.snd);
             if (state->op_result == OP_RESULT_RAISED_ERROR) {
                 return lu_value_none();
@@ -606,7 +668,8 @@ static enum signal_kind eval_stmt(struct lu_istate* state,
 
             struct lu_string* name = get_identifier(state, &fndecl->name_span);
             struct lu_function* func_obj =
-                lu_function_new(state, name, fndecl->params, fndecl->body);
+                lu_function_new(state, name, state->running_module,
+                                fndecl->params, fndecl->body);
             set_variable(state, name, lu_value_object(func_obj));
             break;
         }

@@ -114,6 +114,7 @@ struct lu_function {
     LUNA_OBJECT_HEADER;
     enum lu_function_type type;
     struct lu_string* name;
+    struct lu_module* module;
     size_t param_count;
     union {
         native_func_t func;
@@ -132,6 +133,7 @@ enum lu_module_type {
 struct lu_module {
     LUNA_OBJECT_HEADER;
     enum lu_module_type type;
+    struct lu_string* name;
     union {
         struct ast_program program;
         void* module_handle;
@@ -238,6 +240,7 @@ struct lu_string* lu_small_string_new(struct lu_istate* state, char* data,
 
 struct lu_function* lu_function_new(struct lu_istate* state,
                                     struct lu_string* name,
+                                    struct lu_module* module,
                                     struct ast_node** params,
                                     struct ast_node* body);
 
@@ -245,6 +248,8 @@ struct lu_function* lu_native_function_new(struct lu_istate* state,
                                            struct lu_string* name,
                                            native_func_t native_func,
                                            size_t param_count);
+struct lu_module* lu_module_new(struct lu_istate* state, struct lu_string* name,
+                                struct ast_program* program);
 
 struct lu_array* lu_array_new(struct lu_istate* state);
 void lu_array_push(struct lu_array* array, struct lu_value value);

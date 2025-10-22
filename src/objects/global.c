@@ -5,10 +5,9 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "eval.h"
+#include "luna.h"
 #include "strbuf.h"
 #include "string_interner.h"
-#include "value.h"
 
 #define lu_define_native(state, name_str, func, pc)                           \
     do {                                                                      \
@@ -20,29 +19,34 @@
     } while (0)
 
 struct lu_value print_func(struct lu_istate* state, struct argument* args) {
-    switch (args[0].value.type) {
-        case VALUE_BOOL: {
-            printf("%s\n", args[0].value.integer ? "true" : "false");
-            break;
-        }
-        case VALUE_INTEGER: {
-            printf("%ld\n", args[0].value.integer);
-            break;
-        }
-        case VALUE_NONE: {
-            printf("none\n");
-            break;
-        }
-        case VALUE_OBJECT: {
-            if (lu_is_string(args[0].value)) {
-                printf("%s\n",
-                       lu_string_get_cstring(lu_as_string(args[0].value)));
+    size_t arg_count = LU_ARG_COUNT(state);
+    for (size_t i = 0; i < arg_count; i++) {
+        switch (args[i].value.type) {
+            case VALUE_BOOL: {
+                printf("%s ", args[i].value.integer ? "true" : "false");
                 break;
             }
-            printf("Object<%p>", lu_as_object(args[0].value));
-            break;
+            case VALUE_INTEGER: {
+                printf("%ld ", args[i].value.integer);
+                break;
+            }
+            case VALUE_NONE: {
+                printf("none ");
+                break;
+            }
+            case VALUE_OBJECT: {
+                if (lu_is_string(args[i].value)) {
+                    printf("%s ",
+                           lu_string_get_cstring(lu_as_string(args[i].value)));
+                    break;
+                }
+                printf("Object<%p> ", lu_as_object(args[i].value));
+                break;
+            }
         }
     }
+    printf("\n");
+
     return lu_value_none();
 }
 

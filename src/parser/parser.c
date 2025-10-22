@@ -502,7 +502,7 @@ struct ast_program parse_program(const char* filename, const char* source) {
         .allocator = parser.allocator,
         .nodes = nodes,
         .tokens = tokens,
-        .source = source,
+        .source = parser.source,
         .filepath = filename,
     };
 }

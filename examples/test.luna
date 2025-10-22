@@ -1,9 +1,3 @@
-a={
-    name:"john",
-    call:fn(){
-        print(self.name)
-    }
-}
+h=import("hello")
 
-
-a.call()
+print(h.call().name)
