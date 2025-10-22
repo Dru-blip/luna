@@ -62,6 +62,7 @@ enum token_kind {
 
     TOKEN_COMMA,
     TOKEN_DOT,
+    TOKEN_COLON,
 
     TOKEN_KEYWORD_RETURN,
     TOKEN_KEYWORD_TRUE,
@@ -126,6 +127,7 @@ static const char* token_labels[] = {
     "]",  // TOKEN_RBRACKET
     ",",  // TOKEN_COMMA
     ".",  // TOKEN_DOT
+    ":",  // TOKEN_COLON
 
     "return",    // TOKEN_KEYWORD_RETURN
     "true",      // TOKEN_KEYWORD_TRUE

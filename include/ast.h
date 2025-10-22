@@ -22,6 +22,8 @@ enum ast_node_kind {
 
     AST_NODE_MEMBER_EXPR,
     AST_NODE_COMPUTED_MEMBER_EXPR,
+    AST_NODE_OBJECT_PROPERTY,
+    AST_NODE_OBJECT_EXPR,
 
     AST_NODE_ARRAY_EXPR,
 
@@ -65,6 +67,12 @@ struct ast_member_expr {
     struct span property_name;
 };
 
+struct ast_object_property {
+    struct span property_name;
+    struct ast_node* value;
+    bool shorthand;
+};
+
 struct ast_if_stmt {
     struct ast_node* test;
     struct ast_node* consequent;
@@ -95,6 +103,7 @@ union ast_node_data {
     struct ast_member_expr member_expr;
     struct ast_if_stmt if_stmt;
     struct ast_node** list;
+    struct ast_object_property property;
     struct ast_for_stmt for_stmt;
     struct ast_fn_decl fn_decl;
 };

@@ -161,7 +161,7 @@ static struct ast_node* parse_prefix_expression(struct parser* parser) {
             return node;
         }
         case TOKEN_LBRACKET: {
-            struct token* token = parser_eat(parser);
+            token = parser_eat(parser);
             struct ast_node** elements = nullptr;
             while (!check(parser, TOKEN_RBRACKET)) {
                 struct ast_node* element = parse_expression(parser, 0);
@@ -175,6 +175,39 @@ static struct ast_node* parse_prefix_expression(struct parser* parser) {
                           SPAN_MERGE(token->span, parser->cur_token->span));
             parse_expected(parser, TOKEN_RBRACKET);
             node->data.list = elements;
+            return node;
+        }
+        case TOKEN_LBRACE: {
+            token = parser_eat(parser);
+            struct ast_node** properties = nullptr;
+            while (!check(parser, TOKEN_RBRACE)) {
+                struct token* key = parse_expected(parser, TOKEN_IDENTIFIER);
+                struct ast_node* value = nullptr;
+                bool shorthand = false;
+                if (check(parser, TOKEN_COMMA) || check(parser, TOKEN_RBRACE)) {
+                    shorthand = true;
+                } else {
+                    parse_expected(parser, TOKEN_COLON);
+                    value = parse_expression(parser, 0);
+                }
+                struct ast_node* property =
+                    make_node(parser, AST_NODE_OBJECT_PROPERTY,
+                              SPAN_MERGE(key->span, parser->cur_token->span));
+                if (check(parser, TOKEN_COMMA)) {
+                    parser_advance(parser);
+                }
+                property->data.property = (struct ast_object_property){
+                    .property_name = key->span,
+                    .shorthand = shorthand,
+                    .value = value,
+                };
+                arrput(properties, property);
+            }
+            struct ast_node* node =
+                make_node(parser, AST_NODE_OBJECT_EXPR,
+                          SPAN_MERGE(token->span, parser->cur_token->span));
+            parse_expected(parser, TOKEN_RBRACE);
+            node->data.list = properties;
             return node;
         }
         default: {

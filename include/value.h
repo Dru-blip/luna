@@ -178,8 +178,10 @@ struct lu_array {
 #define lu_obj_get(obj, key) lu_property_map_get(&(obj)->properties, key)
 #define lu_obj_set(obj, key, value) \
     lu_property_map_set(&(obj)->properties, key, value)
-#define lu_obj_size(obj) (obj)->properties.size
 #define lu_obj_remove(obj, key) lu_property_map_remove(&(obj)->properties, key)
+
+#define lu_obj_size(obj) (obj)->properties.size
+#define lu_array_length(array) ((array)->size)
 
 static inline struct lu_value lu_bool(bool v) { return lu_value_bool(v); }
 static inline struct lu_value lu_int(int64_t v) { return lu_value_int(v); }
@@ -225,6 +227,7 @@ void lu_property_map_set(struct property_map* map, struct lu_string* key,
                          struct lu_value value);
 struct lu_value lu_property_map_get(struct property_map* map,
                                     struct lu_string* key);
+// TODO: implement property remove
 void lu_property_map_remove(struct property_map* map, struct lu_string* key);
 
 struct lu_object* lu_object_new(struct lu_istate* state);

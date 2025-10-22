@@ -336,6 +336,12 @@ static void eval_call(struct lu_istate* state, struct span* call_location,
     free(frame);
 }
 
+// TODO: The current error handling repeatedly checks `state->op_result` after
+// each eval. This slows down execution due to frequent branching.
+// Should consider `setjmp`/`longjmp` to implement structured exception
+// handling, allows immediate unwinding to a safe recovery point when  error
+// is raised.
+
 static struct lu_value eval_expr(struct lu_istate* state,
                                  struct ast_node* expr) {
     switch (expr->kind) {
@@ -376,6 +382,34 @@ static struct lu_value eval_expr(struct lu_istate* state,
 
         ret:
             return lu_value_object(array);
+        }
+        case AST_NODE_OBJECT_EXPR: {
+            struct lu_object* obj = lu_object_new(state);
+            const size_t len = arrlen(expr->data.list);
+            struct ast_node* prop;
+            for (size_t i = 0; i < len; i++) {
+                prop = expr->data.list[i];
+                struct lu_string* key =
+                    get_identifier(state, &prop->data.property.property_name);
+                struct lu_value value;
+                if (prop->data.property.shorthand) {
+                    value = get_variable(state, key);
+                    if (lu_is_undefined(value)) {
+                        lu_raise_error(
+                            state,
+                            lu_string_new(state, "Undeclared indentifier"),
+                            &expr->span);
+                        return value;
+                    }
+                } else {
+                    value = eval_expr(state, prop->data.property.value);
+                    if (state->op_result == OP_RESULT_RAISED_ERROR) {
+                        return lu_value_none();
+                    }
+                }
+                lu_obj_set(obj, key, value);
+            }
+            return lu_value_object(obj);
         }
         case AST_NODE_BINOP: {
             struct lu_value lhs = eval_expr(state, expr->data.binop.lhs);
@@ -494,6 +528,8 @@ static struct lu_value eval_expr(struct lu_istate* state,
             if (state->op_result == OP_RESULT_RAISED_ERROR) {
                 return lu_value_none();
             }
+            // implement subscript access for strings.
+            // maybe use vtables for subscript implementation.
             if (lu_is_array(val)) {
                 if (lu_is_int(prop)) {
                     int64_t index = lu_as_int(prop);
@@ -507,9 +543,12 @@ static struct lu_value eval_expr(struct lu_istate* state,
                     struct lu_value result =
                         lu_array_get(lu_as_array(val), index);
                     if (lu_is_undefined(result)) {
-                        lu_raise_error(
-                            state, lu_string_new(state, "Index out of bounds"),
-                            &expr->span);
+                        char buffer[256];
+                        snprintf(buffer, sizeof(buffer),
+                                 "Index %ld out of bounds (array length %ld)",
+                                 index, lu_array_length(lu_as_array(val)));
+                        lu_raise_error(state, lu_string_new(state, buffer),
+                                       &expr->span);
                     }
                     return result;
                 }
@@ -539,7 +578,7 @@ static struct lu_value eval_expr(struct lu_istate* state,
             return result;
         }
         default: {
-            break;
+            return lu_value_none();
         }
     }
 }
