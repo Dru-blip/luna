@@ -477,6 +477,67 @@ static struct lu_value eval_expr(struct lu_istate* state,
 
             return prop;
         }
+        case AST_NODE_COMPUTED_MEMBER_EXPR: {
+            struct lu_value val = eval_expr(state, expr->data.pair.fst);
+            if (state->op_result == OP_RESULT_RAISED_ERROR) {
+                return lu_value_none();
+            }
+            if (!lu_is_object(val)) {
+                lu_raise_error(
+                    state,
+                    lu_string_new(state,
+                                  "Invalid member access on non object value"),
+                    &expr->span);
+                return lu_value_none();
+            }
+            struct lu_value prop = eval_expr(state, expr->data.pair.snd);
+            if (state->op_result == OP_RESULT_RAISED_ERROR) {
+                return lu_value_none();
+            }
+            if (lu_is_array(val)) {
+                if (lu_is_int(prop)) {
+                    int64_t index = lu_as_int(prop);
+                    if (index < 0) {
+                        lu_raise_error(state,
+                                       lu_string_new(state, "Invalid index"),
+                                       &expr->span);
+                        return lu_value_none();
+                    }
+
+                    struct lu_value result =
+                        lu_array_get(lu_as_array(val), index);
+                    if (lu_is_undefined(result)) {
+                        lu_raise_error(
+                            state, lu_string_new(state, "Index out of bounds"),
+                            &expr->span);
+                    }
+                    return result;
+                }
+                lu_raise_error(state,
+                               lu_string_new(state, "Invalid index type"),
+                               &expr->span);
+                return lu_value_none();
+            }
+            if (!lu_is_string(prop)) {
+                lu_raise_error(state,
+                               lu_string_new(state, "Invalid property type"),
+                               &expr->span);
+                return lu_value_none();
+            }
+            struct lu_value result =
+                lu_obj_get(lu_as_object(val), lu_as_string(prop));
+            if (lu_is_undefined(result)) {
+                char buffer[256];
+                struct strbuf sb;
+                strbuf_init_static(&sb, buffer, sizeof(buffer));
+                strbuf_appendf(&sb, "Object has no property '%s'",
+                               lu_string_get_cstring(lu_as_string(prop)));
+                lu_raise_error(state, lu_string_new(state, buffer),
+                               &expr->span);
+                return lu_value_none();
+            }
+            return result;
+        }
         default: {
             break;
         }
@@ -544,7 +605,7 @@ void lu_eval_program(struct lu_istate* state) {
                 lu_obj_get(state->error, lu_intern_string(state, "message")));
             struct lu_string* traceback = lu_as_string(
                 lu_obj_get(state->error, lu_intern_string(state, "traceback")));
-            printf("Error: %s\n", str->block->data);
+            printf("Error: %s\n", lu_string_get_cstring(str));
             if (traceback) {
                 printf("%s\n", traceback->block->data);
             }

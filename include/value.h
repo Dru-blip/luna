@@ -9,6 +9,8 @@
 enum lu_value_type {
     VALUE_BOOL,
     VALUE_NONE,
+    // used only for internal purposes , runtime will not
+    // expose this value to the user.
     VALUE_UNDEFINED,
     VALUE_INTEGER,
     VALUE_OBJECT,
@@ -82,13 +84,15 @@ enum lu_string_type {
     STRING_SMALL_INTERNED,
 };
 
+#define STRING_SMALL_MAX_LENGTH 31
+
 struct lu_string {
     LUNA_OBJECT_HEADER;
     enum lu_string_type type;
     size_t hash;
     size_t length;
     union {
-        char* data;
+        char* data;  // unused field reserved for future use
         struct string_block* block;
     };
     char Sms[];
@@ -165,6 +169,7 @@ struct lu_array {
 #define lu_is_string(v) (lu_is_object(v) && lu_as_object(v)->vtable->is_string)
 #define lu_is_array(v) (lu_is_object(v) && lu_as_object(v)->vtable->is_array)
 
+#define lu_as_int(v) ((v).integer)
 #define lu_as_function(v) ((struct lu_function*)lu_as_object(v))
 #define lu_as_object(v) ((v).object)
 #define lu_as_string(v) ((struct lu_string*)lu_as_object(v))
@@ -184,6 +189,7 @@ static inline struct lu_value lu_undefined(void) {
 }
 
 static inline bool lu_value_equals(struct lu_value a, struct lu_value b) {
+    // strict comparison
     if (a.type != b.type) return false;
     switch (a.type) {
         case VALUE_BOOL:
@@ -239,6 +245,7 @@ struct lu_function* lu_native_function_new(struct lu_istate* state,
 
 struct lu_array* lu_array_new(struct lu_istate* state);
 void lu_array_push(struct lu_array* array, struct lu_value value);
+struct lu_value lu_array_get(struct lu_array* array, size_t index);
 
 void lu_raise_error(struct lu_istate* state, struct lu_string* message,
                     struct span* location);

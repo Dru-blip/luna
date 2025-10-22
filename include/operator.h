@@ -40,6 +40,7 @@ enum assign_op {
 enum postfix_op {
     OP_CALL,
     OP_MEMBER,
+    OP_COMPUTED_MEMBER,
 };
 
 static const char* binary_op_labels[] = {

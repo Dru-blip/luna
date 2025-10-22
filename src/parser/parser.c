@@ -40,6 +40,8 @@ static struct operator operators[] = {
 
     {OPERATOR_POSTFIX, TOKEN_LPAREN, 99, 100, OP_CALL, AST_NODE_CALL},
     {OPERATOR_POSTFIX, TOKEN_DOT, 99, 100, OP_MEMBER, AST_NODE_MEMBER_EXPR},
+    {OPERATOR_POSTFIX, TOKEN_LBRACKET, 99, 100, OP_COMPUTED_MEMBER,
+     AST_NODE_COMPUTED_MEMBER_EXPR},
 };
 
 static const uint32_t operator_table_len =
@@ -218,9 +220,21 @@ static struct ast_node* parse_postfix_expression(struct parser* parser,
             make_node(parser, AST_NODE_MEMBER_EXPR,
                       SPAN_MERGE(lhs->span, property_token->span));
         member_expr->data.member_expr = (struct ast_member_expr){
-            .is_computed = false,
             .object = lhs,
             .property_name = property_token->span,
+        };
+        return member_expr;
+    }
+
+    if (op == OP_COMPUTED_MEMBER) {
+        struct ast_node* property = parse_expression(parser, 0);
+        struct ast_node* member_expr =
+            make_node(parser, AST_NODE_COMPUTED_MEMBER_EXPR,
+                      SPAN_MERGE(lhs->span, parser->cur_token->span));
+        parse_expected(parser, TOKEN_RBRACKET);
+        member_expr->data.pair = (struct ast_pair){
+            .fst = lhs,
+            .snd = property,
         };
         return member_expr;
     }

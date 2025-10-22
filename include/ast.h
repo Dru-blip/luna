@@ -21,6 +21,7 @@ enum ast_node_kind {
     AST_NODE_CALL,
 
     AST_NODE_MEMBER_EXPR,
+    AST_NODE_COMPUTED_MEMBER_EXPR,
 
     AST_NODE_ARRAY_EXPR,
 
@@ -60,7 +61,6 @@ struct ast_call {
 };
 
 struct ast_member_expr {
-    bool is_computed;
     struct ast_node* object;
     struct span property_name;
 };

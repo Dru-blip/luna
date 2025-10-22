@@ -12,6 +12,7 @@
 #include "stb_ds.h"
 #include "strbuf.h"
 #include "string_interner.h"
+#include "worklist.h"
 
 #define LU_PROPERTY_MAP_LOAD_FACTOR 0.7
 #define LU_PROPERTY_MAP_MIN_CAPACITY 16
@@ -48,13 +49,20 @@ static void lu_object_finalize(struct lu_object* self) {
 }
 
 static void lu_object_visit(struct lu_object* self, struct lu_objectset* set) {
-    // TODO: add worklist to visit child objects.
-    struct property_map_iter iter = property_map_iter_new(&self->properties);
+    struct worklist worklist;
+    worklist.head = worklist.tail = nullptr;
+    worklist_enqueue(&worklist, self);
+    struct property_map_iter iter;
     struct property_map_entry* entry;
-    while ((entry = property_map_iter_next(&iter))) {
-        lu_objectset_add(set, lu_cast(struct lu_object, entry->key));
-        if (lu_is_object(entry->value)) {
-            lu_objectset_add(set, lu_as_object(entry->value));
+    while (worklist.head) {
+        struct lu_object* curr = worklist_dequeue(&worklist);
+        lu_objectset_add(set, curr);
+        iter = property_map_iter_new(&curr->properties);
+        while ((entry = property_map_iter_next(&iter))) {
+            worklist_enqueue(&worklist, lu_cast(struct lu_object, entry->key));
+            if (lu_is_object(entry->value)) {
+                worklist_enqueue(&worklist, lu_as_object(entry->value));
+            }
         }
     }
 }
@@ -278,19 +286,28 @@ struct lu_string* lu_string_new(struct lu_istate* state, char* data) {
     size_t len = strlen(data);
     size_t hash = hash_str(data, len);
 
-    struct string_block* block = string_block_new(data, len);
-
-    block->prev = state->string_pool.last_block;
-    state->string_pool.last_block = block;
-    block->prev->next = block;
+    bool is_small = len <= STRING_SMALL_MAX_LENGTH;
 
     struct lu_string* str =
-        lu_object_new_sized(state, sizeof(struct lu_string));
-    str->type = STRING_SIMPLE;
+        is_small
+            ? lu_object_new_sized(state, sizeof(struct lu_string) + len + 1)
+            : lu_object_new_sized(state, sizeof(struct lu_string));
     str->vtable = &lu_string_vtable;
     str->hash = hash;
     str->length = len;
-    str->block = block;
+    if (is_small) {
+        str->type = STRING_SMALL;
+        // inline if small string
+        memcpy(str->Sms, data, len);
+        str->Sms[len] = '\0';
+    } else {
+        struct string_block* block = string_block_new(data, len);
+        block->prev = state->string_pool.last_block;
+        state->string_pool.last_block = block;
+        block->prev->next = block;
+        str->type = STRING_SIMPLE;
+        str->block = block;
+    }
     lu_obj_set(str, lu_intern_string(state, "length"), lu_value_int(len));
     return str;
 }
@@ -343,6 +360,13 @@ void lu_array_push(struct lu_array* array, struct lu_value value) {
             realloc(array->elements, array->capacity * sizeof(struct lu_value));
     }
     array->elements[array->size++] = value;
+}
+
+struct lu_value lu_array_get(struct lu_array* array, size_t index) {
+    if (index >= array->size) {
+        return lu_value_undefined();
+    }
+    return array->elements[index];
 }
 
 void lu_raise_error(struct lu_istate* state, struct lu_string* message,
