@@ -169,6 +169,29 @@ bool lu_string_equal(struct lu_string* a, struct lu_string* b) {
     return strncmp(a->data, b->data, a->length) == 0;
 }
 
+static const char* lu_value_type_names[] = {"bool", "none", "undefined",
+                                            "integer", "object"};
+
+const char* lu_value_get_type_name(struct lu_value a) {
+    if (!lu_is_object(a)) {
+        return lu_value_type_names[a.type];
+    }
+
+    if (lu_is_array(a)) {
+        return "array";
+    }
+
+    if (lu_is_string(a)) {
+        return "string";
+    }
+
+    if (lu_is_function(a)) {
+        return "function";
+    }
+
+    return "object";
+}
+
 void lu_property_map_init(struct property_map* map, size_t capacity) {
     map->capacity = capacity;
     map->size = 0;
@@ -306,10 +329,9 @@ struct lu_string* lu_string_new(struct lu_istate* state, char* data) {
 
     bool is_small = len <= STRING_SMALL_MAX_LENGTH;
 
-    struct lu_string* str =
-        is_small
-            ? lu_object_new_sized(state, sizeof(struct lu_string) + len + 1)
-            : lu_object_new_sized(state, sizeof(struct lu_string));
+    size_t required_size = is_small ? sizeof(struct lu_string) + len + 1
+                                    : sizeof(struct lu_string);
+    struct lu_string* str = lu_object_new_sized(state, required_size);
     str->vtable = &lu_string_vtable;
     str->hash = hash;
     str->length = len;
@@ -413,6 +435,7 @@ void lu_raise_error(struct lu_istate* state, struct lu_string* message,
     lu_obj_set(error, lu_intern_string(state, "message"),
                lu_value_object(message));
 
+    // TODO: include call stack information
     const char* line_start =
         state->context_stack->call_stack->module->program.source +
         location->start;

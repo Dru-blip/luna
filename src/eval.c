@@ -160,6 +160,10 @@ struct lu_value coerce_bool_to_int(struct lu_value* v) {
     return (struct lu_value){.type = VALUE_INTEGER, .integer = v->integer};
 }
 
+struct lu_value coerce_none_to_int(struct lu_value* v) {
+    return (struct lu_value){.type = VALUE_INTEGER, .integer = 0};
+}
+
 #define DEFINE_BINOP(TYPE, NAME, RESULT_TYPE, OP)                          \
     struct lu_value lu_##TYPE##_##NAME(                                    \
         struct lu_istate* state, struct lu_value* a, struct lu_value* b) { \
@@ -215,8 +219,12 @@ struct type_promotion type_promotion_table[5][5] = {
                     .coerce_lhs = coerce_bool_to_int,
                     .coerce_rhs = coerce_identity,
                 },
-            [VALUE_NONE] = INVALID_PROMOTION,
-            [VALUE_OBJECT] = INVALID_PROMOTION,
+            [VALUE_NONE] =
+                {
+                    .result_type = VALUE_INTEGER,
+                    .coerce_lhs = coerce_bool_to_int,
+                    .coerce_rhs = coerce_none_to_int,
+                },
         },
 
     [VALUE_INTEGER] =
@@ -233,18 +241,48 @@ struct type_promotion type_promotion_table[5][5] = {
                     .coerce_lhs = coerce_identity,
                     .coerce_rhs = coerce_identity,
                 },
-            [VALUE_NONE] = INVALID_PROMOTION,
+            [VALUE_NONE] =
+                {
+                    .result_type = VALUE_INTEGER,
+                    .coerce_lhs = coerce_identity,
+                    .coerce_rhs = coerce_none_to_int,
+                },
             [VALUE_OBJECT] = INVALID_PROMOTION,
         },
 
     [VALUE_NONE] =
         {
+            [VALUE_INTEGER] =
+                {
+                    .result_type = VALUE_INTEGER,
+                    .coerce_lhs = coerce_none_to_int,
+                    .coerce_rhs = coerce_identity,
+                },
+            [VALUE_BOOL] =
+                {
+                    .result_type = VALUE_INTEGER,
+                    .coerce_lhs = coerce_none_to_int,
+                    .coerce_rhs = coerce_bool_to_int,
+                },
+            [VALUE_NONE] =
+                {
+                    .result_type = VALUE_NONE,
+                    .coerce_lhs = coerce_identity,
+                    .coerce_rhs = coerce_identity,
+                },
+            [VALUE_OBJECT] = INVALID_PROMOTION,
+        },
+    [VALUE_OBJECT] =
+        {
             [VALUE_INTEGER] = INVALID_PROMOTION,
             [VALUE_BOOL] = INVALID_PROMOTION,
-            [VALUE_NONE] = {.result_type = VALUE_NONE,
-                            .coerce_lhs = coerce_identity,
-                            .coerce_rhs = coerce_identity},
-            [VALUE_OBJECT] = INVALID_PROMOTION,
+            [VALUE_NONE] = INVALID_PROMOTION,
+            [VALUE_OBJECT] =
+                {
+                    .result_type = VALUE_OBJECT,
+                    .coerce_lhs = coerce_identity,
+                    .coerce_rhs = coerce_identity,
+                },
         },
 };
 
@@ -259,11 +297,8 @@ static binaryfunc binop_dispatch_table[5][15] = {
             [OP_GT] = &lu_int_gt,
             [OP_LTE] = &lu_int_lte,
             [OP_GTE] = &lu_int_gte,
-            [OP_EQ] = &lu_int_eq,
-            [OP_NEQ] = &lu_int_neq,
             [OP_LAND] = &lu_int_and,
             [OP_LOR] = &lu_int_or,
-
         },
     [VALUE_BOOL] =
         {
@@ -275,8 +310,6 @@ static binaryfunc binop_dispatch_table[5][15] = {
             [OP_GT] = &lu_bool_gt,
             [OP_LTE] = &lu_bool_lte,
             [OP_GTE] = &lu_bool_gte,
-            [OP_EQ] = &lu_bool_eq,
-            [OP_NEQ] = &lu_bool_neq,
             [OP_LAND] = &lu_bool_and,
             [OP_LOR] = &lu_bool_or,
         },
@@ -365,6 +398,9 @@ static struct lu_value eval_expr(struct lu_istate* state,
         case AST_NODE_BOOL: {
             return lu_value_bool(expr->data.int_val);
         }
+        case AST_NODE_NONE: {
+            return lu_value_none();
+        }
         case AST_NODE_STR: {
             const size_t len = expr->span.end - 1 - expr->span.start - 1;
             char* buffer = arena_alloc(&state->args_buffer, len);
@@ -378,7 +414,7 @@ static struct lu_value eval_expr(struct lu_istate* state,
             struct lu_value value = get_variable(state, name);
             if (lu_is_undefined(value)) {
                 lu_raise_error(state,
-                               lu_string_new(state, "Undeclared indentifier"),
+                               lu_string_new(state, "undeclared indentifier"),
                                &expr->span);
             }
             return value;
@@ -411,7 +447,7 @@ static struct lu_value eval_expr(struct lu_istate* state,
                     if (lu_is_undefined(value)) {
                         lu_raise_error(
                             state,
-                            lu_string_new(state, "Undeclared indentifier"),
+                            lu_string_new(state, "undeclared indentifier"),
                             &expr->span);
                         return value;
                     }
@@ -446,17 +482,53 @@ static struct lu_value eval_expr(struct lu_istate* state,
                 return rhs;
             }
 
+            // if operator is equality(== ,!=)
+            if (expr->data.binop.op == OP_EQ) {
+                return lu_value_bool(lu_value_strict_equals(lhs, rhs));
+            }
+
+            if (expr->data.binop.op == OP_NEQ) {
+                return lu_value_bool(!lu_value_strict_equals(lhs, rhs));
+            }
+
             if (lhs.type == rhs.type) {
                 binaryfunc func =
                     binop_dispatch_table[lhs.type][expr->data.binop.op];
 
                 if (!func) {
-                    // TODO:raise error.
-                    state->op_result = OP_RESULT_RAISED_ERROR;
-                    return lu_value_none();
+                    goto raise_unsupported;
                 }
                 return func(state, &lhs, &rhs);
             }
+
+            struct type_promotion promotion =
+                type_promotion_table[lhs.type][rhs.type];
+
+            if (promotion.result_type == -1) {
+                goto raise_unsupported;
+            }
+
+            lhs = promotion.coerce_lhs(&lhs);
+            rhs = promotion.coerce_rhs(&rhs);
+
+            binaryfunc func =
+                binop_dispatch_table[lhs.type][expr->data.binop.op];
+
+            if (!func) {
+                goto raise_unsupported;
+            }
+
+            return func(state, &lhs, &rhs);
+        raise_unsupported:
+            const char* lhs_type_name = lu_value_get_type_name(lhs);
+            const char* rhs_type_name = lu_value_get_type_name(rhs);
+            char buffer[256];
+            snprintf(buffer, sizeof(buffer),
+                     "invalid operand types for operation (%s) : '%s' and '%s'",
+                     binary_op_symbols[expr->data.binop.op], lhs_type_name,
+                     rhs_type_name);
+            lu_raise_error(state, lu_string_new(state, buffer), &expr->span);
+            return lu_value_none();
         }
         case AST_NODE_ASSIGN: {
             struct lu_value value = eval_expr(state, expr->data.binop.rhs);
@@ -485,7 +557,7 @@ static struct lu_value eval_expr(struct lu_istate* state,
                             state,
                             lu_string_new(
                                 state,
-                                "Invalid member access on non object value"),
+                                "invalid member access on non object value"),
                             &expr->span);
                         return lu_value_none();
                     }
@@ -504,7 +576,7 @@ static struct lu_value eval_expr(struct lu_istate* state,
                             state,
                             lu_string_new(
                                 state,
-                                "Invalid member access on non object value"),
+                                "invalid member access on non object value"),
                             &expr->span);
                         return lu_value_none();
                     }
@@ -522,7 +594,14 @@ static struct lu_value eval_expr(struct lu_istate* state,
 
             if (!lu_is_function(callee)) {
                 // TODO: Raise errors for uncallable objects
-                state->op_result = OP_RESULT_RAISED_ERROR;
+                const char* calle_type_name = lu_value_get_type_name(callee);
+                char buffer[256];
+                snprintf(buffer, sizeof(buffer),
+                         "attempt to call a non function value"
+                         " (%s)",
+                         calle_type_name);
+                lu_raise_error(state, lu_string_new(state, buffer),
+                               &expr->span);
                 return lu_value_none();
             }
 
@@ -553,6 +632,7 @@ static struct lu_value eval_expr(struct lu_istate* state,
                 frame->arg_count = call->argc;
                 frame->call_location = expr->span;
                 frame->self = self_obj;
+                frame->module = state->running_module;
                 res = func->func(state, args);
                 pop_call_frame(state->context_stack);
             } else {
@@ -568,7 +648,7 @@ static struct lu_value eval_expr(struct lu_istate* state,
                 lu_raise_error(
                     state,
                     lu_string_new(state,
-                                  "Invalid member access on non object value"),
+                                  "invalid member access on non object value"),
                     &expr->span);
                 return lu_value_none();
             }
@@ -580,7 +660,7 @@ static struct lu_value eval_expr(struct lu_istate* state,
                 char buffer[256];
                 struct strbuf sb;
                 strbuf_init_static(&sb, buffer, sizeof(buffer));
-                strbuf_appendf(&sb, "Object has no property '%s'",
+                strbuf_appendf(&sb, "object has no property '%s'",
                                lu_string_get_cstring(prop_name));
                 lu_raise_error(state, lu_string_new(state, buffer),
                                &expr->span);
@@ -597,7 +677,7 @@ static struct lu_value eval_expr(struct lu_istate* state,
                 lu_raise_error(
                     state,
                     lu_string_new(state,
-                                  "Invalid member access on non object value"),
+                                  "invalid member access on non object value"),
                     &expr->span);
                 return lu_value_none();
             }
@@ -611,8 +691,9 @@ static struct lu_value eval_expr(struct lu_istate* state,
                 if (lu_is_int(prop)) {
                     int64_t index = lu_as_int(prop);
                     if (index < 0) {
+                        // TODO: should be more descriptive message
                         lu_raise_error(state,
-                                       lu_string_new(state, "Invalid index"),
+                                       lu_string_new(state, "invalid index"),
                                        &expr->span);
                         return lu_value_none();
                     }
@@ -622,21 +703,27 @@ static struct lu_value eval_expr(struct lu_istate* state,
                     if (lu_is_undefined(result)) {
                         char buffer[256];
                         snprintf(buffer, sizeof(buffer),
-                                 "Index %ld out of bounds (array length %ld)",
+                                 "index %ld out of bounds (array length %ld)",
                                  index, lu_array_length(lu_as_array(val)));
                         lu_raise_error(state, lu_string_new(state, buffer),
                                        &expr->span);
                     }
                     return result;
                 }
-                lu_raise_error(state,
-                               lu_string_new(state, "Invalid index type"),
+                char buffer[256];
+                snprintf(buffer, sizeof(buffer),
+                         "array index must be an integer ,got %s",
+                         lu_value_get_type_name(prop));
+                lu_raise_error(state, lu_string_new(state, buffer),
                                &expr->span);
                 return lu_value_none();
             }
             if (!lu_is_string(prop)) {
-                lu_raise_error(state,
-                               lu_string_new(state, "Invalid property type"),
+                char buffer[256];
+                snprintf(buffer, sizeof(buffer),
+                         "object accessor must be a string , got %s",
+                         lu_value_get_type_name(prop));
+                lu_raise_error(state, lu_string_new(state, buffer),
                                &expr->span);
                 return lu_value_none();
             }
@@ -646,7 +733,7 @@ static struct lu_value eval_expr(struct lu_istate* state,
                 char buffer[256];
                 struct strbuf sb;
                 strbuf_init_static(&sb, buffer, sizeof(buffer));
-                strbuf_appendf(&sb, "Object has no property '%s'",
+                strbuf_appendf(&sb, "object has no property '%s'",
                                lu_string_get_cstring(lu_as_string(prop)));
                 lu_raise_error(state, lu_string_new(state, buffer),
                                &expr->span);

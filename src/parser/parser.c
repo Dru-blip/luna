@@ -130,6 +130,11 @@ static struct ast_node* parse_primary_expression(struct parser* parser) {
                 make_node(parser, AST_NODE_SELF_EXPR, token->span);
             return node;
         }
+        case TOKEN_KEYWORD_NONE: {
+            struct ast_node* node =
+                make_node(parser, AST_NODE_NONE, token->span);
+            return node;
+        }
         default: {
             fprintf(stderr, "invalid syntax\n");
             exit(EXIT_FAILURE);

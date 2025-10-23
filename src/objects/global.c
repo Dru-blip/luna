@@ -132,7 +132,6 @@ struct lu_value import_module(struct lu_istate* state, struct argument* args) {
         strbuf_appendf(&sb, "failed to read file: '%s'", file_path);
         lu_raise_error(state, lu_string_new(state, err_buffer),
                        &state->context_stack->call_stack->call_location);
-
         return lu_value_undefined();
     }
 

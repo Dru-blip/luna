@@ -192,7 +192,8 @@ static inline struct lu_value lu_undefined(void) {
     return lu_value_undefined();
 }
 
-static inline bool lu_value_equals(struct lu_value a, struct lu_value b) {
+static inline bool lu_value_strict_equals(struct lu_value a,
+                                          struct lu_value b) {
     // strict comparison
     if (a.type != b.type) return false;
     switch (a.type) {
@@ -221,6 +222,7 @@ static inline uint64_t hash_str(const char* key, size_t len) {
     return hash;
 }
 
+const char* lu_value_get_type_name(struct lu_value a);
 bool lu_string_equal(struct lu_string* a, struct lu_string* b);
 
 void lu_property_map_init(struct property_map* map, size_t capacity);

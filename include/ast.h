@@ -11,6 +11,7 @@ struct ast_node;
 enum ast_node_kind {
     AST_NODE_INT,
     AST_NODE_BOOL,
+    AST_NODE_NONE,
     AST_NODE_STR,
     AST_NODE_UNOP,
     AST_NODE_BINOP,

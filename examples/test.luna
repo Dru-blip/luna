@@ -1,3 +1,4 @@
-h=import("hello")
+a={}
+a["name"]
 
-print(h.call().name)
+print(a.name)
