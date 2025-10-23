@@ -157,9 +157,9 @@ bool lu_string_equal(struct lu_string* a, struct lu_string* b) {
     if (a == b) return true;
     if (a->length != b->length) return false;
 
-    if ((a->type == STRING_SMALL_INTERNED &&
-         b->type == STRING_SMALL_INTERNED) ||
-        (a->type == STRING_SMALL && b->type == STRING_SMALL)) {
+    // refactor
+    if ((a->type == STRING_SMALL || a->type == STRING_SMALL_INTERNED) &&
+        (b->type == STRING_SMALL || b->type == STRING_SMALL_INTERNED)) {
         return memcmp(a->Sms, b->Sms, a->length) == 0;
     }
 
@@ -409,6 +409,15 @@ struct lu_value lu_array_get(struct lu_array* array, size_t index) {
         return lu_value_undefined();
     }
     return array->elements[index];
+}
+
+int lu_array_set(struct lu_array* array, size_t index, struct lu_value value) {
+    if (index >= array->size) {
+        return 1;
+    }
+
+    array->elements[index] = value;
+    return 0;
 }
 
 struct lu_module* lu_module_new(struct lu_istate* state, struct lu_string* name,

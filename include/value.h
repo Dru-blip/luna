@@ -256,6 +256,7 @@ struct lu_module* lu_module_new(struct lu_istate* state, struct lu_string* name,
 struct lu_array* lu_array_new(struct lu_istate* state);
 void lu_array_push(struct lu_array* array, struct lu_value value);
 struct lu_value lu_array_get(struct lu_array* array, size_t index);
+int lu_array_set(struct lu_array* array, size_t index, struct lu_value value);
 
 void lu_raise_error(struct lu_istate* state, struct lu_string* message,
                     struct span* location);

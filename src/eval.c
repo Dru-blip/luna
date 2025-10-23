@@ -405,6 +405,7 @@ static struct lu_value eval_expr(struct lu_istate* state,
             const size_t len = expr->span.end - 1 - expr->span.start - 1;
             char* buffer = arena_alloc(&state->args_buffer, len);
             memcpy(buffer, expr->data.id, len);
+            buffer[len] = '\0';
             struct lu_string* str = lu_string_new(state, buffer);
             arena_reset(&state->args_buffer);
             return lu_value_object(str);
@@ -535,10 +536,100 @@ static struct lu_value eval_expr(struct lu_istate* state,
             if (state->op_result == OP_RESULT_RAISED_ERROR) {
                 return value;
             }
-            struct lu_string* name =
-                get_identifier(state, &expr->data.binop.lhs->span);
-            set_variable(state, name, value);
+            switch (expr->data.binop.lhs->kind) {
+                case AST_NODE_IDENTIFIER: {
+                    struct lu_string* name =
+                        get_identifier(state, &expr->data.binop.lhs->span);
+                    set_variable(state, name, value);
+                    break;
+                }
+                case AST_NODE_MEMBER_EXPR: {
+                    struct lu_value obj = eval_expr(
+                        state, expr->data.binop.lhs->data.member_expr.object);
+                    if (state->op_result == OP_RESULT_RAISED_ERROR) {
+                        return lu_value_none();
+                    }
+                    if (!lu_is_object(obj)) {
+                        goto invalid_assignment;
+                    }
+                    struct lu_string* name = get_identifier(
+                        state,
+                        &expr->data.binop.lhs->data.member_expr.property_name);
+                    lu_obj_set(lu_as_object(obj), name, value);
+                    break;
+                }
+                case AST_NODE_COMPUTED_MEMBER_EXPR: {
+                    /*
+                     * Duplicate block of code starts
+                     */
+                    struct lu_value obj =
+                        eval_expr(state, expr->data.binop.lhs->data.pair.fst);
+                    if (state->op_result == OP_RESULT_RAISED_ERROR) {
+                        return lu_value_none();
+                    }
+                    struct lu_value prop =
+                        eval_expr(state, expr->data.binop.lhs->data.pair.snd);
+                    if (state->op_result == OP_RESULT_RAISED_ERROR) {
+                        return lu_value_none();
+                    }
+                    if (lu_is_array(obj)) {
+                        if (lu_is_int(prop)) {
+                            int64_t index = lu_as_int(prop);
+                            if (index < 0) {
+                                lu_raise_error(
+                                    state,
+                                    lu_string_new(state, "invalid index"),
+                                    &expr->span);
+                                return lu_value_none();
+                            }
+                            if (lu_array_set(lu_as_array(obj), index, value) !=
+                                0) {
+                                char buffer[256];
+                                snprintf(buffer, sizeof(buffer),
+                                         "index %ld out of bounds (array "
+                                         "length %ld)",
+                                         index,
+                                         lu_array_length(lu_as_array(obj)));
+                                lu_raise_error(state,
+                                               lu_string_new(state, buffer),
+                                               &expr->span);
+                            }
+                            break;
+                        }
+                        char buffer[256];
+                        snprintf(buffer, sizeof(buffer),
+                                 "array index must be an integer ,got %s",
+                                 lu_value_get_type_name(prop));
+                        lu_raise_error(state, lu_string_new(state, buffer),
+                                       &expr->span);
+                        return lu_value_none();
+                    }
+                    if (!lu_is_string(prop)) {
+                        char buffer[256];
+                        snprintf(buffer, sizeof(buffer),
+                                 "object accessor must be a string , got %s",
+                                 lu_value_get_type_name(prop));
+                        lu_raise_error(state, lu_string_new(state, buffer),
+                                       &expr->span);
+                        return lu_value_none();
+                    }
+                    lu_obj_set(lu_as_object(obj), lu_as_string(prop), value);
+                    break;
+                    /*
+                     * Duplicate block of code Ends
+                     */
+                }
+                default: {
+                    goto invalid_assignment;
+                }
+            }
+
             return value;
+        invalid_assignment:
+            lu_raise_error(state,
+                           lu_string_new(state, "invalid assignment target"),
+                           &expr->span);
+            return lu_value_none();
         }
         case AST_NODE_CALL: {
             struct lu_value callee;
@@ -626,6 +717,8 @@ static struct lu_value eval_expr(struct lu_istate* state,
                                              : lu_as_object(self);
             struct lu_value res = lu_value_none();
             if (func->type == FUNCTION_NATIVE) {
+                // move this eval call itself , it will decide whether to
+                // dispatch (or) execute ast of function.
                 struct call_frame* frame =
                     push_call_frame(state->context_stack);
                 frame->function = func;
