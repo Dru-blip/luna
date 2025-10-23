@@ -201,24 +201,6 @@ static inline struct lu_value lu_undefined(void) {
     return lu_value_undefined();
 }
 
-static inline bool lu_value_strict_equals(struct lu_value a,
-                                          struct lu_value b) {
-    // strict comparison
-    if (a.type != b.type) return false;
-    switch (a.type) {
-        case VALUE_BOOL:
-        case VALUE_INTEGER:
-            return a.integer == b.integer;
-        case VALUE_NONE:
-        case VALUE_UNDEFINED:
-            return true;
-        case VALUE_OBJECT:
-            return a.object == b.object;
-        default:
-            return false;
-    }
-}
-
 #define FNV_OFFSET 14695981039346656037UL
 #define FNV_PRIME 1099511628211UL
 
@@ -248,6 +230,8 @@ struct lu_object* lu_object_new_sized(struct lu_istate* state, size_t size);
 struct lu_string* lu_string_new(struct lu_istate* state, char* data);
 struct lu_string* lu_small_string_new(struct lu_istate* state, char* data,
                                       size_t length, size_t hash);
+struct lu_string* lu_string_concat(struct lu_istate* state, struct lu_value lhs,
+                                   struct lu_value rhs);
 
 struct lu_function* lu_function_new(struct lu_istate* state,
                                     struct lu_string* name,
@@ -328,4 +312,26 @@ static inline struct lu_value lu_array_iter_next(struct lu_array_iter* iter) {
         return iter->array->elements[iter->index++];
     }
     return lu_value_undefined();
+}
+
+static inline bool lu_value_strict_equals(struct lu_value a,
+                                          struct lu_value b) {
+    // strict comparison
+    if (a.type != b.type) return false;
+    switch (a.type) {
+        case VALUE_BOOL:
+        case VALUE_INTEGER:
+            return a.integer == b.integer;
+        case VALUE_NONE:
+        case VALUE_UNDEFINED:
+            return true;
+        case VALUE_OBJECT: {
+            if (lu_is_string(a)) {
+                return lu_string_equal(lu_as_string(a), lu_as_string(b));
+            }
+            return a.object == b.object;
+        }
+        default:
+            return false;
+    }
 }

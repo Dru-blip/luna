@@ -352,6 +352,80 @@ struct lu_string* lu_string_new(struct lu_istate* state, char* data) {
     return str;
 }
 
+static struct lu_string* lu_integer_to_string(struct lu_istate* state,
+                                              int64_t value) {
+    char buffer[65];
+    snprintf(buffer, sizeof(buffer), "%ld", value);
+    buffer[64] = '\0';
+    return lu_string_new(state, buffer);
+}
+
+static struct lu_string* lu_value_to_string(struct lu_istate* state,
+                                            struct lu_value value) {
+    switch (value.type) {
+        case VALUE_INTEGER: {
+            return lu_integer_to_string(state, lu_as_int(value));
+        }
+        case VALUE_BOOL: {
+            return lu_intern_string(state, value.integer ? "true" : "false");
+        }
+        case VALUE_NONE: {
+            return lu_intern_string(state, "none");
+        }
+        default: {
+            return lu_intern_string(state, "(object)");
+        }
+    }
+}
+
+static struct string_block* string_block_raw_new(struct lu_istate* state,
+                                                 size_t size) {
+    struct string_block* block = malloc(sizeof(struct string_block) + size + 1);
+    block->next = block->prev = nullptr;
+
+    block->prev = state->string_pool.last_block;
+    state->string_pool.last_block = block;
+    block->prev->next = block;
+    block->length = size;
+    block->data[size] = '\0';
+    return block;
+}
+
+struct lu_string* lu_string_concat(struct lu_istate* state, struct lu_value lhs,
+                                   struct lu_value rhs) {
+    struct lu_string* lhs_str = nullptr;
+    struct lu_string* rhs_str = nullptr;
+
+    if (lu_is_string(lhs)) {
+        lhs_str = lu_as_string(lhs);
+    } else {
+        lhs_str = lu_value_to_string(state, lhs);
+    }
+
+    if (lu_is_string(rhs)) {
+        rhs_str = lu_as_string(rhs);
+    } else {
+        rhs_str = lu_value_to_string(state, rhs);
+    }
+
+    size_t len = lhs_str->length + rhs_str->length;
+    struct string_block* block = string_block_raw_new(state, len);
+
+    memcpy(block->data, lu_string_get_cstring(lhs_str), lhs_str->length);
+    memcpy(block->data + lhs_str->length, lu_string_get_cstring(rhs_str),
+           rhs_str->length);
+
+    struct lu_string* str =
+        lu_object_new_sized(state, sizeof(struct lu_string));
+    str->block = block;
+    str->length = len;
+    str->vtable = &lu_string_vtable;
+    str->hash = hash_str(block->data, len);
+    str->type = STRING_SIMPLE;
+
+    return str;
+}
+
 struct lu_function* lu_function_new(struct lu_istate* state,
                                     struct lu_string* name,
                                     struct lu_module* module,

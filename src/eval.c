@@ -484,13 +484,19 @@ static struct lu_value eval_expr(struct lu_istate* state,
                 return rhs;
             }
 
-            // if operator is equality(== ,!=)
+            // TODO: find a better way to handle operations.
+            //
+            //  if operator is equality(== ,!=)
             if (expr->data.binop.op == OP_EQ) {
                 return lu_value_bool(lu_value_strict_equals(lhs, rhs));
             }
 
             if (expr->data.binop.op == OP_NEQ) {
                 return lu_value_bool(!lu_value_strict_equals(lhs, rhs));
+            }
+
+            if (lu_is_string(lhs) || lu_is_string(rhs)) {
+                return lu_value_object(lu_string_concat(state, lhs, rhs));
             }
 
             if (lhs.type == rhs.type) {

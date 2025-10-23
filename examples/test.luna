@@ -1,4 +1,2 @@
-
-for(i in {}){
-    print(i)
-}
+a=console.read_int("enter a number: ")
+print(a)

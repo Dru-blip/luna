@@ -20,6 +20,9 @@ static struct lu_object* cell_get(struct heap_block* block, size_t index) {
 }
 
 static struct lu_object* block_allocate_object(struct heap_block* block) {
+    if (!block->free_list) {
+        return nullptr;
+    }
     struct lu_object* obj = block->free_list;
     obj->state = OBJECT_STATE_ALIVE;
     block->free_list = block->free_list->next;

@@ -5,17 +5,18 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "eval.h"
 #include "luna.h"
 #include "strbuf.h"
 #include "string_interner.h"
+#include "value.h"
 
-#define lu_define_native(state, name_str, func, pc)                           \
+#define lu_define_native(obj, name_str, func, pc)                             \
     do {                                                                      \
         struct lu_string* fname = lu_intern_string(state, (char*)(name_str)); \
         struct lu_function* fobj =                                            \
             lu_native_function_new(state, fname, func, pc);                   \
-        lu_obj_set((state)->global_object, fname,                             \
-                   lu_value_object((struct lu_object*)fobj));                 \
+        lu_obj_set((obj), fname, lu_value_object((struct lu_object*)fobj));   \
     } while (0)
 
 struct lu_value print_func(struct lu_istate* state, struct argument* args) {
@@ -142,9 +143,38 @@ struct lu_value import_module(struct lu_istate* state, struct argument* args) {
     return result;
 }
 
+struct lu_value console_read_int(struct lu_istate* state,
+                                 struct argument* args) {
+    //
+    size_t arg_count = LU_ARG_COUNT(state);
+    if (arg_count <= 0) goto read_impl;
+    struct lu_value help = args[0].value;
+    if (!lu_is_string(help)) {
+        lu_raise_error(state,
+                       lu_string_new(state, "Expected a string argument"),
+                       &state->context_stack->call_stack->call_location);
+        return lu_value_none();
+    }
+    printf("%s", lu_string_get_cstring(lu_as_string(help)));
+
+read_impl:
+    int64_t in;
+    scanf("%ld", &in);
+    return lu_value_int(in);
+}
+
+static void lu_init_console_object(struct lu_istate* state) {
+    struct lu_object* console_obj = lu_object_new(state);
+    lu_define_native(console_obj, "read_int", console_read_int, 1);
+    lu_obj_set(state->global_object, lu_intern_string(state, "console"),
+               lu_value_object(console_obj));
+}
+
 void lu_init_global_object(struct lu_istate* state) {
-    lu_define_native(state, "print", print_func, UINT8_MAX);
-    lu_define_native(state, "raise", raise_func, 0);
-    lu_define_native(state, "import", import_module, 1);
-    lu_define_native(state, "len", len, 1);
+    lu_define_native(state->global_object, "print", print_func, UINT8_MAX);
+    lu_define_native(state->global_object, "raise", raise_func, 0);
+    lu_define_native(state->global_object, "import", import_module, 1);
+    lu_define_native(state->global_object, "len", len, 1);
+
+    lu_init_console_object(state);
 }
