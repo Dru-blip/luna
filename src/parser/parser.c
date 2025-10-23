@@ -152,7 +152,7 @@ static struct ast_node* parse_prefix_expression(struct parser* parser) {
             struct ast_node* node = make_node(
                 parser, AST_NODE_UNOP, SPAN_MERGE(token->span, argument->span));
             node->data.unop = (struct ast_unop){
-                .op = token->kind == TOKEN_PLUS ? OP_PLUS : OP_MINUS,
+                .op = token->kind == TOKEN_PLUS ? OP_UPLUS : OP_NEGATE,
                 .is_prefix = true,
                 .argument = argument,
             };

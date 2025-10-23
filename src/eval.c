@@ -474,6 +474,34 @@ static struct lu_value eval_expr(struct lu_istate* state,
             struct lu_object* s = state->context_stack->call_stack->self;
             return s ? lu_value_object(s) : lu_value_none();
         }
+        case AST_NODE_UNOP: {
+            struct lu_value argument =
+                eval_expr(state, expr->data.unop.argument);
+            if (state->op_result == OP_RESULT_RAISED_ERROR) {
+                return argument;
+            }
+            if (expr->data.unop.op == OP_NEGATE) {
+                if (lu_is_int(argument)) {
+                    return lu_value_int(-argument.integer);
+                }
+                lu_raise_error(
+                    state,
+                    lu_string_new(state, "cannot negate non-integer value"),
+                    &expr->span);
+                return argument;
+            } else if (expr->data.unop.op == OP_UPLUS) {
+                if (!lu_is_int(argument)) {
+                    lu_raise_error(
+                        state,
+                        lu_string_new(
+                            state, "unsupported operand type for unary plus"),
+                        &expr->span);
+                }
+                return argument;
+            } else {
+                return lu_value_bool(!lu_is_truthy(argument));
+            }
+        }
         case AST_NODE_BINOP: {
             struct lu_value lhs = eval_expr(state, expr->data.binop.lhs);
             if (state->op_result == OP_RESULT_RAISED_ERROR) {

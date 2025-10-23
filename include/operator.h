@@ -23,8 +23,8 @@ enum binary_op {
 };
 
 enum unary_op {
-    OP_PLUS,
-    OP_MINUS,
+    OP_UPLUS,
+    OP_NEGATE,
     OP_LNOT,
 };
 

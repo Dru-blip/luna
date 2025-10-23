@@ -38,6 +38,7 @@ fn board_full() {
 }
 
 
+
 fn play() {
     print("Tic Tac Toe!")
     print_board()
