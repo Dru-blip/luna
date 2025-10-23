@@ -185,6 +185,10 @@ struct lu_array {
 #define lu_obj_size(obj) (obj)->properties.size
 #define lu_array_length(array) ((array)->size)
 
+#define lu_is_falsy(val) \
+    (val.type == VALUE_BOOL && val.integer == false) || (val.type == VALUE_NONE)
+#define lu_is_truthy(val) !lu_is_falsy(val)
+
 static inline struct lu_value lu_bool(bool v) { return lu_value_bool(v); }
 static inline struct lu_value lu_int(int64_t v) { return lu_value_int(v); }
 static inline struct lu_value lu_none(void) { return lu_value_none(); }

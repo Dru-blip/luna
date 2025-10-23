@@ -859,6 +859,68 @@ static enum signal_kind eval_stmt(struct lu_istate* state,
             end_scope(state);
             return sig;
         }
+        case AST_NODE_IF_STMT: {
+            struct lu_value cond = eval_expr(state, stmt->data.if_stmt.test);
+            if (lu_is_truthy(cond)) {
+                return eval_stmt(state, stmt->data.if_stmt.consequent);
+            }
+            if (stmt->data.if_stmt.alternate) {
+                return eval_stmt(state, stmt->data.if_stmt.alternate);
+            }
+            break;
+        }
+        case AST_NODE_BREAK_STMT: {
+            return SIGNAL_BREAK;
+        }
+        case AST_NODE_CONTINUE_STMT: {
+            return SIGNAL_CONTINUE;
+        }
+        case AST_NODE_LOOP_STMT: {
+            begin_scope(state);
+        loop_start:
+            enum signal_kind sig = eval_stmt(state, stmt->data.node);
+            if (sig == SIGNAL_BREAK) goto loop_end;
+            if (sig == SIGNAL_CONTINUE) goto loop_start;
+            if (sig == SIGNAL_RETURN || sig == SIGNAL_ERROR) return sig;
+            goto loop_start;
+        loop_end:
+            end_scope(state);
+        }
+        case AST_NODE_WHILE_STMT: {
+            const struct ast_pair* pair = &stmt->data.pair;
+        w_loop_start:
+            struct lu_value cond = eval_expr(state, pair->fst);
+            if (!(lu_is_truthy(cond))) {
+                goto w_loop_end;
+            }
+            enum signal_kind sig = eval_stmt(state, pair->snd);
+            if (sig == SIGNAL_BREAK) goto w_loop_end;
+            if (sig == SIGNAL_CONTINUE) goto w_loop_start;
+            if (sig == SIGNAL_RETURN || sig == SIGNAL_ERROR) return sig;
+            goto w_loop_start;
+        w_loop_end:
+            break;
+        }
+        case AST_NODE_FOR_STMT: {
+            const struct ast_for_stmt* for_stmt = &stmt->data.for_stmt;
+            begin_scope(state);
+            eval_stmt(state, for_stmt->init);
+        f_loop_start:
+            struct lu_value cond = eval_expr(state, for_stmt->test);
+            if (!(lu_is_truthy(cond))) {
+                goto f_loop_end;
+            }
+            enum signal_kind sig = eval_stmt(state, for_stmt->body);
+            if (sig == SIGNAL_BREAK) goto f_loop_end;
+            if (sig == SIGNAL_CONTINUE) goto f_loop_update;
+            if (sig == SIGNAL_RETURN || sig == SIGNAL_ERROR) return sig;
+        f_loop_update:
+            eval_expr(state, for_stmt->update);
+            goto f_loop_start;
+        f_loop_end:
+            end_scope(state);
+            break;
+        }
         case AST_NODE_EXPR_STMT: {
             struct lu_value res = eval_expr(state, stmt->data.node);
             if (state->op_result == OP_RESULT_RAISED_ERROR) {
