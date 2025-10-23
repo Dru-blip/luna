@@ -15,6 +15,7 @@
 #include "stb_ds.h"
 #include "strbuf.h"
 #include "string_interner.h"
+#include "tokenizer.h"
 #include "value.h"
 
 static char* read_file(const char* filename) {
@@ -918,6 +919,44 @@ static enum signal_kind eval_stmt(struct lu_istate* state,
             eval_expr(state, for_stmt->update);
             goto f_loop_start;
         f_loop_end:
+            end_scope(state);
+            break;
+        }
+        case AST_NODE_FOR_IN_STMT: {
+            const struct ast_for_in_stmt* for_in_stmt = &stmt->data.for_in_stmt;
+            if (for_in_stmt->left->kind != AST_NODE_IDENTIFIER) {
+                lu_raise_error(
+                    state,
+                    lu_string_new(state, "loop variable must be an identifier"),
+                    &for_in_stmt->left->span);
+                return SIGNAL_ERROR;
+            }
+            struct lu_value iterable = eval_expr(state, for_in_stmt->right);
+            if (!lu_is_array(iterable)) {
+                lu_raise_error(
+                    state,
+                    lu_string_new(
+                        state, "only array iteration is supported currently"),
+                    &SPAN_MERGE(stmt->span, for_in_stmt->right->span));
+                return SIGNAL_ERROR;
+            }
+            begin_scope(state);
+            struct lu_string* loop_var_name =
+                get_identifier(state, &for_in_stmt->left->span);
+            struct lu_array_iter iter =
+                lu_array_iter_new(lu_as_array(iterable));
+        in_loop_start:
+            struct lu_value value = lu_array_iter_next(&iter);
+            if (lu_is_undefined(value)) {
+                goto in_loop_end;
+            }
+            set_variable(state, loop_var_name, value);
+            enum signal_kind sig = eval_stmt(state, for_in_stmt->body);
+            if (sig == SIGNAL_BREAK) goto in_loop_end;
+            if (sig == SIGNAL_CONTINUE) goto in_loop_start;
+            if (sig == SIGNAL_RETURN || sig == SIGNAL_ERROR) return sig;
+            goto in_loop_start;
+        in_loop_end:
             end_scope(state);
             break;
         }

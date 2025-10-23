@@ -406,21 +406,38 @@ static struct ast_node* parse_while_stmt(struct parser* parser) {
 static struct ast_node* parse_for_stmt(struct parser* parser) {
     struct token* token = parser_eat(parser);
     parse_expected(parser, TOKEN_LPAREN);
-    struct ast_node* init = parse_stmt(parser);
-    parse_expected(parser, TOKEN_SEMICOLON);
-    struct ast_node* test = parse_expression(parser, 0);
-    parse_expected(parser, TOKEN_SEMICOLON);
-    struct ast_node* update = parse_expression(parser, 0);
+    struct ast_node* init = parse_expression(parser, 0);
+    struct ast_node *test, *update, *right = nullptr;
+    if (!check(parser, TOKEN_SEMICOLON) && check(parser, TOKEN_KEYWORD_IN)) {
+        parser_eat(parser);
+        right = parse_expression(parser, 0);
+    } else {
+        parse_expected(parser, TOKEN_SEMICOLON);
+        test = parse_expression(parser, 0);
+        parse_expected(parser, TOKEN_SEMICOLON);
+        update = parse_expression(parser, 0);
+    }
+
     parse_expected(parser, TOKEN_RPAREN);
     struct ast_node* body = parse_stmt(parser);
     struct ast_node* node = make_node(parser, AST_NODE_FOR_STMT,
                                       SPAN_MERGE(token->span, body->span));
-    node->data.for_stmt = (struct ast_for_stmt){
-        .init = init,
-        .test = test,
-        .update = update,
-        .body = body,
-    };
+    if (right) {
+        node->kind = AST_NODE_FOR_IN_STMT;
+        node->data.for_in_stmt = (struct ast_for_in_stmt){
+            .left = init,
+            .right = right,
+            .body = body,
+        };
+    } else {
+        node->data.for_stmt = (struct ast_for_stmt){
+            .init = init,
+            .test = test,
+            .update = update,
+            .body = body,
+        };
+    }
+
     return node;
 }
 

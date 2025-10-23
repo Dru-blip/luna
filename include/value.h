@@ -151,6 +151,11 @@ struct lu_array {
     struct lu_value* elements;
 };
 
+struct lu_array_iter {
+    struct lu_array* array;
+    size_t index;
+};
+
 // all macros normally follows SCREAMING_SNAKE_CASE naming convention but these
 // are the only macro defs dont follow the convention.
 #define lu_cast(T, obj) ((T*)(obj))
@@ -311,4 +316,16 @@ static inline char* lu_string_get_cstring(struct lu_string* str) {
     }
 
     return str->data;
+}
+
+static inline struct lu_array_iter lu_array_iter_new(struct lu_array* array) {
+    struct lu_array_iter iter = {array, 0};
+    return iter;
+}
+
+static inline struct lu_value lu_array_iter_next(struct lu_array_iter* iter) {
+    if (iter->index < iter->array->size) {
+        return iter->array->elements[iter->index++];
+    }
+    return lu_value_undefined();
 }

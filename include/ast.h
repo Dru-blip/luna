@@ -38,6 +38,7 @@ enum ast_node_kind {
     AST_NODE_LOOP_STMT,
     AST_NODE_WHILE_STMT,
     AST_NODE_FOR_STMT,
+    AST_NODE_FOR_IN_STMT,
     AST_NODE_FN_DECL,
 };
 
@@ -88,6 +89,12 @@ struct ast_for_stmt {
     struct ast_node* body;
 };
 
+struct ast_for_in_stmt {
+    struct ast_node* left;
+    struct ast_node* right;
+    struct ast_node* body;
+};
+
 struct ast_fn_decl {
     struct span name_span;
     struct ast_node** params;
@@ -107,6 +114,7 @@ union ast_node_data {
     struct ast_node** list;
     struct ast_object_property property;
     struct ast_for_stmt for_stmt;
+    struct ast_for_in_stmt for_in_stmt;
     struct ast_fn_decl fn_decl;
 };
 
