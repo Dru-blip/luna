@@ -441,6 +441,20 @@ static struct ast_node* parse_for_stmt(struct parser* parser) {
     return node;
 }
 
+static struct ast_node* parse_let_decl(struct parser* parser) {
+    struct token* token = parser_eat(parser);
+    struct token* id = parse_expected(parser, TOKEN_IDENTIFIER);
+    parse_expected(parser, TOKEN_EQUAL);
+    struct ast_node* value = parse_expression(parser, 0);
+    struct ast_node* node = make_node(parser, AST_NODE_LET_DECL,
+                                      SPAN_MERGE(token->span, value->span));
+    node->data.let_decl = (struct ast_let_decl){
+        .name_span = id->span,
+        .value = value,
+    };
+    return node;
+}
+
 static void parse_param_list(struct parser* parser, struct ast_node*** params) {
     parse_expected(parser, TOKEN_LPAREN);
     while (!check(parser, TOKEN_RPAREN)) {
@@ -490,6 +504,8 @@ static struct ast_node* parse_stmt(struct parser* parser) {
             return parse_for_stmt(parser);
         case TOKEN_KEYWORD_FN:
             return parse_fn_decl(parser);
+        case TOKEN_KEYWORD_LET:
+            return parse_let_decl(parser);
         default: {
             struct ast_node* expr = parse_expression(parser, 0);
             struct ast_node* node =

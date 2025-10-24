@@ -24,7 +24,6 @@ enum op_result_kind {
 
 struct scope {
     struct lu_object* variables;
-    struct scope* parent;
     size_t depth;
 };
 
@@ -35,11 +34,12 @@ struct call_frame {
     struct lu_value return_value;
     struct span call_location;
     struct lu_module* module;
+    struct scope* scopes;
     size_t arg_count;
 };
 
 struct execution_context {
-    struct scope* scope;
+    struct scope global_scope;
     struct call_frame* call_stack;
     struct execution_context* prev;
     size_t scope_depth;

@@ -58,7 +58,7 @@ static struct execution_context* create_execution_context(
     struct execution_context* ctx = malloc(sizeof(struct execution_context));
     ctx->call_stack = nullptr;
     ctx->prev = prev;
-    ctx->scope = new_scope(state, nullptr);
+    ctx->global_scope.variables = lu_object_new(state);
     return ctx;
 }
 
@@ -68,7 +68,6 @@ static void delete_execution_context(struct lu_istate* state) {
     // arrfree(ctx->program.tokens);
     // free(ctx->program.source);
     // arena_destroy(&ctx->program.allocator);
-    free(ctx->scope);
     free(ctx);
 }
 
@@ -83,6 +82,7 @@ struct lu_value lu_run_program(struct lu_istate* state, const char* filepath) {
         lu_module_new(state, lu_string_new(state, filepath), &program);
     struct call_frame* frame = push_call_frame(state->context_stack);
     struct lu_module* prev_module = state->running_module;
+    frame->scopes = nullptr;
     frame->module = module;
     state->running_module = module;
     lu_eval_program(state);
@@ -101,6 +101,7 @@ struct call_frame* push_call_frame(struct execution_context* ctx) {
     frame->parent = ctx->call_stack;
     ctx->call_stack = frame;
     frame->self = nullptr;
+    frame->scopes = nullptr;
     frame->return_value = lu_value_none();
     ctx->frame_count++;
     return frame;
@@ -117,7 +118,6 @@ struct scope* new_scope(struct lu_istate* state, struct scope* parent) {
     struct scope* scope = calloc(1, sizeof(struct scope));
     scope->variables = lu_object_new(state);
     scope->depth = parent ? parent->depth + 1 : 0;
-    scope->parent = parent;
     return scope;
 }
 
@@ -125,19 +125,17 @@ struct scope* new_scope_with(struct heap* heap, struct scope* parent,
                              struct lu_object* variables) {
     struct scope* scope = calloc(1, sizeof(struct scope));
     scope->variables = variables;
-    scope->parent = parent;
     return scope;
 }
 
 static void begin_scope(struct lu_istate* state) {
-    state->context_stack->scope = new_scope(state, state->context_stack->scope);
+    struct scope new_scope;
+    new_scope.variables = lu_object_new(state);
+    arrput(state->context_stack->call_stack->scopes, new_scope);
 }
 
 static void end_scope(struct lu_istate* state) {
-    struct scope* scope = state->context_stack->scope;
-    state->context_stack->scope = scope->parent;
-    state->context_stack->scope->depth--;
-    free(scope);
+    struct scope scope = arrpop(state->context_stack->call_stack->scopes);
 }
 
 static enum signal_kind eval_stmts(struct lu_istate* state,
@@ -316,50 +314,70 @@ static binaryfunc binop_dispatch_table[5][15] = {
         },
 };
 
-static inline void set_variable(struct lu_istate* state, struct lu_string* name,
-                                struct lu_value value) {
-    struct scope* scope = state->context_stack->scope;
-    while (scope) {
-        if (!lu_is_undefined(lu_obj_get(scope->variables, name))) {
-            break;
-        }
-        scope = scope->parent;
-    }
-    if (scope) {
-        lu_obj_set(scope->variables, name, value);
+static inline void declare_variable(struct lu_istate* state,
+                                    struct lu_string* name,
+                                    struct lu_value value) {
+    size_t len = arrlen(state->context_stack->call_stack->scopes);
+    if (len > 0) {
+        lu_obj_set(state->context_stack->call_stack->scopes[len - 1].variables,
+                   name, value);
     } else {
-        lu_obj_set(state->context_stack->scope->variables, name, value);
+        lu_obj_set(state->context_stack->global_scope.variables, name, value);
     }
+}
+
+static inline int set_variable(struct lu_istate* state, struct lu_string* name,
+                               struct lu_value value) {
+    struct execution_context* ctx = state->context_stack;
+    struct call_frame* frame = ctx->call_stack;
+
+    size_t len = arrlen(frame->scopes);
+    for (size_t i = len; i > 0; i--) {
+        struct scope* scope = &frame->scopes[i - 1];
+        struct lu_value existing = lu_obj_get(scope->variables, name);
+        if (!lu_is_undefined(existing)) {
+            lu_obj_set(scope->variables, name, value);
+            return 0;
+        }
+    }
+
+    struct lu_value global_val = lu_obj_get(ctx->global_scope.variables, name);
+    if (!lu_is_undefined(global_val)) {
+        lu_obj_set(ctx->global_scope.variables, name, value);
+        return 0;
+    }
+    return 1;
 }
 
 static inline struct lu_value get_variable(struct lu_istate* state,
                                            struct lu_string* name) {
-    struct scope* scope = state->context_stack->scope;
-    struct lu_value val = lu_value_undefined();
-    while (scope) {
-        val = lu_obj_get(scope->variables, name);
-        if (!lu_is_undefined(val)) {
-            return val;
-        }
-        scope = scope->parent;
+    struct execution_context* ctx = state->context_stack;
+    struct call_frame* frame = ctx->call_stack;
+
+    size_t len = arrlen(frame->scopes);
+    for (size_t i = len; i > 0; i--) {
+        struct scope* scope = &frame->scopes[i - 1];
+        struct lu_value val = lu_obj_get(scope->variables, name);
+        if (!lu_is_undefined(val)) return val;
     }
-    val = lu_obj_get(state->global_object, name);
-    if (lu_is_undefined(val)) {
-        return val;
-    }
-    return val;
+
+    struct lu_value val = lu_obj_get(ctx->global_scope.variables, name);
+    if (!lu_is_undefined(val)) return val;
+
+    return lu_obj_get(state->global_object, name);
 }
 
 struct lu_string* get_identifier(struct lu_istate* state, struct span* span) {
     const size_t len = span->end - span->start;
-    char* buffer = arena_alloc(&state->args_buffer, len + 1);
+    char* buffer = malloc(len + 1);
     memcpy(
         buffer,
         state->context_stack->call_stack->module->program.source + span->start,
         len);
     buffer[len] = '\0';
+    // printf("%s \n ", buffer);
     struct lu_string* str = lu_intern_string(state, buffer);
-    arena_reset(&state->args_buffer);
+    free(buffer);
     return str;
 }
 
@@ -373,6 +391,12 @@ static void eval_call(struct lu_istate* state, struct lu_object* self,
     frame->call_location = *call_location;
     frame->module = func->module;
     struct ast_node body = *func->body;
+    frame->scopes = nullptr;
+    struct scope frame_scope;
+    frame_scope.variables = lu_object_new(state);
+    arrput(frame->scopes, frame_scope);
+    // frame->scope = new_scope(state, nullptr);
+
     begin_scope(state);
     for (uint8_t i = 0; i < func->param_count; i++) {
         set_variable(state, args[i].name, args[i].value);
@@ -384,8 +408,8 @@ static void eval_call(struct lu_istate* state, struct lu_object* self,
     free(frame);
 }
 
-// TODO: The current error handling repeatedly checks `state->op_result` after
-// each eval. This slows down execution due to frequent branching.
+// TODO: The current error handling repeatedly checks `state->op_result`
+// after each eval. This slows down execution due to frequent branching.
 // Should consider `setjmp`/`longjmp` to implement structured exception
 // handling, allows immediate unwinding to a safe recovery point when  error
 // is raised.
@@ -575,7 +599,11 @@ static struct lu_value eval_expr(struct lu_istate* state,
                 case AST_NODE_IDENTIFIER: {
                     struct lu_string* name =
                         get_identifier(state, &expr->data.binop.lhs->span);
-                    set_variable(state, name, value);
+                    if (set_variable(state, name, value) == 1) {
+                        lu_raise_error(
+                            state, lu_string_new(state, "undeclared variable"),
+                            &expr->span);
+                    }
                     break;
                 }
                 case AST_NODE_MEMBER_EXPR: {
@@ -681,9 +709,9 @@ static struct lu_value eval_expr(struct lu_istate* state,
                     if (!lu_is_object(self)) {
                         lu_raise_error(
                             state,
-                            lu_string_new(
-                                state,
-                                "invalid member access on non object value"),
+                            lu_string_new(state,
+                                          "invalid member access on non "
+                                          "object value"),
                             &expr->span);
                         return lu_value_none();
                     }
@@ -700,9 +728,9 @@ static struct lu_value eval_expr(struct lu_istate* state,
                     if (!lu_is_object(self)) {
                         lu_raise_error(
                             state,
-                            lu_string_new(
-                                state,
-                                "invalid member access on non object value"),
+                            lu_string_new(state,
+                                          "invalid member access on non "
+                                          "object value"),
                             &expr->span);
                         return lu_value_none();
                     }
@@ -737,8 +765,9 @@ static struct lu_value eval_expr(struct lu_istate* state,
 
             for (uint32_t i = 0; i < call->argc; ++i) {
                 if (func->type == FUNCTION_USER) {
-                    args[i].name =
+                    struct lu_string* arg_name =
                         get_identifier(state, &func->params[i]->span);
+                    args[i].name = arg_name;
                 }
                 args[i].value = eval_expr(state, call->args[i]);
                 if (state->op_result == OP_RESULT_RAISED_ERROR) {
@@ -764,6 +793,7 @@ static struct lu_value eval_expr(struct lu_istate* state,
                 res = func->func(state, args);
                 pop_call_frame(state->context_stack);
             } else {
+                struct argument arg = args[0];
                 eval_call(state, self_obj, &expr->span, func, args, &res);
             }
             arena_reset(&state->args_buffer);
@@ -885,7 +915,18 @@ static enum signal_kind eval_stmt(struct lu_istate* state,
             struct lu_function* func_obj =
                 lu_function_new(state, name, state->running_module,
                                 fndecl->params, fndecl->body);
-            set_variable(state, name, lu_value_object(func_obj));
+            declare_variable(state, name, lu_value_object(func_obj));
+            break;
+        }
+        case AST_NODE_LET_DECL: {
+            struct ast_let_decl* letdecl = &stmt->data.let_decl;
+
+            struct lu_string* name = get_identifier(state, &letdecl->name_span);
+            struct lu_value value = eval_expr(state, letdecl->value);
+            if (state->op_result == OP_RESULT_RAISED_ERROR) {
+                return SIGNAL_ERROR;
+            }
+            declare_variable(state, name, value);
             break;
         }
         case AST_NODE_BLOCK: {
@@ -979,6 +1020,7 @@ static enum signal_kind eval_stmt(struct lu_istate* state,
                 get_identifier(state, &for_in_stmt->left->span);
             struct lu_array_iter iter =
                 lu_array_iter_new(lu_as_array(iterable));
+            declare_variable(state, loop_var_name, lu_value_none());
         in_loop_start:
             struct lu_value value = lu_array_iter_next(&iter);
             if (lu_is_undefined(value)) {

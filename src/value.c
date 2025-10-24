@@ -7,6 +7,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "arena.h"
 #include "ast.h"
 #include "eval.h"
 #include "heap.h"
@@ -59,7 +60,7 @@ static void lu_object_visit(struct lu_object* self, struct lu_objectset* set) {
         struct lu_object* curr = worklist_dequeue(&worklist);
         lu_objectset_add(set, curr);
         iter = property_map_iter_new(&curr->properties);
-        while ((entry = property_map_iter_next(&iter))) {
+        while ((entry = property_map_iter_next(&iter))!=nullptr) {
             worklist_enqueue(&worklist, lu_cast(struct lu_object, entry->key));
             if (lu_is_object(entry->value)) {
                 worklist_enqueue(&worklist, lu_as_object(entry->value));
@@ -113,6 +114,14 @@ static void lu_module_visit(struct lu_object* self, struct lu_objectset* set) {
     lu_object_visit(self, set);
 }
 
+static void lu_module_finalize(struct lu_object* self) {
+    struct lu_module* module = lu_cast(struct lu_module, self);
+    free(module->program.source);
+    arrfree(module->program.tokens);
+    arena_destroy(&module->program.allocator);
+    lu_object_finalize(self);
+}
+
 static struct lu_object_vtable lu_object_default_vtable = {
     .is_function = false,
     .is_string = false,
@@ -149,7 +158,7 @@ static struct lu_object_vtable lu_module_vtable = {
     .is_function = false,
     .is_string = false,
     .is_array = false,
-    .finalize = lu_object_finalize,
+    .finalize = lu_module_finalize,
     .visit = lu_module_visit,
 };
 
@@ -204,51 +213,47 @@ void lu_property_map_deinit(struct property_map* map) {
     free(map->entries);
 }
 
-static bool lu_property_map_add_entry(struct property_map_entry* entries,
+static bool lu_property_map_add_entry(struct property_map_entry** entries,
                                       size_t capacity, struct lu_string* key,
                                       struct lu_value value) {
     size_t index = key->hash & (capacity - 1);
 
-    size_t current_psl = 0;
-    struct property_map_entry entry = {
-        .key = key, .value = value, .occupied = true};
+    struct property_map_entry* new_entry =
+        malloc(sizeof(struct property_map_entry));
+    new_entry->key = key;
+    new_entry->value = value;
+    new_entry->next = new_entry->prev = nullptr;
 
-    while (true) {
-        if (!entries[index].occupied) {
-            entries[index] = entry;
-            return true;
-        }
+    struct property_map_entry* entry = entries[index];
 
-        struct property_map_entry c_entry = entries[index];
-
-        if (lu_string_equal(entry.key, c_entry.key)) {
-            entries[index].value = value;
+    while (entry) {
+        if (lu_string_equal(entry->key, new_entry->key)) {
+            entry->value = value;
+            free(new_entry);
             return false;
         }
-
-        if (c_entry.psl > current_psl) {
-            struct property_map_entry tmp = c_entry;
-            entry.psl = current_psl;
-            entries[index] = entry;
-            entry = tmp;
-            current_psl = entry.psl;
-        }
-
-        index = (index + 1) & (capacity - 1);
-        current_psl++;
+        entry = entry->next;
     }
+
+    new_entry->next = entries[index];
+    if (new_entry->next) {
+        new_entry->next->prev = new_entry;
+    }
+    entries[index] = new_entry;
+    return true;
 }
 
 static void property_map_resize(struct property_map* map, size_t capacity) {
     size_t new_capacity = capacity;
-    struct property_map_entry* new_entries =
+    struct property_map_entry** new_entries =
         calloc(new_capacity, sizeof(struct property_map_entry));
 
     for (size_t i = 0; i < map->capacity; i++) {
-        struct property_map_entry* entry = &map->entries[i];
-        if (entry->occupied) {
+        struct property_map_entry* entry = map->entries[i];
+        while (entry) {
             lu_property_map_add_entry(new_entries, new_capacity, entry->key,
                                       entry->value);
+            entry = entry->next;
         }
     }
 
@@ -272,18 +277,13 @@ void lu_property_map_set(struct property_map* map, struct lu_string* key,
 struct lu_value lu_property_map_get(struct property_map* map,
                                     struct lu_string* key) {
     size_t index = (key->hash) & (map->capacity - 1);
-    size_t current_psl = 0;
 
-    while (map->entries[index].occupied) {
-        struct property_map_entry* entry = &map->entries[index];
+    struct property_map_entry* entry = map->entries[index];
+    while (entry) {
         if (lu_string_equal(entry->key, key)) {
-            return map->entries[index].value;
+            return entry->value;
         }
-        if (current_psl > entry->psl) {
-            return lu_value_undefined();
-        }
-        current_psl++;
-        index = (index + 1) % map->capacity;
+        entry = entry->next;
     }
 
     return lu_value_undefined();
@@ -501,6 +501,7 @@ struct lu_module* lu_module_new(struct lu_istate* state, struct lu_string* name,
         lu_object_new_sized(state, sizeof(struct lu_module));
     mod->program = *program;
     mod->name = name;
+    mod->type = MODULE_USER;
     mod->vtable = &lu_module_vtable;
     mod->exported = lu_value_undefined();
 

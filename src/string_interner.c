@@ -55,6 +55,7 @@ static bool string_map_add_string(struct string_interner* interner,
     new_entry->key = key;
     new_entry->value = lu_small_string_new(interner->state, key, key_len, hash);
     new_entry->next = new_entry->prev = nullptr;
+    new_entry->key_len = key_len;
 
     if (entries[index]) {
         new_entry->next = entries[index];

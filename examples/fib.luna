@@ -1,0 +1,9 @@
+fn fib(x) {
+    if (x < 2) {
+        return x
+    }
+    return fib(x-1)+fib(x-2)
+}
+
+f = fib(10)
+print("10th Fibonacci number is: " + f)

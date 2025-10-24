@@ -1,5 +1,5 @@
-board = [" ", " ", " ", " ", " ", " ", " ", " ", " "]
-current = "X"
+let board = [" ", " ", " ", " ", " ", " ", " ", " ", " "]
+let current = "X"
 
 fn print_board() {
     print(board[0] + "|" + board[1] + "|" + board[2])
@@ -10,16 +10,16 @@ fn print_board() {
 }
 
 fn check_winner() {
-    wins = [
+    let wins = [
         [0,1,2], [3,4,5], [6,7,8],
         [0,3,6], [1,4,7], [2,5,8],
         [0,4,8], [2,4,6]
     ]
 
     for (combo in wins) {
-        a = combo[0]
-        b = combo[1]
-        c = combo[2]
+        let a = combo[0]
+        let b = combo[1]
+        let c = combo[2]
         if (board[a] != " " && board[a] == board[b] && board[b] == board[c]) {
             return board[a]
         }
@@ -37,15 +37,13 @@ fn board_full() {
     return true
 }
 
-
-
 fn play() {
     print("Tic Tac Toe!")
     print_board()
 
     while (true) {
         print("Player " + current + ", enter position (0-8): ")
-        pos = console.read_int("pos: ")
+        let pos = console.read_int("pos: ")
 
         // convert input to integer if needed
         if (board[pos] != " ") {
@@ -56,7 +54,7 @@ fn play() {
         board[pos] = current
         print_board()
 
-        winner = check_winner()
+        let winner = check_winner()
         if (winner != none) {
             print("Player " + winner + " wins!")
             break

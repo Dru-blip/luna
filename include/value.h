@@ -1,5 +1,6 @@
 #pragma once
 
+#include <asm-generic/errno.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -27,19 +28,19 @@ struct lu_value {
 struct property_map_entry {
     struct lu_string* key;
     struct lu_value value;
-    size_t psl;
-    bool occupied;
+    struct property_map_entry *next, *prev;
 };
 
 struct property_map {
     size_t size;
     size_t capacity;
-    struct property_map_entry* entries;
+    struct property_map_entry** entries;
 };
 
 struct property_map_iter {
     struct property_map* map;
     size_t index;
+    struct property_map_entry* chain;
 };
 
 enum lu_object_state {
@@ -278,16 +279,32 @@ static inline struct lu_object* lu_objectset_iter_next(
 static inline struct property_map_iter property_map_iter_new(
     struct property_map* map) {
     struct property_map_iter iter = {map, 0};
+    iter.chain = nullptr;
+    while (iter.index < map->capacity && !map->entries[iter.index]) {
+        iter.index++;
+    }
+    if (iter.index < map->capacity) {
+        iter.chain = map->entries[iter.index];
+    }
     return iter;
 }
 
 static inline struct property_map_entry* property_map_iter_next(
     struct property_map_iter* iter) {
-    while (iter->index < iter->map->capacity) {
-        struct property_map_entry* entry = &iter->map->entries[iter->index++];
-        if (entry->occupied) return entry;
+    struct property_map_entry* current = iter->chain;
+    if (!current) return nullptr;
+    if (current->next) {
+        iter->chain = current->next;
+    } else {
+        while (iter->index < iter->map->capacity &&
+               !iter->map->entries[iter->index]) {
+            iter->index++;
+        }
+        if (iter->index < iter->map->capacity) {
+            iter->chain = iter->map->entries[iter->index];
+        }
     }
-    return nullptr;
+    return current;
 }
 
 static inline char* lu_string_get_cstring(struct lu_string* str) {
