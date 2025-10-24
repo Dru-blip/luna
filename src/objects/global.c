@@ -19,7 +19,7 @@
         lu_obj_set((obj), fname, lu_value_object((struct lu_object*)fobj));   \
     } while (0)
 
-struct lu_value print_func(struct lu_istate* state, struct argument* args) {
+LU_NATIVE_FN(print_func) {
     size_t arg_count = LU_ARG_COUNT(state);
     for (size_t i = 0; i < arg_count; i++) {
         switch (args[i].value.type) {
@@ -48,20 +48,20 @@ struct lu_value print_func(struct lu_istate* state, struct argument* args) {
     }
     printf("\n");
 
-    return lu_value_none();
+    LU_RETURN_NONE();
 }
 
-struct lu_value raise_func(struct lu_istate* state, struct argument* args) {
+LU_NATIVE_FN(raise_func) {
     lu_raise_error(state, lu_string_new(state, "raised error"),
                    &state->context_stack->call_stack->call_location);
     return lu_value_none();
 }
 
-struct lu_value len(struct lu_istate* state, struct argument* args) {
-    struct lu_value arg = args[0].value;
+LU_NATIVE_FN(len) {
+    struct lu_value arg = LU_ARG_GET(args, 0);
     switch (arg.type) {
         case VALUE_BOOL: {
-            return lu_value_int(1);
+            LU_RETURN_INT(1);
         }
         case VALUE_INTEGER: {
             // TODO: implement digit count
@@ -69,22 +69,22 @@ struct lu_value len(struct lu_istate* state, struct argument* args) {
         }
         case VALUE_OBJECT: {
             if (lu_is_string(arg)) {
-                return lu_value_int(lu_as_string(arg)->length);
+                LU_RETURN_INT(lu_as_string(arg)->length);
             }
             if (lu_is_array(arg)) {
-                return lu_value_int(lu_as_array(arg)->size);
+                LU_RETURN_INT(lu_as_array(arg)->size);
             }
-            return lu_value_int(lu_obj_size(lu_as_object(arg)));
+            LU_RETURN_INT(lu_obj_size(lu_as_object(arg)));
         }
         default: {
-            return lu_value_int(0);
+            LU_RETURN_INT(0);
         }
     }
 }
 
-struct lu_value import_module(struct lu_istate* state, struct argument* args) {
+LU_NATIVE_FN(import_module) {
     // TODO: handle package format (foo.bar)
-    struct lu_value file_path_value = args[0].value;
+    struct lu_value file_path_value = LU_ARG_GET(args, 0);
     // TODO: add checks for file path
     struct lu_value module =
         lu_obj_get(state->module_cache, lu_as_string(file_path_value));
@@ -143,24 +143,23 @@ struct lu_value import_module(struct lu_istate* state, struct argument* args) {
     return result;
 }
 
-struct lu_value console_read_int(struct lu_istate* state,
-                                 struct argument* args) {
-    //
+LU_NATIVE_FN(console_read_int) {
     size_t arg_count = LU_ARG_COUNT(state);
     if (arg_count <= 0) goto read_impl;
-    struct lu_value help = args[0].value;
+    struct lu_value help = LU_ARG_GET(args, 0);
     if (!lu_is_string(help)) {
         lu_raise_error(state,
                        lu_string_new(state, "Expected a string argument"),
                        &state->context_stack->call_stack->call_location);
-        return lu_value_none();
+        LU_RETURN_NONE();
     }
     printf("%s", lu_string_get_cstring(lu_as_string(help)));
-
 read_impl:
+    // Maybe find a better way to handle input
+    // or leave it as is
     int64_t in;
     scanf("%ld", &in);
-    return lu_value_int(in);
+    LU_RETURN_INT(in);
 }
 
 static void lu_init_console_object(struct lu_istate* state) {

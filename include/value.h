@@ -29,12 +29,15 @@ struct property_map_entry {
     struct lu_string* key;
     struct lu_value value;
     struct property_map_entry *next, *prev;
+    struct property_map_entry* next_in_order;
 };
 
 struct property_map {
     size_t size;
     size_t capacity;
     struct property_map_entry** entries;
+    struct property_map_entry* head;
+    struct property_map_entry* tail;
 };
 
 struct property_map_iter {
@@ -279,30 +282,15 @@ static inline struct lu_object* lu_objectset_iter_next(
 static inline struct property_map_iter property_map_iter_new(
     struct property_map* map) {
     struct property_map_iter iter = {map, 0};
-    iter.chain = nullptr;
-    while (iter.index < map->capacity && !map->entries[iter.index]) {
-        iter.index++;
-    }
-    if (iter.index < map->capacity) {
-        iter.chain = map->entries[iter.index];
-    }
+    iter.chain = map->head;
     return iter;
 }
 
 static inline struct property_map_entry* property_map_iter_next(
     struct property_map_iter* iter) {
     struct property_map_entry* current = iter->chain;
-    if (!current) return nullptr;
-    if (current->next) {
-        iter->chain = current->next;
-    } else {
-        while (iter->index < iter->map->capacity &&
-               !iter->map->entries[iter->index]) {
-            iter->index++;
-        }
-        if (iter->index < iter->map->capacity) {
-            iter->chain = iter->map->entries[iter->index];
-        }
+    if (current) {
+        iter->chain = current->next_in_order;
     }
     return current;
 }

@@ -2,12 +2,38 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "eval.h"
 #include "stb_ds.h"
 #include "value.h"
 
-#define KB 1024
+#define GC_DEBUG_STATS
+
+#ifdef GC_DEBUG_STATS
+struct heap_stats {
+    size_t total_allocs;
+    size_t total_frees;
+    size_t total_blocks;
+    size_t total_cells;
+    size_t gc_count;
+    size_t last_gc_live;
+    size_t last_gc_freed;
+    size_t bytes_allocated;
+};
+
+static struct heap_stats g_stats = {0};
+
+static inline void stats_print_summary(struct heap* heap) {
+    fprintf(stderr,
+            "[heap] blocks=%zu  allocs=%zu  frees=%zu  live=%zu  bytes=%zuKB  "
+            "gc=%zu\n",
+            g_stats.total_blocks, g_stats.total_allocs, g_stats.total_frees,
+            g_stats.total_allocs - g_stats.total_frees,
+            g_stats.bytes_allocated / 1024, g_stats.gc_count);
+}
+
+#endif
 
 struct heap* heap_create(struct lu_istate* state) {
     struct heap* heap = malloc(sizeof(struct heap));
@@ -15,6 +41,9 @@ struct heap* heap_create(struct lu_istate* state) {
     heap->block_count = 0;
     heap->bytes_allocated_since_last_gc = 0;
     heap->istate = state;
+#ifdef GC_DEBUG_STATS
+    fprintf(stderr, "[heap] created new heap %p\n", (void*)heap);
+#endif
     return heap;
 }
 
@@ -49,19 +78,36 @@ static struct heap_block* block_create(size_t cell_size) {
     }
 
     block->free_list = cell_get(block, 0);
+
+#ifdef GC_DEBUG_STATS
+    g_stats.total_blocks++;
+    g_stats.total_cells += block->cell_count;
+    fprintf(stderr, "[heap] created block %p (%zu cells of %zu bytes)\n",
+            (void*)block, block->cell_count, block->cell_size);
+#endif
     return block;
 }
 
 struct lu_object* heap_allocate_object(struct heap* heap, size_t size) {
     if (heap->bytes_allocated_since_last_gc + size > GC_BYTES_THRESHOLD) {
+#ifdef GC_DEBUG_STATS
+
+        fprintf(stderr,
+                "[heap] GC threshold reached (%zu bytes), collecting...\n",
+                heap->bytes_allocated_since_last_gc);
         collect_garbage(heap);
+#endif
         heap->bytes_allocated_since_last_gc = 0;
     }
     struct heap_block* block = heap->block_list;
     while (block) {
-        if (size < block->cell_size) {
+        if (size <= block->cell_size) {
             struct lu_object* obj = block_allocate_object(block);
             if (obj) {
+#ifdef GC_DEBUG_STATS
+                g_stats.total_allocs++;
+                g_stats.bytes_allocated += size;
+#endif
                 heap->bytes_allocated_since_last_gc += size;
                 return obj;
             }
@@ -70,9 +116,19 @@ struct lu_object* heap_allocate_object(struct heap* heap, size_t size) {
     }
 
     block = block_create(size);
+    if (!block) {
+        printf("Failed to create block\n");
+        return nullptr;
+    }
     block->next = heap->block_list;
     heap->block_list = block;
     struct lu_object* obj = block_allocate_object(block);
+
+#ifdef GC_DEBUG_STATS
+    g_stats.total_allocs++;
+    g_stats.bytes_allocated += size;
+    if (g_stats.total_allocs % 1000000 == 0) stats_print_summary(heap);
+#endif
     heap->bytes_allocated_since_last_gc += size;
     return obj;
 }
@@ -166,6 +222,9 @@ static void block_deallocate_cell(struct heap_block* block,
     obj->state = OBJECT_STATE_DEAD;
     obj->next = block->free_list;
     block->free_list = obj;
+#ifdef GC_DEBUG_STATS
+    g_stats.total_frees++;
+#endif
 }
 
 static void sweep_dead_cells(struct heap* heap) {
@@ -182,16 +241,43 @@ static void sweep_dead_cells(struct heap* heap) {
 }
 
 void collect_garbage(struct heap* heap) {
+#ifdef GC_DEBUG_STATS
+    clock_t start = clock();
+#endif
+
     struct lu_objectset* roots = lu_objectset_new(16);
     struct lu_objectset* live_cells = lu_objectset_new(16);
     collect_roots(heap, roots);
     collect_live_cells(heap, roots, live_cells);
     clear_mark_bits(heap);
     mark_live_cells(heap, live_cells);
+
+#ifdef GC_DEBUG_STATS
+    size_t before_free = g_stats.total_frees;
+#endif
     sweep_dead_cells(heap);
+// debug
+#ifdef GC_DEBUG_STATS
+    size_t freed_now = g_stats.total_frees - before_free;
+    g_stats.gc_count++;
+    g_stats.last_gc_freed = freed_now;
+    g_stats.last_gc_live = live_cells->size;
+    double secs = (double)(clock() - start) / CLOCKS_PER_SEC;
+    fprintf(stderr, "[gc] #%zu done in %.3f s, live=%zu freed=%zu\n",
+            g_stats.gc_count, secs, g_stats.last_gc_live,
+            g_stats.last_gc_freed);
+#endif
+
+    lu_objectset_free(roots);
+    lu_objectset_free(live_cells);
 }
 
 void heap_destroy(struct heap* heap) {
+#ifdef GC_DEBUG_STATS
+    fprintf(stderr, "[heap] destroying heap...\n");
+    stats_print_summary(heap);
+#endif
+
     struct heap_block* block = heap->block_list;
     while (block) {
         struct heap_block* next = block->next;
@@ -199,4 +285,7 @@ void heap_destroy(struct heap* heap) {
         block = next;
     }
     free(heap);
+#ifdef GC_DEBUG_STATS
+    fprintf(stderr, "[heap] destroyed, total freed=%zu\n", g_stats.total_frees);
+#endif
 }

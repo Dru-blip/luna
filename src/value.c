@@ -60,7 +60,7 @@ static void lu_object_visit(struct lu_object* self, struct lu_objectset* set) {
         struct lu_object* curr = worklist_dequeue(&worklist);
         lu_objectset_add(set, curr);
         iter = property_map_iter_new(&curr->properties);
-        while ((entry = property_map_iter_next(&iter))!=nullptr) {
+        while ((entry = property_map_iter_next(&iter)) != nullptr) {
             worklist_enqueue(&worklist, lu_cast(struct lu_object, entry->key));
             if (lu_is_object(entry->value)) {
                 worklist_enqueue(&worklist, lu_as_object(entry->value));
@@ -122,6 +122,7 @@ static void lu_module_finalize(struct lu_object* self) {
     lu_object_finalize(self);
 }
 
+// Object V-Tables
 static struct lu_object_vtable lu_object_default_vtable = {
     .is_function = false,
     .is_string = false,
@@ -161,6 +162,8 @@ static struct lu_object_vtable lu_module_vtable = {
     .finalize = lu_module_finalize,
     .visit = lu_module_visit,
 };
+//
+//
 
 bool lu_string_equal(struct lu_string* a, struct lu_string* b) {
     if (a == b) return true;
@@ -213,9 +216,10 @@ void lu_property_map_deinit(struct property_map* map) {
     free(map->entries);
 }
 
-static bool lu_property_map_add_entry(struct property_map_entry** entries,
+static bool lu_property_map_add_entry(struct property_map* map,
+                                      struct property_map_entry** entries,
                                       size_t capacity, struct lu_string* key,
-                                      struct lu_value value) {
+                                      struct lu_value value, bool is_resize) {
     size_t index = key->hash & (capacity - 1);
 
     struct property_map_entry* new_entry =
@@ -240,6 +244,16 @@ static bool lu_property_map_add_entry(struct property_map_entry** entries,
         new_entry->next->prev = new_entry;
     }
     entries[index] = new_entry;
+
+    if (!is_resize) {
+        if (map->tail) {
+            map->tail->next_in_order = new_entry;
+            map->tail = new_entry;
+        } else {
+            map->head = map->tail = new_entry;
+        }
+    }
+
     return true;
 }
 
@@ -251,8 +265,8 @@ static void property_map_resize(struct property_map* map, size_t capacity) {
     for (size_t i = 0; i < map->capacity; i++) {
         struct property_map_entry* entry = map->entries[i];
         while (entry) {
-            lu_property_map_add_entry(new_entries, new_capacity, entry->key,
-                                      entry->value);
+            lu_property_map_add_entry(map, new_entries, new_capacity,
+                                      entry->key, entry->value, true);
             entry = entry->next;
         }
     }
@@ -269,7 +283,8 @@ void lu_property_map_set(struct property_map* map, struct lu_string* key,
         size_t new_capacity = map->capacity * 2;
         property_map_resize(map, new_capacity);
     }
-    if (lu_property_map_add_entry(map->entries, map->capacity, key, value)) {
+    if (lu_property_map_add_entry(map, map->entries, map->capacity, key, value,
+                                  false)) {
         map->size++;
     };
 }
