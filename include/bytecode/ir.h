@@ -1,4 +1,4 @@
-#pragma  once
+#pragma once
 #include <stddef.h>
 #include <stdint.h>
 
@@ -6,11 +6,26 @@
 #include "value.h"
 
 enum opcode {
-    // Load accumulator with small integer
-    OPCODE_LDASI,
-    // Load accumulator with constant value
+    OPCODE_LOAD_SMI,
+    // Load constant value
     OPCODE_LOAD_CONST,
-    // Return value from accumulator
+
+    OPCODE_ADD,
+    OPCODE_SUB,
+    OPCODE_MUL,
+
+    OPCODE_DIV,
+    OPCODE_MOD,
+
+    OPCODE_TEST_GREATER_THAN,
+    OPCODE_TEST_GREATER_THAN_EQUAL,
+
+    OPCODE_TEST_LESS_THAN,
+    OPCODE_TEST_LESS_THAN_EQUAL,
+
+    OPCODE_TEST_EQUAL,
+    OPCODE_TEST_NOT_EQUAL,
+
     OPCODE_RET,
 };
 
@@ -20,7 +35,15 @@ enum opcode {
 struct instruction {
     enum opcode opcode;
     union {
-        uint16_t const_index;
+        struct {
+            uint16_t const_index;
+            uint32_t register_index;
+        };
+        struct {
+            uint32_t r1;
+            uint32_t r2;
+            uint32_t dst;
+        };
     };
 };
 
@@ -36,6 +59,7 @@ struct exectuable {
     size_t instructions_size;
     size_t constants_size;
     struct lu_value* constants;
+    uint32_t max_register_count;
 };
 
 struct generator {
@@ -46,6 +70,7 @@ struct generator {
     size_t block_counter;
     struct lu_value* constants;
     size_t constant_counter;
+    uint32_t register_counter;
 };
 
 void generator_init(struct generator* generator, struct ast_program program);
