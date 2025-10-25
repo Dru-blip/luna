@@ -1,5 +1,6 @@
 #include "bytecode/vm.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "bytecode/interpreter.h"
@@ -7,6 +8,9 @@
 #include "stb_ds.h"
 // #include "value.h"
 #include "bytecode/vm_ops.h"
+#include "value.h"
+
+#define lu_has_error(vm) (vm)->istate->error != nullptr
 
 struct lu_vm* lu_vm_new(struct lu_istate* istate) {
     struct lu_vm* vm = malloc(sizeof(struct lu_vm));
@@ -35,9 +39,6 @@ static void lu_vm_push_new_record(struct lu_vm* vm,
 
 struct lu_value lu_run_executable(struct lu_istate* state,
                                   struct exectuable* executable) {
-    //
-    //
-
     lu_vm_push_new_record(state->vm, executable);
     struct activation_record* record = &state->vm->records[state->vm->rp - 1];
     return lu_vm_run_record(state->vm, record);
@@ -56,66 +57,60 @@ record_start:
                     record->executable->constants[instr->const_index];
                 goto record_start;
             }
-            case OPCODE_ADD: {
-                record->registers[instr->dst] =
-                    lu_vm_op_add(vm->istate, record->registers[instr->r1],
-                                 record->registers[instr->r2]);
+            case OPCODE_LOAD_NONE: {
+                record->registers[instr->register_index] = lu_value_none();
                 goto record_start;
             }
-            case OPCODE_SUB: {
-                record->registers[instr->dst] =
-                    lu_vm_op_sub(vm->istate, record->registers[instr->r1],
-                                 record->registers[instr->r2]);
+            case OPCODE_LOAD_TRUE: {
+                record->registers[instr->register_index] = lu_value_bool(true);
                 goto record_start;
             }
-            case OPCODE_MUL: {
-                record->registers[instr->dst] =
-                    lu_vm_op_mul(vm->istate, record->registers[instr->r1],
-                                 record->registers[instr->r2]);
+            case OPCODE_LOAD_FALSE: {
+                record->registers[instr->register_index] = lu_value_bool(false);
                 goto record_start;
             }
-            case OPCODE_TEST_LESS_THAN: {
-                record->registers[instr->dst] =
-                    lu_vm_op_lt(vm->istate, record->registers[instr->r1],
-                                record->registers[instr->r2]);
-                goto record_start;
-            }
-            case OPCODE_TEST_LESS_THAN_EQUAL: {
-                record->registers[instr->dst] =
-                    lu_vm_op_lte(vm->istate, record->registers[instr->r1],
-                                 record->registers[instr->r2]);
-                goto record_start;
-            }
-            case OPCODE_TEST_GREATER_THAN: {
-                record->registers[instr->dst] =
-                    lu_vm_op_gt(vm->istate, record->registers[instr->r1],
-                                record->registers[instr->r2]);
-                goto record_start;
-            }
-            case OPCODE_TEST_GREATER_THAN_EQUAL: {
-                record->registers[instr->dst] =
-                    lu_vm_op_gte(vm->istate, record->registers[instr->r1],
-                                 record->registers[instr->r2]);
-                goto record_start;
-            }
-            case OPCODE_TEST_EQUAL: {
-                record->registers[instr->dst] =
-                    lu_vm_op_eq(vm->istate, record->registers[instr->r1],
-                                record->registers[instr->r2]);
-                goto record_start;
-            }
-            case OPCODE_TEST_NOT_EQUAL: {
-                record->registers[instr->dst] =
-                    lu_vm_op_neq(vm->istate, record->registers[instr->r1],
-                                 record->registers[instr->r2]);
-                goto record_start;
-            }
+
+#define HANDLE_BINARY_INSTRUCTION(opcode, func)                                \
+    case opcode: {                                                             \
+        record->registers[instr->dst] = func(vm, record->registers[instr->r1], \
+                                             record->registers[instr->r2]);    \
+        if (lu_has_error(vm)) {                                                \
+            goto error_reporter;                                               \
+        }                                                                      \
+        goto record_start;                                                     \
+    }
+                HANDLE_BINARY_INSTRUCTION(OPCODE_ADD, lu_vm_op_add);
+                HANDLE_BINARY_INSTRUCTION(OPCODE_SUB, lu_vm_op_sub);
+                HANDLE_BINARY_INSTRUCTION(OPCODE_MUL, lu_vm_op_mul);
+                HANDLE_BINARY_INSTRUCTION(OPCODE_DIV, lu_vm_op_div);
+
+                HANDLE_BINARY_INSTRUCTION(OPCODE_TEST_LESS_THAN, lu_vm_op_lt);
+                HANDLE_BINARY_INSTRUCTION(OPCODE_TEST_LESS_THAN_EQUAL,
+                                          lu_vm_op_lte);
+                HANDLE_BINARY_INSTRUCTION(OPCODE_TEST_GREATER_THAN,
+                                          lu_vm_op_gt);
+                HANDLE_BINARY_INSTRUCTION(OPCODE_TEST_GREATER_THAN_EQUAL,
+                                          lu_vm_op_gte);
+                HANDLE_BINARY_INSTRUCTION(OPCODE_TEST_EQUAL, lu_vm_op_eq);
+                HANDLE_BINARY_INSTRUCTION(OPCODE_TEST_NOT_EQUAL, lu_vm_op_neq);
+
             case OPCODE_RET: {
                 return record->registers[instr->register_index];
             }
             default: {
                 break;
             }
+        }
+    }
+error_reporter:
+    if (vm->istate->error) {
+        struct lu_string* str = lu_as_string(lu_obj_get(
+            vm->istate->error, lu_intern_string(vm->istate, "message")));
+        struct lu_string* traceback = lu_as_string(lu_obj_get(
+            vm->istate->error, lu_intern_string(vm->istate, "traceback")));
+        printf("Error: %s\n", lu_string_get_cstring(str));
+        if (traceback) {
+            printf("%s\n", traceback->block->data);
         }
     }
     return lu_value_none();

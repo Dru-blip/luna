@@ -9,6 +9,9 @@ enum opcode {
     OPCODE_LOAD_SMI,
     // Load constant value
     OPCODE_LOAD_CONST,
+    OPCODE_LOAD_NONE,
+    OPCODE_LOAD_TRUE,
+    OPCODE_LOAD_FALSE,
 
     OPCODE_ADD,
     OPCODE_SUB,
@@ -30,8 +33,7 @@ enum opcode {
 };
 
 // this is high level representation of instruction
-// later this will be optimized to byte stream for efficient storage and
-// execution.
+// later this will be represented in byte stream for efficient storage.
 struct instruction {
     enum opcode opcode;
     union {
@@ -54,12 +56,13 @@ struct basic_block {
 };
 
 struct exectuable {
-    LUNA_OBJECT_HEADER;
     struct instruction* instructions;
     size_t instructions_size;
     size_t constants_size;
     struct lu_value* constants;
     uint32_t max_register_count;
+    struct span* instructions_span;
+    const char* file_path;
 };
 
 struct generator {
@@ -71,6 +74,7 @@ struct generator {
     struct lu_value* constants;
     size_t constant_counter;
     uint32_t register_counter;
+    struct span* instructions_span;
 };
 
 void generator_init(struct generator* generator, struct ast_program program);

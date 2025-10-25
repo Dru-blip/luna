@@ -7,14 +7,15 @@
 #include "value.h"
 
 void generator_init(struct generator* generator, struct ast_program program) {
+    generator->program = program;
     generator->current_block_id = 0;
-    generator->blocks = nullptr;
     generator->block_counter = 0;
     generator->constant_counter = 0;
+    generator->register_counter = 0;
+    generator->blocks = nullptr;
     generator->node = nullptr;
     generator->constants = nullptr;
-    generator->program = program;
-    generator->register_counter = 0;
+    generator->instructions_span = nullptr;
 }
 
 size_t generator_basic_block_new(struct generator* generator) {
@@ -27,7 +28,6 @@ size_t generator_basic_block_new(struct generator* generator) {
 
 static size_t generator_add_int_contant(struct generator* generator,
                                         int64_t val) {
-    //
     arrput(generator->constants, lu_value_int(val));
     return generator->constant_counter++;
 }
@@ -39,8 +39,6 @@ static inline uint32_t generator_allocate_register(
 
 static uint32_t generator_emit_load_constant(struct generator* generator,
                                              size_t const_index) {
-    //
-
     struct instruction instr = {
         .const_index = const_index,
         .register_index = generator_allocate_register(generator),
@@ -52,7 +50,6 @@ static uint32_t generator_emit_load_constant(struct generator* generator,
 
 static void generator_emit_instruction(struct generator* generator,
                                        enum opcode opcode) {
-    //
     struct instruction instr = {.opcode = opcode};
     arrput(generator->blocks[generator->current_block_id].instructions, instr);
 }
@@ -94,11 +91,36 @@ static uint32_t generate_expr(struct generator* generator,
         case AST_NODE_INT: {
             size_t const_index =
                 generator_add_int_contant(generator, expr->data.int_val);
+            arrput(generator->instructions_span, expr->span);
             return generator_emit_load_constant(generator, const_index);
+        }
+        case AST_NODE_NONE: {
+            const uint32_t dst_reg = generator_allocate_register(generator);
+            arrput(generator->instructions_span, expr->span);
+            struct instruction instr = {
+                .register_index = dst_reg,
+                .opcode = OPCODE_LOAD_NONE,
+            };
+            arrput(generator->blocks[generator->current_block_id].instructions,
+                   instr);
+            return dst_reg;
+        }
+        case AST_NODE_BOOL: {
+            const uint32_t dst_reg = generator_allocate_register(generator);
+            arrput(generator->instructions_span, expr->span);
+            struct instruction instr = {
+                .register_index = dst_reg,
+                .opcode =
+                    expr->data.int_val ? OPCODE_LOAD_TRUE : OPCODE_LOAD_FALSE,
+            };
+            arrput(generator->blocks[generator->current_block_id].instructions,
+                   instr);
+            return dst_reg;
         }
         case AST_NODE_BINOP: {
             uint32_t lhs = generate_expr(generator, expr->data.binop.lhs);
             uint32_t rhs = generate_expr(generator, expr->data.binop.rhs);
+            arrput(generator->instructions_span, expr->span);
             return generator_emit_binop_instruction(
                 generator, expr->data.binop.op, lhs, rhs);
         }
@@ -114,6 +136,7 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
             uint32_t value = generate_expr(generator, stmt->data.node);
             struct instruction instr = {.opcode = OPCODE_RET,
                                         .register_index = value};
+            arrput(generator->instructions_span, stmt->span);
             arrput(generator->blocks[generator->current_block_id].instructions,
                    instr);
             break;
@@ -148,5 +171,7 @@ struct exectuable* generator_make_executable(struct generator* generator) {
     executable->constants = generator->constants;
     executable->constants_size = arrlen(executable->constants);
     executable->max_register_count = generator->register_counter;
+    executable->file_path = generator->program.filepath;
+    executable->instructions_span = generator->instructions_span;
     return executable;
 }

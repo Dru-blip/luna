@@ -16,6 +16,12 @@ struct lu_vm {
     struct lu_istate* istate;
 };
 
+#define lu_vm_active_record(vm) ((vm)->records[(vm)->rp - 1])
+
+#define lu_vm_current_ip_span(vm) \
+    (lu_vm_active_record(vm)      \
+         .executable->instructions_span[(lu_vm_active_record(vm).ip) - 1])
+
 struct lu_vm* lu_vm_new(struct lu_istate* istate);
 void lu_vm_destroy(struct lu_vm* vm);
 
