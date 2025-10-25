@@ -1,3 +1,4 @@
+#pragma  once
 #include <stddef.h>
 #include <stdint.h>
 
@@ -7,6 +8,8 @@
 enum opcode {
     // Load accumulator with small integer
     OPCODE_LDASI,
+    // Load accumulator with constant value
+    OPCODE_LOAD_CONST,
     // Return value from accumulator
     OPCODE_RET,
 };

@@ -117,6 +117,10 @@ union ast_node_data {
     struct ast_call call;
     struct ast_member_expr member_expr;
     struct ast_if_stmt if_stmt;
+    // DANGER: memory leak happens here
+    // this list is externally managed
+    // not arena allocated, should be freed manually by walking the tree or make
+    // a linked list or flatten the tree.
     struct ast_node** list;
     struct ast_object_property property;
     struct ast_for_stmt for_stmt;

@@ -122,6 +122,7 @@ struct lu_function {
     size_t param_count;
     union {
         native_func_t func;
+        struct exectuable* executable;
         struct {
             struct ast_node** params;
             struct ast_node* body;

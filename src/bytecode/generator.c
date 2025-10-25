@@ -11,6 +11,7 @@ void generator_init(struct generator* generator, struct ast_program program) {
     generator->block_counter = 0;
     generator->constant_counter = 0;
     generator->node = nullptr;
+    generator->constants = nullptr;
     generator->program = program;
 }
 
@@ -33,7 +34,7 @@ static void generator_emit_load_constant(struct generator* generator,
                                          size_t const_index) {
     //
     struct instruction instr = {.const_index = const_index,
-                                .opcode = OPCODE_LDASI};
+                                .opcode = OPCODE_LOAD_CONST};
     arrput(generator->blocks[generator->current_block_id].instructions, instr);
 }
 
