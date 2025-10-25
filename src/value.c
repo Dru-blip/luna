@@ -9,7 +9,7 @@
 
 #include "arena.h"
 #include "ast.h"
-#include "eval.h"
+#include "bytecode/interpreter.h"
 #include "heap.h"
 #include "stb_ds.h"
 #include "strbuf.h"
@@ -525,44 +525,44 @@ struct lu_module* lu_module_new(struct lu_istate* state, struct lu_string* name,
 
 void lu_raise_error(struct lu_istate* state, struct lu_string* message,
                     struct span* location) {
-    struct lu_object* error = lu_object_new(state);
+    // struct lu_object* error = lu_object_new(state);
 
-    char buffer[1024];
-    struct strbuf sb;
-    strbuf_init_static(&sb, buffer, sizeof(buffer));
+    // char buffer[1024];
+    // struct strbuf sb;
+    // strbuf_init_static(&sb, buffer, sizeof(buffer));
 
-    lu_obj_set(error, lu_intern_string(state, "message"),
-               lu_value_object(message));
+    // lu_obj_set(error, lu_intern_string(state, "message"),
+    //            lu_value_object(message));
 
-    // TODO: include call stack information
-    const char* line_start =
-        state->context_stack->call_stack->module->program.source +
-        location->start;
-    int line_length = location->end - location->start;
+    // // TODO: include call stack information
+    // const char* line_start =
+    //     state->context_stack->call_stack->module->program.source +
+    //     location->start;
+    // int line_length = location->end - location->start;
 
-    strbuf_append(&sb, "  | \n");
-    strbuf_appendf(&sb, "%d | ", location->line);
-    strbuf_append_n(&sb, line_start, line_length);
-    strbuf_append(&sb, "\n");
-    strbuf_append(&sb, "  | \n");
+    // strbuf_append(&sb, "  | \n");
+    // strbuf_appendf(&sb, "%d | ", location->line);
+    // strbuf_append_n(&sb, line_start, line_length);
+    // strbuf_append(&sb, "\n");
+    // strbuf_append(&sb, "  | \n");
 
-    strbuf_append(&sb, "    ");
-    for (size_t i = 0; i < line_length; i++) {
-        strbuf_append(&sb, "^");
-    }
-    strbuf_append(&sb, "\n");
+    // strbuf_append(&sb, "    ");
+    // for (size_t i = 0; i < line_length; i++) {
+    //     strbuf_append(&sb, "^");
+    // }
+    // strbuf_append(&sb, "\n");
 
-    strbuf_appendf(
-        &sb, "in %s:%d:%d",
-        lu_string_get_cstring(state->context_stack->call_stack->module->name),
-        location->line, location->col);
+    // strbuf_appendf(
+    //     &sb, "in %s:%d:%d",
+    //     lu_string_get_cstring(state->context_stack->call_stack->module->name),
+    //     location->line, location->col);
 
-    lu_obj_set(error, lu_intern_string(state, "traceback"),
-               lu_value_object(lu_string_new(state, buffer)));
+    // lu_obj_set(error, lu_intern_string(state, "traceback"),
+    //            lu_value_object(lu_string_new(state, buffer)));
 
-    state->error_location = *location;
-    state->op_result = OP_RESULT_RAISED_ERROR;
-    state->error = error;
+    // state->error_location = *location;
+    // state->op_result = OP_RESULT_RAISED_ERROR;
+    // state->error = error;
 }
 
 // object set implementation

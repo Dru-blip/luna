@@ -1,3 +1,4 @@
+#ifdef EVAL_IMPLEMENTATION
 #include "eval.h"
 
 #include <assert.h>
@@ -135,7 +136,7 @@ static void begin_scope(struct lu_istate* state) {
 }
 
 static void end_scope(struct lu_istate* state) {
-    struct scope scope = arrpop(state->context_stack->call_stack->scopes);
+    arrpop(state->context_stack->call_stack->scopes);
 }
 
 static enum signal_kind eval_stmts(struct lu_istate* state,
@@ -1086,3 +1087,4 @@ void lu_eval_program(struct lu_istate* state) {
         }
     }
 }
+#endif

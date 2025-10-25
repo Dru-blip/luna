@@ -4,11 +4,11 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include "eval.h"
+#include "bytecode/interpreter.h"
 #include "stb_ds.h"
 #include "value.h"
 
-#define GC_DEBUG_STATS
+// #define GC_DEBUG_STATS
 
 #ifdef GC_DEBUG_STATS
 struct heap_stats {
@@ -144,29 +144,6 @@ static void collect_roots(struct heap* heap, struct lu_objectset* roots) {
         lu_objectset_add(roots, heap->istate->error);
     }
 
-    struct execution_context* ctx = heap->istate->context_stack;
-    while (ctx) {
-        struct call_frame* frame = ctx->call_stack;
-        lu_objectset_add(roots, ctx->global_scope.variables);
-        while (frame) {
-            lu_objectset_add(roots, ctx->call_stack->module);
-            lu_objectset_add(roots, frame->function);
-            if (frame->self) {
-                lu_objectset_add(roots, frame->self);
-            }
-            if (lu_is_object(frame->return_value)) {
-                lu_objectset_add(roots, lu_as_object(frame->return_value));
-            }
-            size_t scope_count = arrlen(frame->scopes);
-            struct scope* scope;
-            for (size_t i = 0; i < scope_count; i++) {
-                scope = &frame->scopes[i];
-                lu_objectset_add(roots, scope->variables);
-            }
-            frame = frame->parent;
-        }
-        ctx = ctx->prev;
-    }
     // adding interned strings to roots if any missed
     struct string_map_iter it;
     string_map_iter_init(&it, &heap->istate->string_pool.strings);

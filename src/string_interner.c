@@ -5,7 +5,7 @@
 #include <string.h>
 
 #include "arena.h"
-#include "eval.h"
+#include "bytecode/interpreter.h"
 #include "value.h"
 
 static struct string_block sentinel = {

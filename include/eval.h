@@ -1,3 +1,5 @@
+#ifdef EVAL_IMPLEMENTATION
+
 #pragma once
 
 #include <stddef.h>
@@ -74,3 +76,4 @@ void lu_eval_program(struct lu_istate* state);
 struct lu_value lu_call_function(struct lu_istate* state,
                                  struct lu_object* self);
 struct lu_value lu_run_program(struct lu_istate* state, const char* filepath);
+#endif

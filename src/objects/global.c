@@ -5,7 +5,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "eval.h"
 #include "luna.h"
 #include "strbuf.h"
 #include "string_interner.h"
@@ -52,8 +51,8 @@ LU_NATIVE_FN(print_func) {
 }
 
 LU_NATIVE_FN(raise_func) {
-    lu_raise_error(state, lu_string_new(state, "raised error"),
-                   &state->context_stack->call_stack->call_location);
+    // lu_raise_error(state, lu_string_new(state, "raised error"),
+    //                &state->context_stack->call_stack->call_location);
     return lu_value_none();
 }
 
@@ -108,8 +107,8 @@ LU_NATIVE_FN(import_module) {
     if ((dir = opendir(path)) == nullptr) {
         strbuf_appendf(&sb, "failed to read file: '%s'",
                        lu_string_get_cstring(lu_as_string(file_path_value)));
-        lu_raise_error(state, lu_string_new(state, err_buffer),
-                       &state->context_stack->call_stack->call_location);
+        // lu_raise_error(state, lu_string_new(state, err_buffer),
+        //                &state->context_stack->call_stack->call_location);
 
         return lu_value_undefined();
     }
@@ -131,16 +130,16 @@ LU_NATIVE_FN(import_module) {
     if (path_buffer == nullptr) {
         closedir(dir);
         strbuf_appendf(&sb, "failed to read file: '%s'", file_path);
-        lu_raise_error(state, lu_string_new(state, err_buffer),
-                       &state->context_stack->call_stack->call_location);
+        // lu_raise_error(state, lu_string_new(state, err_buffer),
+        //                &state->context_stack->call_stack->call_location);
         return lu_value_undefined();
     }
 
-    struct lu_value result = lu_run_program(state, path_buffer);
+    // struct lu_value result = lu_run_program(state, path_buffer);
     closedir(dir);
     free(path_buffer);
 
-    return result;
+    LU_RETURN_NONE();
 }
 
 LU_NATIVE_FN(console_read_int) {

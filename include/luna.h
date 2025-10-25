@@ -2,7 +2,7 @@
 
 #include <stdbool.h>
 
-#include "eval.h"
+#include "bytecode/interpreter.h"
 #include "heap.h"
 #include "value.h"
 
