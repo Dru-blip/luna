@@ -11,6 +11,7 @@
 #include "value.h"
 
 #define lu_has_error(vm) (vm)->istate->error != nullptr
+#define IS_NUMERIC(a) (lu_is_int(a) || lu_is_bool(a))
 
 struct lu_vm* lu_vm_new(struct lu_istate* istate) {
     struct lu_vm* vm = malloc(sizeof(struct lu_vm));
@@ -67,6 +68,37 @@ record_start:
             }
             case OPCODE_LOAD_FALSE: {
                 record->registers[instr->register_index] = lu_value_bool(false);
+                goto record_start;
+            }
+            case OPCODE_UNARY_PLUS: {
+                // Currently this is a no-op, but operation can be performed
+                // based on type.
+                goto record_start;
+            }
+            case OPCODE_UNARY_MINUS: {
+                struct lu_value argument =
+                    record->registers[instr->register_index];
+                if (IS_NUMERIC(argument)) {
+                    record->registers[instr->register_index] =
+                        lu_value_int(-lu_as_int(argument));
+                    goto record_start;
+                }
+
+                struct span span = lu_vm_current_ip_span(vm);
+                const char* argument_type_name =
+                    lu_value_get_type_name(argument);
+                char buffer[256];
+                snprintf(buffer, sizeof(buffer),
+                         "invalid operand type for unary (-) : '%s'",
+                         argument_type_name);
+                lu_raise_error(vm->istate, lu_string_new(vm->istate, buffer),
+                               &span);
+
+                goto error_reporter;
+            }
+            case OPCODE_UNARY_NOT: {
+                record->registers[instr->register_index] = lu_value_bool(
+                    lu_is_falsy(record->registers[instr->register_index]));
                 goto record_start;
             }
 

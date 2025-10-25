@@ -79,6 +79,12 @@ static enum opcode binop_to_opcode[] = {
     OPCODE_TEST_LESS_THAN_EQUAL,
 };
 
+static enum opcode unop_to_opcode[] = {
+    OPCODE_UNARY_PLUS,
+    OPCODE_UNARY_MINUS,
+    OPCODE_UNARY_NOT,
+};
+
 static uint32_t generator_emit_binop_instruction(struct generator* generator,
                                                  enum binary_op binop,
                                                  uint32_t lhs_register_index,
@@ -135,6 +141,18 @@ static uint32_t generate_expr(struct generator* generator,
                 generator, expr->data.id, &expr->span);
             arrput(generator->instructions_span, expr->span);
             return generator_emit_load_constant(generator, const_index);
+        }
+        case AST_NODE_UNOP: {
+            uint32_t dst_reg =
+                generate_expr(generator, expr->data.unop.argument);
+            arrput(generator->instructions_span, expr->span);
+            struct instruction instr = {
+                .register_index = dst_reg,
+                .opcode = unop_to_opcode[expr->data.unop.op],
+            };
+            arrput(generator->blocks[generator->current_block_id].instructions,
+                   instr);
+            return dst_reg;
         }
         case AST_NODE_BINOP: {
             uint32_t lhs = generate_expr(generator, expr->data.binop.lhs);
