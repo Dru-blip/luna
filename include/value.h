@@ -3,6 +3,7 @@
 #include <asm-generic/errno.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "ast.h"
 #include "string_interner.h"
@@ -318,6 +319,15 @@ static inline struct lu_value lu_array_iter_next(struct lu_array_iter* iter) {
         return iter->array->elements[iter->index++];
     }
     return lu_value_undefined();
+}
+
+static inline int64_t lu_strcmp(struct lu_string* a, struct lu_string* b) {
+    size_t min_len = a->length > b->length ? b->length : a->length;
+    char* adata = lu_string_get_cstring(a);
+    char* bdata = lu_string_get_cstring(b);
+    int64_t cmp_res = memcmp(adata, bdata, min_len);
+    if (cmp_res != 0) return cmp_res;
+    return a->length < b->length ? -1 : a->length > b->length;
 }
 
 static inline bool lu_value_strict_equals(struct lu_value a,

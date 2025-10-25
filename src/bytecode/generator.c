@@ -26,9 +26,22 @@ size_t generator_basic_block_new(struct generator* generator) {
     return block.id;
 }
 
-static size_t generator_add_int_contant(struct generator* generator,
-                                        int64_t val) {
+static inline size_t generator_add_int_contant(struct generator* generator,
+                                               int64_t val) {
     arrput(generator->constants, lu_value_int(val));
+    return generator->constant_counter++;
+}
+
+static inline size_t generator_add_str_contant(struct generator* generator,
+                                               char* data,
+                                               struct span* str_span) {
+    const size_t len = str_span->end - 1 - str_span->start - 1;
+    char* buffer = malloc(len);
+    memcpy(buffer, data, len);
+    buffer[len] = '\0';
+    struct lu_string* str = lu_string_new(generator->state, buffer);
+    arrput(generator->constants, lu_value_object(str));
+    free(buffer);
     return generator->constant_counter++;
 }
 
@@ -117,6 +130,12 @@ static uint32_t generate_expr(struct generator* generator,
                    instr);
             return dst_reg;
         }
+        case AST_NODE_STR: {
+            size_t const_index = generator_add_str_contant(
+                generator, expr->data.id, &expr->span);
+            arrput(generator->instructions_span, expr->span);
+            return generator_emit_load_constant(generator, const_index);
+        }
         case AST_NODE_BINOP: {
             uint32_t lhs = generate_expr(generator, expr->data.binop.lhs);
             uint32_t rhs = generate_expr(generator, expr->data.binop.rhs);
@@ -154,8 +173,10 @@ static void generate_stmts(struct generator* generator,
     }
 }
 
-struct exectuable* generator_generate(struct ast_program program) {
+struct exectuable* generator_generate(struct lu_istate* state,
+                                      struct ast_program program) {
     struct generator generator;
+    generator.state = state;
     generator_init(&generator, program);
     size_t entry_block_id = generator_basic_block_new(&generator);
     generator.current_block_id = entry_block_id;

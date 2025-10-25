@@ -71,7 +71,7 @@ static void print_value(struct lu_value value) {
 struct lu_value lu_run_program(struct lu_istate* state, const char* filepath) {
     const char* source = read_file(filepath);
     struct ast_program program = parse_program(filepath, source);
-    struct exectuable* executable = generator_generate(program);
+    struct exectuable* executable = generator_generate(state, program);
     struct lu_module* module =
         lu_module_new(state, lu_string_new(state, filepath), &program);
     lu_obj_set(state->module_cache, module->name, lu_value_object(module));

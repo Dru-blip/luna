@@ -64,10 +64,16 @@ static inline struct lu_value lu_vm_op_div(struct lu_vm* vm, struct lu_value a,
     RAISE_TYPE_ERROR(vm, "/", a, b);
 }
 
+#define STR_CMP(a, b) (lu_strcmp(lu_as_string(a), lu_as_string(b)))
+
 static inline struct lu_value lu_vm_op_lt(struct lu_vm* vm, struct lu_value a,
                                           struct lu_value b) {
     if (IS_NUMERIC(a) && IS_NUMERIC(b)) {
         return lu_value_bool(a.integer < b.integer);
+    }
+
+    if (lu_is_string(a) && lu_is_string(b)) {
+        return lu_value_bool(STR_CMP(a, b) < 0);
     }
 
     RAISE_TYPE_ERROR(vm, "<", a, b);
@@ -79,6 +85,10 @@ static inline struct lu_value lu_vm_op_lte(struct lu_vm* vm, struct lu_value a,
         return lu_value_bool(a.integer <= b.integer);
     }
 
+    if (lu_is_string(a) && lu_is_string(b)) {
+        return lu_value_bool(STR_CMP(a, b) <= 0);
+    }
+
     RAISE_TYPE_ERROR(vm, "<=", a, b);
 }
 
@@ -88,6 +98,10 @@ static inline struct lu_value lu_vm_op_gt(struct lu_vm* vm, struct lu_value a,
         return lu_value_bool(a.integer > b.integer);
     }
 
+    if (lu_is_string(a) && lu_is_string(b)) {
+        return lu_value_bool(STR_CMP(a, b) > 0);
+    }
+
     RAISE_TYPE_ERROR(vm, ">", a, b);
 }
 
@@ -95,6 +109,10 @@ static inline struct lu_value lu_vm_op_gte(struct lu_vm* vm, struct lu_value a,
                                            struct lu_value b) {
     if (IS_NUMERIC(a) && IS_NUMERIC(b)) {
         return lu_value_bool(a.integer >= b.integer);
+    }
+
+    if (lu_is_string(a) && lu_is_string(b)) {
+        return lu_value_bool(STR_CMP(a, b) >= 0);
     }
 
     RAISE_TYPE_ERROR(vm, ">=", a, b);

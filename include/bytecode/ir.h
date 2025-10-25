@@ -66,6 +66,7 @@ struct exectuable {
 };
 
 struct generator {
+    struct lu_istate* state;
     size_t current_block_id;
     struct basic_block* blocks;
     struct ast_node* node;
@@ -79,5 +80,6 @@ struct generator {
 
 void generator_init(struct generator* generator, struct ast_program program);
 size_t generator_basic_block_new(struct generator* generator);
-struct exectuable* generator_generate(struct ast_program program);
+struct exectuable* generator_generate(struct lu_istate* state,
+                                      struct ast_program program);
 struct exectuable* generator_make_executable(struct generator* generator);
