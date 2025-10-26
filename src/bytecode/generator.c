@@ -427,6 +427,41 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
             end_scope(generator);
             break;
         }
+        case AST_NODE_IF_STMT: {
+            uint32_t true_block = generator_basic_block_new(generator);
+            uint32_t false_block = generator_basic_block_new(generator);
+            uint32_t end_block = stmt->data.if_stmt.alternate
+                                     ? generator_basic_block_new(generator)
+                                     : false_block;
+            uint32_t condition =
+                generate_expr(generator, stmt->data.if_stmt.test);
+
+            struct instruction branch_instr = {
+                .opcode = OPCODE_JMP_IF,
+            };
+            branch_instr.jmp_if.condition_reg = condition;
+            branch_instr.jmp_if.true_block_id = true_block;
+            branch_instr.jmp_if.false_block_id = false_block;
+
+            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+            arrput(GET_CURRENT_BLOCK.instructions, branch_instr);
+
+            generator_switch_basic_block(generator, true_block);
+            generate_stmt(generator, stmt->data.if_stmt.consequent);
+
+            generator_emit_jump_instruction(generator, end_block);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+
+            if (stmt->data.if_stmt.alternate) {
+                generator_switch_basic_block(generator, false_block);
+                generate_stmt(generator, stmt->data.if_stmt.alternate);
+                generator_emit_jump_instruction(generator, end_block);
+                arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+            }
+
+            generator_switch_basic_block(generator, end_block);
+            break;
+        }
         default: {
         }
     }

@@ -1,7 +1,11 @@
-let c=5
-{
-    let a=4
-    c=a
+
+let c=4
+
+if c<5{
+    c=10
+}else{
+    c=20
 }
+
 
 return c
