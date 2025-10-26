@@ -1,3 +1,7 @@
-let a=3
-a=a+3
-return a
+let c=5
+{
+    let a=4
+    c=a
+}
+
+return c

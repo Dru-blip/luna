@@ -83,6 +83,7 @@ static void declare_variable(struct generator* generator, char* name,
             &generator->global_variables[generator->global_variable_count - 1];
     } else {
         arrput(generator->local_variables, new_variable);
+        generator->local_variable_count++;
         *result =
             &generator->local_variables[arrlen(generator->local_variables) - 1];
     }
@@ -360,6 +361,31 @@ static uint32_t generate_expr(struct generator* generator,
     }
 }
 
+static void begin_scope(struct generator* generator) {
+    generator->scope_depth++;
+}
+
+static void end_scope(struct generator* generator) {
+    size_t number_of_elements_to_pop = 0;
+    struct variable* var;
+    for (size_t i = generator->local_variable_count; i > 0; i--) {
+        var = &generator->local_variables[i - 1];
+        if (var->scope == SCOPE_LOCAL &&
+            var->scope_depth == generator->scope_depth) {
+            number_of_elements_to_pop++;
+        }
+    }
+
+    while (number_of_elements_to_pop > 0) {
+        arrpop(generator->local_variables);
+        number_of_elements_to_pop--;
+    }
+    generator->scope_depth--;
+}
+
+static void generate_stmts(struct generator* generator,
+                           struct ast_node** stmts);
+
 static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
     switch (stmt->kind) {
         case AST_NODE_LET_DECL: {
@@ -393,6 +419,12 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
         }
         case AST_NODE_EXPR_STMT: {
             generate_expr(generator, stmt->data.node);
+            break;
+        }
+        case AST_NODE_BLOCK: {
+            begin_scope(generator);
+            generate_stmts(generator, stmt->data.list);
+            end_scope(generator);
             break;
         }
         default: {

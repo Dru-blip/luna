@@ -48,12 +48,6 @@ void print_executable(struct exectuable* executable) {
            executable->file_path ? executable->file_path : "unknown file");
     printf("Max registers : %u\n", executable->max_register_count);
     printf("Constants (%zu)\n", executable->constants_size);
-    // for (size_t i = 0; i < executable->constants_size; i++) {
-    //     printf("  [%zu] ", i);
-    //     lu_value_print(
-    //         &executable->constants[i]);  // assume you have a print function
-    //     printf("\n");
-    // }
 
     printf("\nInstructions:\n");
     for (size_t i = 0; i < executable->instructions_size; i++) {
