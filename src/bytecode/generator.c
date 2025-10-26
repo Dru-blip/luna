@@ -139,12 +139,15 @@ static inline size_t generator_add_str_contant(struct generator* generator,
 static uint32_t generator_emit_load_constant(struct generator* generator,
                                              size_t const_index) {
     struct instruction instr = {
-        .const_index = const_index,
-        .register_index = generator_allocate_register(generator),
+        .load_const =
+            {
+                const_index,
+                generator_allocate_register(generator),
+            },
         .opcode = OPCODE_LOAD_CONST,
     };
     arrput(generator->blocks[generator->current_block_id].instructions, instr);
-    return instr.register_index;
+    return instr.load_const.destination_reg;
 }
 
 static void generator_emit_instruction(struct generator* generator,
@@ -177,12 +180,11 @@ static uint32_t generator_emit_binop_instruction(struct generator* generator,
                                                  uint32_t rhs_register_index) {
     const uint32_t dst_reg = generator_allocate_register(generator);
 
-    struct instruction instr = {
-        .opcode = binop_to_opcode[binop],
-        .r1 = lhs_register_index,
-        .r2 = rhs_register_index,
-        .dst = dst_reg,
-    };
+    struct instruction instr = {};
+    instr.binary_op.left_reg = lhs_register_index;
+    instr.binary_op.right_reg = rhs_register_index;
+    instr.binary_op.result_reg = dst_reg;
+    instr.opcode = binop_to_opcode[binop];
     arrput(generator->blocks[generator->current_block_id].instructions, instr);
     return dst_reg;
 }
@@ -192,9 +194,9 @@ static void generator_emit_mov_instruction(struct generator* generator,
                                            uint32_t src_register_index) {
     struct instruction instr = {
         .opcode = OPCODE_MOV,
-        .m_dst = dst_register_index,
-        .m_src = src_register_index,
     };
+    instr.mov.src_reg = src_register_index;
+    instr.mov.dest_reg = dst_register_index;
     arrput(generator->blocks[generator->current_block_id].instructions, instr);
 }
 
@@ -202,8 +204,8 @@ static void generator_emit_jump_instruction(struct generator* generator,
                                             uint32_t target_block_id) {
     struct instruction instr = {
         .opcode = OPCODE_JUMP,
-        .target_block_id = target_block_id,
     };
+    instr.jmp.target_offset = target_block_id;
     arrput(generator->blocks[generator->current_block_id].instructions, instr);
 }
 
@@ -223,9 +225,9 @@ static uint32_t generate_expr(struct generator* generator,
             const uint32_t dst_reg = generator_allocate_register(generator);
             arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
             struct instruction instr = {
-                .register_index = dst_reg,
                 .opcode = OPCODE_LOAD_NONE,
             };
+            instr.destination_reg = dst_reg;
             arrput(GET_CURRENT_BLOCK.instructions, instr);
             return dst_reg;
         }
@@ -233,10 +235,10 @@ static uint32_t generate_expr(struct generator* generator,
             const uint32_t dst_reg = generator_allocate_register(generator);
             arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
             struct instruction instr = {
-                .register_index = dst_reg,
                 .opcode =
                     expr->data.int_val ? OPCODE_LOAD_TRUE : OPCODE_LOAD_FALSE,
             };
+            instr.destination_reg = dst_reg;
             arrput(GET_CURRENT_BLOCK.instructions, instr);
             return dst_reg;
         }
@@ -259,9 +261,10 @@ static uint32_t generate_expr(struct generator* generator,
             uint32_t dst_reg = generator_allocate_register(generator);
             struct instruction instr = {
                 .opcode = OPCODE_LOAD_GLOBAL_BY_INDEX,
-                .m_src = var->allocated_reg,
-                .m_dst = dst_reg,
             };
+
+            instr.mov.dest_reg = dst_reg;
+            instr.mov.src_reg = var->allocated_reg;
 
             arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
             arrput(GET_CURRENT_BLOCK.instructions, instr);
@@ -272,9 +275,9 @@ static uint32_t generate_expr(struct generator* generator,
                 generate_expr(generator, expr->data.unop.argument);
             arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
             struct instruction instr = {
-                .register_index = dst_reg,
                 .opcode = unop_to_opcode[expr->data.unop.op],
             };
+            instr.destination_reg = dst_reg;
             arrput(GET_CURRENT_BLOCK.instructions, instr);
             return dst_reg;
         }
@@ -290,14 +293,15 @@ static uint32_t generate_expr(struct generator* generator,
 
                 struct instruction branch_instr = {
                     .opcode = OPCODE_JMP_IF,
-                    .cond = lhs,
-                    .true_block_id = rhs_block,
-                    .false_block_id = end_block,
                 };
 
+                branch_instr.jmp_if.condition_reg = lhs;
+                branch_instr.jmp_if.true_block_id = rhs_block;
+                branch_instr.jmp_if.false_block_id = end_block;
+
                 if (expr->data.binop.op == OP_LOR) {
-                    branch_instr.true_block_id = end_block;
-                    branch_instr.false_block_id = rhs_block;
+                    branch_instr.jmp_if.true_block_id = end_block;
+                    branch_instr.jmp_if.false_block_id = rhs_block;
                 }
 
                 arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
@@ -341,17 +345,17 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
                 .opcode = var->scope == SCOPE_GLOBAL
                               ? OPCODE_STORE_GLOBAL_BY_INDEX
                               : OPCODE_STORE_LOCAL,
-                .m_dst = var->allocated_reg,
-                .m_src = value,
             };
+            store_instr.mov.dest_reg = var->allocated_reg;
+            store_instr.mov.src_reg = value;
             arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
             arrput(GET_CURRENT_BLOCK.instructions, store_instr);
             break;
         }
         case AST_NODE_RETURN: {
             uint32_t value = generate_expr(generator, stmt->data.node);
-            struct instruction instr = {.opcode = OPCODE_RET,
-                                        .register_index = value};
+            struct instruction instr = {.opcode = OPCODE_RET};
+            instr.destination_reg = value;
             arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
             arrput(GET_CURRENT_BLOCK.instructions, instr);
             break;
@@ -427,15 +431,15 @@ static void generator_basic_blocks_linearize(struct generator* generator,
         struct instruction* instr = &flat[i];
         switch (instr->opcode) {
             case OPCODE_JUMP: {
-                instr->target_block_id =
-                    block_start_offsets[instr->target_block_id];
+                instr->jmp.target_offset =
+                    block_start_offsets[instr->jmp.target_offset];
                 break;
             }
             case OPCODE_JMP_IF: {
-                instr->true_block_id =
-                    block_start_offsets[instr->true_block_id];
-                instr->false_block_id =
-                    block_start_offsets[instr->false_block_id];
+                instr->jmp_if.true_block_id =
+                    block_start_offsets[instr->jmp_if.true_block_id];
+                instr->jmp_if.false_block_id =
+                    block_start_offsets[instr->jmp_if.false_block_id];
                 break;
             }
             default:

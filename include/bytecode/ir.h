@@ -42,9 +42,6 @@ enum opcode {
     OPCODE_SHIFT_LEFT,
     OPCODE_SHIFT_RIGHT,
 
-    OPCODE_LOGIC_AND,
-    OPCODE_LOGIC_OR,
-
     OPCODE_UNARY_MINUS,
     OPCODE_UNARY_PLUS,
     OPCODE_UNARY_NOT,
@@ -59,32 +56,33 @@ enum opcode {
 struct instruction {
     enum opcode opcode;
     union {
-        // for load constants
         struct {
-            uint16_t const_index;
-            uint32_t register_index;
-        };
-        // for binary operations
+            uint16_t constant_index;
+            uint32_t destination_reg;
+        } load_const;
+
         struct {
-            uint32_t r1;
-            uint32_t r2;
-            uint32_t dst;
-        };
-        // for jump if
+            uint32_t left_reg;
+            uint32_t right_reg;
+            uint32_t result_reg;
+        } binary_op;
+
         struct {
-            uint32_t cond;
+            uint32_t condition_reg;
             uint32_t true_block_id;
             uint32_t false_block_id;
-        };
-        // for unconditional jump
+        } jmp_if;
+
         struct {
-            uint32_t target_block_id;
-        };
+            uint32_t target_offset;
+        } jmp;
+
         struct {
-            // for mov instruction
-            uint32_t m_dst;
-            uint32_t m_src;
-        };
+            uint32_t dest_reg;
+            uint32_t src_reg;
+        } mov;
+
+        uint32_t destination_reg;
     };
 };
 

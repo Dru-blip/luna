@@ -56,33 +56,37 @@ record_start:
             &record->executable->instructions[record->ip++];
         switch (instr->opcode) {
             case OPCODE_LOAD_CONST: {
-                record->registers[instr->register_index] =
-                    record->executable->constants[instr->const_index];
+                record->registers[instr->load_const.destination_reg] =
+                    record->executable
+                        ->constants[instr->load_const.constant_index];
                 goto record_start;
             }
             case OPCODE_LOAD_NONE: {
-                record->registers[instr->register_index] = lu_value_none();
+                record->registers[instr->destination_reg] = lu_value_none();
                 goto record_start;
             }
             case OPCODE_LOAD_TRUE: {
-                record->registers[instr->register_index] = lu_value_bool(true);
+                record->registers[instr->destination_reg] = lu_value_bool(true);
                 goto record_start;
             }
             case OPCODE_LOAD_FALSE: {
-                record->registers[instr->register_index] = lu_value_bool(false);
+                record->registers[instr->destination_reg] =
+                    lu_value_bool(false);
                 goto record_start;
             }
             case OPCODE_MOV: {
-                record->registers[instr->m_dst] =
-                    record->registers[instr->m_src];
+                record->registers[instr->mov.dest_reg] =
+                    record->registers[instr->mov.src_reg];
                 goto record_start;
             }
             case OPCODE_LOAD_GLOBAL_BY_INDEX: {
-                record->registers[instr->m_dst] = record->globals[instr->m_src];
+                record->registers[instr->mov.dest_reg] =
+                    record->globals[instr->mov.src_reg];
                 goto record_start;
             }
             case OPCODE_STORE_GLOBAL_BY_INDEX: {
-                record->globals[instr->m_dst] = record->registers[instr->m_src];
+                record->globals[instr->mov.dest_reg] =
+                    record->registers[instr->mov.src_reg];
                 goto record_start;
             }
             case OPCODE_UNARY_PLUS: {
@@ -92,9 +96,9 @@ record_start:
             }
             case OPCODE_UNARY_MINUS: {
                 struct lu_value argument =
-                    record->registers[instr->register_index];
+                    record->registers[instr->destination_reg];
                 if (IS_NUMERIC(argument)) {
-                    record->registers[instr->register_index] =
+                    record->registers[instr->destination_reg] =
                         lu_value_int(-lu_as_int(argument));
                     goto record_start;
                 }
@@ -112,19 +116,20 @@ record_start:
                 goto error_reporter;
             }
             case OPCODE_UNARY_NOT: {
-                record->registers[instr->register_index] = lu_value_bool(
-                    lu_is_falsy(record->registers[instr->register_index]));
+                record->registers[instr->destination_reg] = lu_value_bool(
+                    lu_is_falsy(record->registers[instr->destination_reg]));
                 goto record_start;
             }
 
-#define HANDLE_BINARY_INSTRUCTION(opcode, func)                                \
-    case opcode: {                                                             \
-        record->registers[instr->dst] = func(vm, record->registers[instr->r1], \
-                                             record->registers[instr->r2]);    \
-        if (lu_has_error(vm)) {                                                \
-            goto error_reporter;                                               \
-        }                                                                      \
-        goto record_start;                                                     \
+#define HANDLE_BINARY_INSTRUCTION(opcode, func)                    \
+    case opcode: {                                                 \
+        record->registers[instr->binary_op.result_reg] =           \
+            func(vm, record->registers[instr->binary_op.left_reg], \
+                 record->registers[instr->binary_op.right_reg]);   \
+        if (lu_has_error(vm)) {                                    \
+            goto error_reporter;                                   \
+        }                                                          \
+        goto record_start;                                         \
     }
                 HANDLE_BINARY_INSTRUCTION(OPCODE_ADD, lu_vm_op_add);
                 HANDLE_BINARY_INSTRUCTION(OPCODE_SUB, lu_vm_op_sub);
@@ -142,17 +147,18 @@ record_start:
                 HANDLE_BINARY_INSTRUCTION(OPCODE_TEST_NOT_EQUAL, lu_vm_op_neq);
 
             case OPCODE_RET: {
-                return record->registers[instr->register_index];
+                return record->registers[instr->destination_reg];
             }
             case OPCODE_JUMP: {
-                record->ip = instr->target_block_id;
+                record->ip = instr->jmp.target_offset;
                 goto record_start;
             }
             case OPCODE_JMP_IF: {
-                if (lu_is_truthy(record->registers[instr->cond])) {
-                    record->ip = instr->true_block_id;
+                if (lu_is_truthy(
+                        record->registers[instr->jmp_if.condition_reg])) {
+                    record->ip = instr->jmp_if.true_block_id;
                 } else {
-                    record->ip = instr->false_block_id;
+                    record->ip = instr->jmp_if.false_block_id;
                 }
                 goto record_start;
             }
