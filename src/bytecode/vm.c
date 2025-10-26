@@ -70,6 +70,11 @@ record_start:
                 record->registers[instr->register_index] = lu_value_bool(false);
                 goto record_start;
             }
+            case OPCODE_MOV: {
+                record->registers[instr->m_dst] =
+                    record->registers[instr->m_src];
+                goto record_start;
+            }
             case OPCODE_UNARY_PLUS: {
                 // Currently this is a no-op, but operation can be performed
                 // based on type.
@@ -128,6 +133,18 @@ record_start:
 
             case OPCODE_RET: {
                 return record->registers[instr->register_index];
+            }
+            case OPCODE_JUMP: {
+                record->ip = instr->target_block_id;
+                goto record_start;
+            }
+            case OPCODE_JMP_IF: {
+                if (lu_is_truthy(record->registers[instr->cond])) {
+                    record->ip = instr->true_block_id;
+                } else {
+                    record->ip = instr->false_block_id;
+                }
+                goto record_start;
             }
             default: {
                 break;
