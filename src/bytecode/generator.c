@@ -43,14 +43,14 @@ static inline uint32_t generator_allocate_register(
 }
 
 static void declare_variable(struct generator* generator, char* name,
-                             uint32_t name_length, struct variable** variable) {
+                             uint32_t name_length, struct variable** result) {
     // check for local variable
     struct variable* var;
     for (uint32_t i = generator->local_variable_count; i > 0; i--) {
         var = &generator->local_variables[i - 1];
         if (var->name_length == name_length &&
             strncmp(var->name, name, name_length) == 0) {
-            *variable = var;
+            *result = var;
             return;
         }
     }
@@ -60,7 +60,7 @@ static void declare_variable(struct generator* generator, char* name,
         var = &generator->global_variables[i - 1];
         if (var->name_length == name_length &&
             strncmp(var->name, name, name_length) == 0) {
-            *variable = var;
+            *result = var;
             return;
         }
     }
@@ -79,23 +79,23 @@ static void declare_variable(struct generator* generator, char* name,
     new_variable.allocated_reg = slot;
     if (new_variable.scope == SCOPE_GLOBAL) {
         arrput(generator->global_variables, new_variable);
-        *variable =
+        *result =
             &generator->global_variables[generator->global_variable_count - 1];
     } else {
         arrput(generator->local_variables, new_variable);
-        *variable =
+        *result =
             &generator->local_variables[arrlen(generator->local_variables) - 1];
     }
 }
 
 static bool find_variable(struct generator* generator, char* name,
-                          uint32_t name_length, struct variable** variable) {
+                          uint32_t name_length, struct variable** result) {
     struct variable* var;
     for (uint32_t i = generator->local_variable_count; i > 0; i--) {
         var = &generator->local_variables[i - 1];
         if (var->name_length == name_length &&
             strncmp(var->name, name, name_length) == 0) {
-            *variable = var;
+            *result = var;
             return true;
         }
     }
@@ -105,7 +105,7 @@ static bool find_variable(struct generator* generator, char* name,
         var = &generator->global_variables[i - 1];
         if (var->name_length == name_length &&
             strncmp(var->name, name, name_length) == 0) {
-            *variable = var;
+            *result = var;
             return true;
         }
     }
@@ -282,46 +282,77 @@ static uint32_t generate_expr(struct generator* generator,
             return dst_reg;
         }
         case AST_NODE_BINOP: {
-            if (expr->data.binop.op >= OP_LAND) {
-                uint32_t lhs = generate_expr(generator, expr->data.binop.lhs);
-                uint32_t dst = generator_allocate_register(generator);
-                const size_t rhs_block = generator_basic_block_new(generator);
-                const size_t end_block = generator_basic_block_new(generator);
-
-                generator_emit_mov_instruction(generator, dst, lhs);
-                arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-
-                struct instruction branch_instr = {
-                    .opcode = OPCODE_JMP_IF,
-                };
-
-                branch_instr.jmp_if.condition_reg = lhs;
-                branch_instr.jmp_if.true_block_id = rhs_block;
-                branch_instr.jmp_if.false_block_id = end_block;
-
-                if (expr->data.binop.op == OP_LOR) {
-                    branch_instr.jmp_if.true_block_id = end_block;
-                    branch_instr.jmp_if.false_block_id = rhs_block;
-                }
-
-                arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-                arrput(GET_CURRENT_BLOCK.instructions, branch_instr);
-                generator_switch_basic_block(generator, rhs_block);
-
-                uint32_t rhs = generate_expr(generator, expr->data.binop.rhs);
-                generator_emit_mov_instruction(generator, dst, rhs);
-                arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-                generator_emit_jump_instruction(generator, end_block);
-                arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-                generator_switch_basic_block(generator, end_block);
-                return dst;
-            } else {
+            if (expr->data.binop.op < OP_LAND) {
                 uint32_t lhs = generate_expr(generator, expr->data.binop.lhs);
                 uint32_t rhs = generate_expr(generator, expr->data.binop.rhs);
                 arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
                 return generator_emit_binop_instruction(
                     generator, expr->data.binop.op, lhs, rhs);
             }
+            uint32_t lhs = generate_expr(generator, expr->data.binop.lhs);
+            uint32_t dst = generator_allocate_register(generator);
+            const size_t rhs_block = generator_basic_block_new(generator);
+            const size_t end_block = generator_basic_block_new(generator);
+
+            generator_emit_mov_instruction(generator, dst, lhs);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
+
+            struct instruction branch_instr = {
+                .opcode = OPCODE_JMP_IF,
+            };
+
+            branch_instr.jmp_if.condition_reg = lhs;
+            branch_instr.jmp_if.true_block_id = rhs_block;
+            branch_instr.jmp_if.false_block_id = end_block;
+
+            if (expr->data.binop.op == OP_LOR) {
+                branch_instr.jmp_if.true_block_id = end_block;
+                branch_instr.jmp_if.false_block_id = rhs_block;
+            }
+
+            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
+            arrput(GET_CURRENT_BLOCK.instructions, branch_instr);
+            generator_switch_basic_block(generator, rhs_block);
+
+            uint32_t rhs = generate_expr(generator, expr->data.binop.rhs);
+            generator_emit_mov_instruction(generator, dst, rhs);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
+            generator_emit_jump_instruction(generator, end_block);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
+            generator_switch_basic_block(generator, end_block);
+            return dst;
+        }
+        case AST_NODE_ASSIGN: {
+            uint32_t val_reg = generate_expr(generator, expr->data.binop.rhs);
+            switch (expr->data.binop.lhs->kind) {
+                case AST_NODE_IDENTIFIER: {
+                    char* name = generator->program.source +
+                                 expr->data.binop.lhs->span.start;
+                    uint32_t name_len = expr->data.binop.lhs->span.end -
+                                        expr->data.binop.lhs->span.start;
+                    struct variable* var;
+                    if (!find_variable(generator, name, name_len, &var)) {
+                        // TODO: raise error for undeclared variables
+                    }
+
+                    struct instruction instr;
+                    instr.opcode = var->scope == SCOPE_GLOBAL
+                                       ? OPCODE_STORE_GLOBAL_BY_INDEX
+                                       : OPCODE_MOV;
+                    instr.mov.dest_reg = var->allocated_reg;
+                    instr.mov.src_reg = val_reg;
+
+                    arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
+                    arrput(GET_CURRENT_BLOCK.instructions, instr);
+                    break;
+                }
+                default: {
+                    // TODO: raise invalid target assignment error
+                    break;
+                }
+            }
+
+            return val_reg;
         }
         default: {
             return 0;
@@ -344,7 +375,7 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
             struct instruction store_instr = {
                 .opcode = var->scope == SCOPE_GLOBAL
                               ? OPCODE_STORE_GLOBAL_BY_INDEX
-                              : OPCODE_STORE_LOCAL,
+                              : OPCODE_MOV,
             };
             store_instr.mov.dest_reg = var->allocated_reg;
             store_instr.mov.src_reg = value;

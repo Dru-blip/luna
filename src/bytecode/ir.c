@@ -78,7 +78,11 @@ void print_executable(struct exectuable* executable) {
                 printf("r%u", instr->destination_reg);
                 break;
             }
-            case OPCODE_STORE_GLOBAL_BY_INDEX:
+            case OPCODE_STORE_GLOBAL_BY_INDEX: {
+                printf("global[%u] r%u", instr->mov.dest_reg,
+                       instr->mov.src_reg);
+                break;
+            }
             case OPCODE_LOAD_GLOBAL_BY_INDEX: {
                 printf("r%u, global[%u]", instr->mov.dest_reg,
                        instr->mov.src_reg);
@@ -88,11 +92,6 @@ void print_executable(struct exectuable* executable) {
             case OPCODE_LOAD_GLOBAL_BY_NAME: {
                 printf("r%u, name_index %u", instr->destination_reg,
                        instr->load_const.constant_index);
-                break;
-            }
-            case OPCODE_STORE_LOCAL:
-            case OPCODE_LOAD_LOCAL: {
-                printf("r%u", instr->destination_reg);
                 break;
             }
             case OPCODE_MOV: {
