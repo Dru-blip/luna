@@ -1,11 +1,10 @@
+let c=0
 
-let c=4
-
-if c<5{
-    c=10
-}else{
-    c=20
+loop{
+    if c==5{
+        break
+    }
+    c=c+1
 }
-
 
 return c

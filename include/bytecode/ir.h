@@ -92,6 +92,7 @@ struct basic_block {
     struct instruction* instructions;
     struct span* instructions_spans;
     size_t start_offset;  // used when linearizing blocks
+    bool visited;
 };
 
 struct exectuable {
@@ -119,6 +120,11 @@ struct variable {
     uint32_t allocated_reg;
 };
 
+struct loop {
+    uint32_t start_block_id;
+    uint32_t end_block_id;
+};
+
 struct generator {
     struct lu_istate* state;
     size_t current_block_id;
@@ -134,6 +140,7 @@ struct generator {
     size_t local_variable_count;
     size_t global_variable_count;
     uint32_t scope_depth;
+    struct loop* loop_stack;
 };
 
 void generator_init(struct generator* generator, struct ast_program program);

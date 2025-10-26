@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -22,6 +23,7 @@ void generator_init(struct generator* generator, struct ast_program program) {
     generator->constants = nullptr;
     generator->local_variables = nullptr;
     generator->global_variables = nullptr;
+    generator->loop_stack = nullptr;
 
     generator->local_variable_count = 0;
     generator->global_variable_count = 0;
@@ -167,6 +169,9 @@ static enum opcode binop_to_opcode[] = {
     OPCODE_TEST_GREATER_THAN_EQUAL,
     OPCODE_TEST_LESS_THAN,
     OPCODE_TEST_LESS_THAN_EQUAL,
+
+    OPCODE_TEST_EQUAL,
+    OPCODE_TEST_NOT_EQUAL,
 };
 
 static enum opcode unop_to_opcode[] = {
@@ -421,6 +426,22 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
             generate_expr(generator, stmt->data.node);
             break;
         }
+        case AST_NODE_BREAK_STMT: {
+            generator_emit_jump_instruction(
+                generator,
+                generator->loop_stack[arrlen(generator->loop_stack) - 1]
+                    .end_block_id);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+            break;
+        }
+        case AST_NODE_CONTINUE_STMT: {
+            generator_emit_jump_instruction(
+                generator,
+                generator->loop_stack[arrlen(generator->loop_stack) - 1]
+                    .start_block_id);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+            break;
+        }
         case AST_NODE_BLOCK: {
             begin_scope(generator);
             generate_stmts(generator, stmt->data.list);
@@ -462,6 +483,24 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
             generator_switch_basic_block(generator, end_block);
             break;
         }
+        case AST_NODE_LOOP_STMT: {
+            uint32_t start_block = generator_basic_block_new(generator);
+            uint32_t end_block = generator_basic_block_new(generator);
+
+            generator_emit_jump_instruction(generator, start_block);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+            struct loop loop = {.start_block_id = start_block,
+                                .end_block_id = end_block};
+            arrput(generator->loop_stack, loop);
+            generator_switch_basic_block(generator, start_block);
+            generate_stmt(generator, stmt->data.node);
+
+            generator_emit_jump_instruction(generator, start_block);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+            arrpop(generator->loop_stack);
+            generator_switch_basic_block(generator, end_block);
+            break;
+        }
         default: {
         }
     }
@@ -486,6 +525,130 @@ struct exectuable* generator_generate(struct lu_istate* state,
 
     return generator_make_executable(&generator);
 }
+
+///
+
+struct instruction_array {
+    struct instruction* data;
+    size_t len;
+    size_t cap;
+};
+
+void instruction_array_init(struct instruction_array* arr, size_t cap) {
+    arr->cap = cap;
+    arr->data = malloc(sizeof(struct instruction) * arr->cap);
+    arr->len = 0;
+}
+
+size_t instruction_array_len(struct instruction_array* arr) {
+    return arr ? arr->len : 0;
+}
+
+void instruction_array_put(struct instruction_array* arr,
+                           struct instruction* item) {
+    if (arr->len >= arr->cap) {
+        size_t new_cap = arr->cap * 2;
+        struct instruction* new_data =
+            realloc(arr->data, sizeof(struct instruction) * new_cap);
+        arr->data = new_data;
+        arr->cap = new_cap;
+    }
+
+    arr->data[arr->len++] = *item;
+}
+
+void instruction_array_copy(struct instruction_array* arr,
+                            struct instruction* src, size_t count) {
+    size_t needed = arr->len + count;
+
+    if (needed > arr->cap) {
+        struct instruction* new_data =
+            realloc(arr->data, sizeof(struct instruction) * needed);
+        arr->data = new_data;
+        arr->cap = needed;
+    }
+
+    memcpy(arr->data + arr->len, src, sizeof(struct instruction) * count);
+    arr->len += count;
+}
+
+// static void generator_cfg_linearize(struct generator* generator,
+//                                     struct exectuable* executable) {
+//     //
+//     size_t* block_start_offsets =
+//         malloc(sizeof(size_t) * generator->block_counter);
+//     size_t offset = 0;
+//     struct basic_block** stack = nullptr;
+//     assert(generator->block_counter > 0);
+//     arrput(stack, &generator->blocks[0]);
+
+//     struct instruction_array inst_arr;
+//     instruction_array_init(&inst_arr,
+//                            arrlen(generator->blocks[0].instructions));
+
+//     while (arrlen(stack) > 0) {
+//         struct basic_block* curr_block = arrpop(stack);
+//         if (curr_block->visited) {
+//             continue;
+//         }
+//         block_start_offsets[curr_block->id] = offset;
+//         curr_block->start_offset = offset;
+//         curr_block->visited = true;
+
+//         instruction_array_copy(&inst_arr, curr_block->instructions,
+//                                arrlen(curr_block->instructions));
+
+//         offset += arrlen(curr_block->instructions);
+//         struct instruction* terminator =
+//             &curr_block->instructions[arrlen(curr_block->instructions) - 1];
+//         assert(terminator->opcode == OPCODE_JMP_IF ||
+//                terminator->opcode == OPCODE_JUMP);
+
+//         if (terminator->opcode == OPCODE_JUMP &&
+//             !generator->blocks[terminator->jmp.target_offset].visited) {
+//             arrput(stack, &generator->blocks[terminator->jmp.target_offset]);
+//         } else {
+//             if
+//             (!generator->blocks[terminator->jmp_if.false_block_id].visited) {
+//                 arrput(stack,
+//                        &generator->blocks[terminator->jmp_if.false_block_id]);
+//             }
+//             if (!generator->blocks[terminator->jmp_if.true_block_id].visited)
+//             {
+//                 arrput(stack,
+//                        &generator->blocks[terminator->jmp_if.true_block_id]);
+//             }
+//         }
+//     }
+
+//     struct instruction* instructions = inst_arr.data;
+
+//     for (size_t i = 0; i < offset; i++) {
+//         struct instruction* instr = &instructions[i];
+//         switch (instr->opcode) {
+//             case OPCODE_JUMP: {
+//                 instr->jmp.target_offset =
+//                     block_start_offsets[instr->jmp.target_offset];
+//                 break;
+//             }
+//             case OPCODE_JMP_IF: {
+//                 instr->jmp_if.true_block_id =
+//                     block_start_offsets[instr->jmp_if.true_block_id];
+//                 instr->jmp_if.false_block_id =
+//                     block_start_offsets[instr->jmp_if.false_block_id];
+//                 break;
+//             }
+//             default:
+//                 break;
+//         }
+//     }
+
+//     free(block_start_offsets);
+
+//     executable->instructions = instructions;
+//     executable->instructions_size = inst_arr.len;
+//     // executable->instructions_span = ;
+// }
 
 static void generator_basic_blocks_linearize(struct generator* generator,
                                              struct exectuable* executable) {
@@ -559,6 +722,7 @@ struct exectuable* generator_make_executable(struct generator* generator) {
     executable->max_register_count = generator->register_counter;
     executable->file_path = generator->program.filepath;
     executable->global_variable_count = generator->global_variable_count;
+    // generator_cfg_linearize(generator, executable);
     generator_basic_blocks_linearize(generator, executable);
     return executable;
 }
