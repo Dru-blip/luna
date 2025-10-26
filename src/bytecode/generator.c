@@ -1,11 +1,15 @@
+#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "ast.h"
 #include "bytecode/ir.h"
 #include "operator.h"
 #include "stb_ds.h"
 #include "value.h"
+
+#define GET_CURRENT_BLOCK generator->blocks[generator->current_block_id]
 
 void generator_init(struct generator* generator, struct ast_program program) {
     generator->program = program;
@@ -16,15 +20,96 @@ void generator_init(struct generator* generator, struct ast_program program) {
     generator->blocks = nullptr;
     generator->node = nullptr;
     generator->constants = nullptr;
-    generator->instructions_span = nullptr;
+    generator->local_variables = nullptr;
+    generator->global_variables = nullptr;
+
+    generator->local_variable_count = 0;
+    generator->global_variable_count = 0;
+    generator->scope_depth = 0;
 }
 
 size_t generator_basic_block_new(struct generator* generator) {
     struct basic_block block;
     block.instructions = nullptr;
+    block.instructions_spans = nullptr;
     block.id = generator->block_counter++;
     arrput(generator->blocks, block);
     return block.id;
+}
+
+static inline uint32_t generator_allocate_register(
+    struct generator* generator) {
+    return generator->register_counter++;
+}
+
+static void declare_variable(struct generator* generator, char* name,
+                             uint32_t name_length, struct variable** variable) {
+    // check for local variable
+    struct variable* var;
+    for (uint32_t i = generator->local_variable_count; i > 0; i--) {
+        var = &generator->local_variables[i - 1];
+        if (var->name_length == name_length &&
+            strncmp(var->name, name, name_length) == 0) {
+            *variable = var;
+            return;
+        }
+    }
+
+    // check for global variable , if it is not a local variable
+    for (uint32_t i = generator->global_variable_count; i > 0; i--) {
+        var = &generator->global_variables[i - 1];
+        if (var->name_length == name_length &&
+            strncmp(var->name, name, name_length) == 0) {
+            *variable = var;
+            return;
+        }
+    }
+
+    // if variable was not declared anywhere,create a new variable
+    uint32_t scope_depth = generator->scope_depth;
+    struct variable new_variable = {
+        .name = name,
+        .name_length = name_length,
+        .scope = scope_depth == 0 ? SCOPE_GLOBAL : SCOPE_LOCAL,
+        .scope_depth = scope_depth,
+    };
+    uint32_t slot = new_variable.scope == SCOPE_GLOBAL
+                        ? generator->global_variable_count++
+                        : generator_allocate_register(generator);
+    new_variable.allocated_reg = slot;
+    if (new_variable.scope == SCOPE_GLOBAL) {
+        arrput(generator->global_variables, new_variable);
+        *variable =
+            &generator->global_variables[generator->global_variable_count - 1];
+    } else {
+        arrput(generator->local_variables, new_variable);
+        *variable =
+            &generator->local_variables[arrlen(generator->local_variables) - 1];
+    }
+}
+
+static bool find_variable(struct generator* generator, char* name,
+                          uint32_t name_length, struct variable** variable) {
+    struct variable* var;
+    for (uint32_t i = generator->local_variable_count; i > 0; i--) {
+        var = &generator->local_variables[i - 1];
+        if (var->name_length == name_length &&
+            strncmp(var->name, name, name_length) == 0) {
+            *variable = var;
+            return true;
+        }
+    }
+
+    // check for global variable , if it is not a local variable
+    for (uint32_t i = generator->global_variable_count; i > 0; i--) {
+        var = &generator->global_variables[i - 1];
+        if (var->name_length == name_length &&
+            strncmp(var->name, name, name_length) == 0) {
+            *variable = var;
+            return true;
+        }
+    }
+    return false;
 }
 
 static inline void generator_switch_basic_block(struct generator* generator,
@@ -49,11 +134,6 @@ static inline size_t generator_add_str_contant(struct generator* generator,
     arrput(generator->constants, lu_value_object(str));
     free(buffer);
     return generator->constant_counter++;
-}
-
-static inline uint32_t generator_allocate_register(
-    struct generator* generator) {
-    return generator->register_counter++;
 }
 
 static uint32_t generator_emit_load_constant(struct generator* generator,
@@ -136,48 +216,66 @@ static uint32_t generate_expr(struct generator* generator,
         case AST_NODE_INT: {
             size_t const_index =
                 generator_add_int_contant(generator, expr->data.int_val);
-            arrput(generator->instructions_span, expr->span);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
             return generator_emit_load_constant(generator, const_index);
         }
         case AST_NODE_NONE: {
             const uint32_t dst_reg = generator_allocate_register(generator);
-            arrput(generator->instructions_span, expr->span);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
             struct instruction instr = {
                 .register_index = dst_reg,
                 .opcode = OPCODE_LOAD_NONE,
             };
-            arrput(generator->blocks[generator->current_block_id].instructions,
-                   instr);
+            arrput(GET_CURRENT_BLOCK.instructions, instr);
             return dst_reg;
         }
         case AST_NODE_BOOL: {
             const uint32_t dst_reg = generator_allocate_register(generator);
-            arrput(generator->instructions_span, expr->span);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
             struct instruction instr = {
                 .register_index = dst_reg,
                 .opcode =
                     expr->data.int_val ? OPCODE_LOAD_TRUE : OPCODE_LOAD_FALSE,
             };
-            arrput(generator->blocks[generator->current_block_id].instructions,
-                   instr);
+            arrput(GET_CURRENT_BLOCK.instructions, instr);
             return dst_reg;
         }
         case AST_NODE_STR: {
             size_t const_index = generator_add_str_contant(
                 generator, expr->data.id, &expr->span);
-            arrput(generator->instructions_span, expr->span);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
             return generator_emit_load_constant(generator, const_index);
+        }
+        case AST_NODE_IDENTIFIER: {
+            char* name = generator->program.source + expr->span.start;
+            uint32_t name_len = expr->span.end - expr->span.start;
+            struct variable* var;
+            if (!find_variable(generator, name, name_len, &var)) {
+                // raise error for undeclared variables
+            }
+            if (var->scope == SCOPE_LOCAL) {
+                return var->allocated_reg;
+            }
+            uint32_t dst_reg = generator_allocate_register(generator);
+            struct instruction instr = {
+                .opcode = OPCODE_LOAD_GLOBAL_BY_INDEX,
+                .m_src = var->allocated_reg,
+                .m_dst = dst_reg,
+            };
+
+            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
+            arrput(GET_CURRENT_BLOCK.instructions, instr);
+            return dst_reg;
         }
         case AST_NODE_UNOP: {
             uint32_t dst_reg =
                 generate_expr(generator, expr->data.unop.argument);
-            arrput(generator->instructions_span, expr->span);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
             struct instruction instr = {
                 .register_index = dst_reg,
                 .opcode = unop_to_opcode[expr->data.unop.op],
             };
-            arrput(generator->blocks[generator->current_block_id].instructions,
-                   instr);
+            arrput(GET_CURRENT_BLOCK.instructions, instr);
             return dst_reg;
         }
         case AST_NODE_BINOP: {
@@ -188,7 +286,7 @@ static uint32_t generate_expr(struct generator* generator,
                 const size_t end_block = generator_basic_block_new(generator);
 
                 generator_emit_mov_instruction(generator, dst, lhs);
-                arrput(generator->instructions_span, expr->span);
+                arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
 
                 struct instruction branch_instr = {
                     .opcode = OPCODE_JMP_IF,
@@ -202,23 +300,21 @@ static uint32_t generate_expr(struct generator* generator,
                     branch_instr.false_block_id = rhs_block;
                 }
 
-                arrput(generator->instructions_span, expr->span);
-                arrput(
-                    generator->blocks[generator->current_block_id].instructions,
-                    branch_instr);
+                arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
+                arrput(GET_CURRENT_BLOCK.instructions, branch_instr);
                 generator_switch_basic_block(generator, rhs_block);
 
                 uint32_t rhs = generate_expr(generator, expr->data.binop.rhs);
                 generator_emit_mov_instruction(generator, dst, rhs);
-                arrput(generator->instructions_span, expr->span);
+                arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
                 generator_emit_jump_instruction(generator, end_block);
-                arrput(generator->instructions_span, expr->span);
+                arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
                 generator_switch_basic_block(generator, end_block);
                 return dst;
             } else {
                 uint32_t lhs = generate_expr(generator, expr->data.binop.lhs);
                 uint32_t rhs = generate_expr(generator, expr->data.binop.rhs);
-                arrput(generator->instructions_span, expr->span);
+                arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
                 return generator_emit_binop_instruction(
                     generator, expr->data.binop.op, lhs, rhs);
             }
@@ -231,13 +327,37 @@ static uint32_t generate_expr(struct generator* generator,
 
 static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
     switch (stmt->kind) {
+        case AST_NODE_LET_DECL: {
+            uint32_t value =
+                generate_expr(generator, stmt->data.let_decl.value);
+            struct variable* var;
+            char* name =
+                generator->program.source + stmt->data.let_decl.name_span.start;
+            uint32_t name_len = stmt->data.let_decl.name_span.end -
+                                stmt->data.let_decl.name_span.start;
+            declare_variable(generator, name, name_len, &var);
+
+            struct instruction store_instr = {
+                .opcode = var->scope == SCOPE_GLOBAL
+                              ? OPCODE_STORE_GLOBAL_BY_INDEX
+                              : OPCODE_STORE_LOCAL,
+                .m_dst = var->allocated_reg,
+                .m_src = value,
+            };
+            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+            arrput(GET_CURRENT_BLOCK.instructions, store_instr);
+            break;
+        }
         case AST_NODE_RETURN: {
             uint32_t value = generate_expr(generator, stmt->data.node);
             struct instruction instr = {.opcode = OPCODE_RET,
                                         .register_index = value};
-            arrput(generator->instructions_span, stmt->span);
-            arrput(generator->blocks[generator->current_block_id].instructions,
-                   instr);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+            arrput(GET_CURRENT_BLOCK.instructions, instr);
+            break;
+        }
+        case AST_NODE_EXPR_STMT: {
+            generate_expr(generator, stmt->data.node);
             break;
         }
         default: {
@@ -265,13 +385,8 @@ struct exectuable* generator_generate(struct lu_istate* state,
     return generator_make_executable(&generator);
 }
 
-struct linearize_result {
-    struct instruction* instructions;
-    size_t size;
-};
-
-static struct linearize_result generator_basic_blocks_linearize(
-    struct generator* generator) {
+static void generator_basic_blocks_linearize(struct generator* generator,
+                                             struct exectuable* executable) {
     // calculate block start offsets
     size_t* block_start_offsets =
         malloc(sizeof(size_t) * generator->block_counter);
@@ -288,6 +403,8 @@ static struct linearize_result generator_basic_blocks_linearize(
     size_t total_instructions = offset;
     struct instruction* flat =
         malloc(sizeof(struct instruction) * total_instructions);
+    struct span* instructions_spans =
+        malloc(sizeof(struct span) * total_instructions);
 
     // copy each block's instruction into flat instruction array
     size_t write_index = 0;
@@ -295,6 +412,8 @@ static struct linearize_result generator_basic_blocks_linearize(
         struct basic_block* blk = &generator->blocks[i];
         memcpy(&flat[write_index], blk->instructions,
                arrlen(blk->instructions) * sizeof(struct instruction));
+        memcpy(&instructions_spans[write_index], blk->instructions_spans,
+               arrlen(blk->instructions_spans) * sizeof(struct span));
         write_index += arrlen(blk->instructions);
     }
 
@@ -326,8 +445,9 @@ static struct linearize_result generator_basic_blocks_linearize(
 
     free(block_start_offsets);
 
-    return (struct linearize_result){.instructions = flat,
-                                     .size = total_instructions};
+    executable->instructions = flat;
+    executable->instructions_size = total_instructions;
+    executable->instructions_span = instructions_spans;
 }
 
 struct exectuable* generator_make_executable(struct generator* generator) {
@@ -336,10 +456,7 @@ struct exectuable* generator_make_executable(struct generator* generator) {
     executable->constants_size = arrlen(executable->constants);
     executable->max_register_count = generator->register_counter;
     executable->file_path = generator->program.filepath;
-    executable->instructions_span = generator->instructions_span;
-    struct linearize_result result =
-        generator_basic_blocks_linearize(generator);
-    executable->instructions = result.instructions;
-    executable->instructions_size = result.size;
+    executable->global_variable_count = generator->global_variable_count;
+    generator_basic_blocks_linearize(generator, executable);
     return executable;
 }

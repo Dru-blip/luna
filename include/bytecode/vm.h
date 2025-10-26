@@ -7,6 +7,7 @@ struct activation_record {
     struct lu_value* registers;
     size_t max_register_count;
     size_t ip;
+    struct lu_value* globals;
 };
 
 struct lu_vm {

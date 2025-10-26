@@ -31,6 +31,8 @@ static void lu_vm_push_new_record(struct lu_vm* vm,
     struct activation_record record;
     record.executable = executable;
     record.ip = 0;
+    record.globals = nullptr;
+    arrsetlen(record.globals, executable->global_variable_count);
     record.max_register_count = executable->max_register_count;
     record.registers = nullptr;
     arrsetlen(record.registers, record.max_register_count);
@@ -73,6 +75,14 @@ record_start:
             case OPCODE_MOV: {
                 record->registers[instr->m_dst] =
                     record->registers[instr->m_src];
+                goto record_start;
+            }
+            case OPCODE_LOAD_GLOBAL_BY_INDEX: {
+                record->registers[instr->m_dst] = record->globals[instr->m_src];
+                goto record_start;
+            }
+            case OPCODE_STORE_GLOBAL_BY_INDEX: {
+                record->globals[instr->m_dst] = record->registers[instr->m_src];
                 goto record_start;
             }
             case OPCODE_UNARY_PLUS: {

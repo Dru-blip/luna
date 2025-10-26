@@ -13,6 +13,14 @@ enum opcode {
     OPCODE_LOAD_NONE,
     OPCODE_LOAD_TRUE,
     OPCODE_LOAD_FALSE,
+
+    OPCODE_LOAD_GLOBAL_BY_INDEX,
+    OPCODE_LOAD_GLOBAL_BY_NAME,
+    OPCODE_STORE_GLOBAL_BY_INDEX,
+    OPCODE_STORE_GLOBAL_BY_NAME,
+    OPCODE_STORE_LOCAL,
+    OPCODE_LOAD_LOCAL,
+
     OPCODE_MOV,
 
     OPCODE_ADD,
@@ -84,6 +92,7 @@ struct basic_block {
     size_t id;
     char* label;
     struct instruction* instructions;
+    struct span* instructions_spans;
     size_t start_offset;  // used when linearizing blocks
 };
 
@@ -95,6 +104,21 @@ struct exectuable {
     uint32_t max_register_count;
     struct span* instructions_span;
     const char* file_path;
+    size_t global_variable_count;
+};
+
+enum scope {
+    SCOPE_GLOBAL,
+    SCOPE_LOCAL,
+    SCOPE_PARAM,
+};
+
+struct variable {
+    enum scope scope;
+    char* name;
+    size_t name_length;
+    size_t scope_depth;
+    uint32_t allocated_reg;
 };
 
 struct generator {
@@ -107,7 +131,11 @@ struct generator {
     struct lu_value* constants;
     size_t constant_counter;
     uint32_t register_counter;
-    struct span* instructions_span;
+    struct variable* local_variables;
+    struct variable* global_variables;
+    size_t local_variable_count;
+    size_t global_variable_count;
+    uint32_t scope_depth;
 };
 
 void generator_init(struct generator* generator, struct ast_program program);

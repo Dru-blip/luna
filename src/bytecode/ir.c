@@ -8,7 +8,15 @@ static const char* opcode_names[] = {
     "load_none",   // OPCODE_LOAD_NONE
     "load_true",   // OPCODE_LOAD_TRUE
     "load_false",  // OPCODE_LOAD_FALSE
-    "mov",         // OPCODE_MOV
+
+    "load_global_by_index",
+    "load_global_by_name",
+    "store_global_by_index",
+    "store_global_by_name",
+    "store_local",
+    "load_local",
+
+    "mov",  // OPCODE_MOV
 
     "add",  // OPCODE_ADD
     "sub",  // OPCODE_SUB
