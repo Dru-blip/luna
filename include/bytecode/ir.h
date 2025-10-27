@@ -49,6 +49,8 @@ enum opcode {
     OPCODE_JUMP,
     OPCODE_JMP_IF,
     OPCODE_RET,
+
+    OPCODE_MAKE_FUNCTION,
 };
 
 // this is high level representation of instruction
@@ -82,6 +84,11 @@ struct instruction {
             uint32_t src_reg;
         } mov;
 
+        struct {
+            uint32_t fst;
+            uint32_t snd;
+        } pair;
+
         uint32_t destination_reg;
     };
 };
@@ -96,10 +103,13 @@ struct basic_block {
 };
 
 struct exectuable {
+    LUNA_OBJECT_HEADER;
     struct instruction* instructions;
     size_t instructions_size;
     size_t constants_size;
     struct lu_value* constants;
+    struct lu_string** identifier_table;
+    size_t identifier_table_size;
     uint32_t max_register_count;
     struct span* instructions_span;
     const char* file_path;
@@ -126,6 +136,7 @@ struct loop {
 };
 
 struct generator {
+    struct generator* prev;
     struct lu_istate* state;
     size_t current_block_id;
     struct basic_block* blocks;
@@ -134,6 +145,8 @@ struct generator {
     size_t block_counter;
     struct lu_value* constants;
     size_t constant_counter;
+    struct lu_string** identifier_table;
+    size_t identifier_table_size;
     uint32_t register_counter;
     struct variable* local_variables;
     struct variable* global_variables;

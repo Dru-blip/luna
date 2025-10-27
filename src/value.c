@@ -321,6 +321,10 @@ inline struct lu_object* lu_object_new_sized(struct lu_istate* state,
     return obj;
 }
 
+inline struct lu_object_vtable* lu_object_get_default_vtable() {
+    return &lu_object_default_vtable;
+}
+
 struct lu_string* lu_small_string_new(struct lu_istate* state, char* data,
                                       size_t length, size_t hash) {
     struct lu_string* str =

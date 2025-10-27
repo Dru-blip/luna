@@ -13,6 +13,7 @@ struct lu_istate {
     struct span error_location;
     struct lu_module* running_module;
     struct lu_vm* vm;
+    struct generator* ir_generator;
 };
 
 struct lu_istate* lu_istate_new();

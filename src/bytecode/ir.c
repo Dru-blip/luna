@@ -2,6 +2,8 @@
 
 #include <stdio.h>
 
+#include "value.h"
+
 static const char* opcode_names[] = {
     "LoadSmi",    // OPCODE_LOAD_SMI
     "LoadConst",  // OPCODE_LOAD_CONST
@@ -41,10 +43,12 @@ static const char* opcode_names[] = {
     "Jump",    // OPCODE_JUMP
     "JumpIf",  // OPCODE_JMP_IF
     "Ret",     // OPCODE_RET
+
+    "MakeFunction",
 };
 
-void print_executable(struct exectuable* executable) {
-    printf("Executable (%s):\n",
+static void print_instructions(struct exectuable* executable) {
+    printf("Executable (%s):{\n",
            executable->file_path ? executable->file_path : "unknown file");
     printf("Max registers : %u\n", executable->max_register_count);
     printf("Constants (%zu)\n", executable->constants_size);
@@ -52,7 +56,7 @@ void print_executable(struct exectuable* executable) {
     printf("\nInstructions:\n");
     for (size_t i = 0; i < executable->instructions_size; i++) {
         struct instruction* instr = &executable->instructions[i];
-        printf("%04zu: %s ", i, opcode_names[instr->opcode]);
+        printf("\t %04zu: %s ", i, opcode_names[instr->opcode]);
 
         switch (instr->opcode) {
             case OPCODE_LOAD_CONST: {
@@ -84,7 +88,7 @@ void print_executable(struct exectuable* executable) {
             }
             case OPCODE_STORE_GLOBAL_BY_NAME:
             case OPCODE_LOAD_GLOBAL_BY_NAME: {
-                printf("r%u, name_index %u", instr->destination_reg,
+                printf("r%u, names[%u]", instr->destination_reg,
                        instr->load_const.constant_index);
                 break;
             }
@@ -138,6 +142,11 @@ void print_executable(struct exectuable* executable) {
                 printf("r%u", instr->destination_reg);
                 break;
             }
+            case OPCODE_MAKE_FUNCTION: {
+                printf("r%u e[%u] names[%u]", instr->binary_op.result_reg,
+                       instr->binary_op.left_reg, instr->binary_op.right_reg);
+                break;
+            }
             default: {
                 printf("unknown opcode");
                 break;
@@ -146,4 +155,17 @@ void print_executable(struct exectuable* executable) {
 
         printf("\n");
     }
+    printf("}\n");
+}
+
+void print_executable(struct exectuable* executable) {
+    for (size_t i = 0; i < executable->constants_size; i++) {
+        struct lu_value constant = executable->constants[i];
+        if (lu_is_executable(constant)) {
+            print_instructions(lu_as_object(constant));
+            printf("\n");
+        }
+    }
+
+    print_instructions(executable);
 }

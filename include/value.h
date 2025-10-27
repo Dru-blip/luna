@@ -74,10 +74,18 @@ struct lu_objectset_iter {
     size_t index;
 };
 
+enum object_tag {
+    OBJECT_TAG_FUNCTION,
+    OBJECT_TAG_STRING,
+    OBJECT_TAG_ARRAY,
+    OBJECT_TAG_EXECUTABLE,
+};
+
 struct lu_object_vtable {
     bool is_function;
     bool is_string;
     bool is_array;
+    enum object_tag tag;
     void (*finalize)(struct lu_object*);
     void (*visit)(struct lu_object*, struct lu_objectset*);
 };
@@ -181,6 +189,8 @@ struct lu_array_iter {
     (lu_is_object(v) && lu_as_object(v)->vtable->is_function)
 #define lu_is_string(v) (lu_is_object(v) && lu_as_object(v)->vtable->is_string)
 #define lu_is_array(v) (lu_is_object(v) && lu_as_object(v)->vtable->is_array)
+#define lu_is_executable(v) \
+    (lu_is_object(v) && lu_as_object(v)->vtable->tag == OBJECT_TAG_EXECUTABLE)
 
 #define lu_as_int(v) ((v).integer)
 #define lu_as_function(v) ((struct lu_function*)lu_as_object(v))
@@ -233,6 +243,7 @@ void lu_property_map_remove(struct property_map* map, struct lu_string* key);
 
 struct lu_object* lu_object_new(struct lu_istate* state);
 struct lu_object* lu_object_new_sized(struct lu_istate* state, size_t size);
+struct lu_object_vtable* lu_object_get_default_vtable();
 struct lu_string* lu_string_new(struct lu_istate* state, char* data);
 struct lu_string* lu_small_string_new(struct lu_istate* state, char* data,
                                       size_t length, size_t hash);

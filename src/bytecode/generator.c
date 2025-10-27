@@ -5,12 +5,31 @@
 #include <string.h>
 
 #include "ast.h"
+#include "bytecode/interpreter.h"
 #include "bytecode/ir.h"
 #include "operator.h"
 #include "stb_ds.h"
+#include "string_interner.h"
 #include "value.h"
 
 #define GET_CURRENT_BLOCK generator->blocks[generator->current_block_id]
+
+static void executable_finalize(struct lu_object* obj) {
+    lu_object_get_default_vtable()->finalize(obj);
+}
+
+static void executable_visit(struct lu_object* obj, struct lu_objectset* set) {
+    lu_object_get_default_vtable()->visit(obj, set);
+}
+
+static struct lu_object_vtable lu_executable_vtable = {
+    .is_array = false,
+    .is_function = false,
+    .is_string = false,
+    .tag = OBJECT_TAG_EXECUTABLE,
+    .finalize = executable_finalize,
+    .visit = executable_visit,
+};
 
 void generator_init(struct generator* generator, struct ast_program program) {
     generator->program = program;
@@ -20,11 +39,14 @@ void generator_init(struct generator* generator, struct ast_program program) {
     generator->register_counter = 0;
     generator->blocks = nullptr;
     generator->node = nullptr;
+    generator->prev = nullptr;
     generator->constants = nullptr;
     generator->local_variables = nullptr;
     generator->global_variables = nullptr;
     generator->loop_stack = nullptr;
+    generator->identifier_table = nullptr;
 
+    generator->identifier_table_size = 0;
     generator->local_variable_count = 0;
     generator->global_variable_count = 0;
     generator->scope_depth = 0;
@@ -126,6 +148,12 @@ static inline size_t generator_add_int_contant(struct generator* generator,
     return generator->constant_counter++;
 }
 
+static inline size_t generator_add_identifier(struct generator* generator,
+                                              struct lu_string* id) {
+    arrput(generator->identifier_table, id);
+    return generator->identifier_table_size++;
+}
+
 static inline size_t generator_add_str_contant(struct generator* generator,
                                                char* data,
                                                struct span* str_span) {
@@ -136,6 +164,12 @@ static inline size_t generator_add_str_contant(struct generator* generator,
     struct lu_string* str = lu_string_new(generator->state, buffer);
     arrput(generator->constants, lu_value_object(str));
     free(buffer);
+    return generator->constant_counter++;
+}
+
+static inline size_t generator_add_exectuable_contant(
+    struct generator* generator, struct exectuable* executable) {
+    arrput(generator->constants, lu_value_object(executable));
     return generator->constant_counter++;
 }
 
@@ -590,6 +624,65 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
             generator_switch_basic_block(generator, end_block);
             break;
         }
+        case AST_NODE_FN_DECL: {
+            struct generator* fn_generator = malloc(sizeof(struct generator));
+
+            generator_init(fn_generator, generator->program);
+            fn_generator->state = generator->state;
+            fn_generator->state->ir_generator = fn_generator;
+            fn_generator->prev = generator;
+            fn_generator->global_variables = generator->global_variables;
+            fn_generator->global_variable_count =
+                generator->global_variable_count;
+
+            generator = fn_generator;
+            uint32_t fn_entry_block = generator_basic_block_new(generator);
+            generator_switch_basic_block(generator, fn_entry_block);
+            generate_stmt(generator, stmt->data.fn_decl.body);
+            struct exectuable* fn_executable =
+                generator_make_executable(generator);
+
+            generator = generator->prev;
+            generator->global_variable_count =
+                fn_generator->global_variable_count;
+            uint32_t executable_index =
+                generator_add_exectuable_contant(generator, fn_executable);
+
+            char* name =
+                generator->program.source + stmt->data.fn_decl.name_span.start;
+            uint32_t name_len = stmt->data.fn_decl.name_span.end -
+                                stmt->data.fn_decl.name_span.start;
+            char* name_copy = malloc(name_len + 1);
+            memcpy(name_copy, name, name_len);
+            name_copy[name_len] = '\0';
+
+            struct lu_string* name_string =
+                lu_intern_string(generator->state, name_copy);
+
+            uint32_t name_index =
+                generator_add_identifier(generator, name_string);
+
+            struct instruction make_fn_instr;
+            make_fn_instr.opcode = OPCODE_MAKE_FUNCTION;
+            make_fn_instr.binary_op.result_reg =
+                generator_allocate_register(generator);
+            make_fn_instr.binary_op.left_reg = executable_index;
+            make_fn_instr.binary_op.right_reg = name_index;
+
+            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+            arrput(GET_CURRENT_BLOCK.instructions, make_fn_instr);
+
+            struct instruction store_func_instr;
+            store_func_instr.opcode = OPCODE_STORE_GLOBAL_BY_NAME;
+            store_func_instr.destination_reg =
+                make_fn_instr.binary_op.result_reg;
+
+            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+            arrput(GET_CURRENT_BLOCK.instructions, store_func_instr);
+
+            free(name_copy);
+            break;
+        }
         default: {
         }
     }
@@ -605,14 +698,15 @@ static void generate_stmts(struct generator* generator,
 
 struct exectuable* generator_generate(struct lu_istate* state,
                                       struct ast_program program) {
-    struct generator generator;
-    generator.state = state;
-    generator_init(&generator, program);
-    size_t entry_block_id = generator_basic_block_new(&generator);
-    generator.current_block_id = entry_block_id;
-    generate_stmts(&generator, program.nodes);
-
-    return generator_make_executable(&generator);
+    // Move to arena alloc
+    struct generator* generator = malloc(sizeof(struct generator));
+    generator->state = state;
+    generator->state->ir_generator = generator;
+    generator_init(generator, program);
+    size_t entry_block_id = generator_basic_block_new(generator);
+    generator->current_block_id = entry_block_id;
+    generate_stmts(generator, program.nodes);
+    return generator_make_executable(generator);
 }
 
 ///
@@ -805,13 +899,16 @@ static void generator_basic_blocks_linearize(struct generator* generator,
 }
 
 struct exectuable* generator_make_executable(struct generator* generator) {
-    struct exectuable* executable = malloc(sizeof(struct exectuable));
+    struct exectuable* executable =
+        lu_object_new_sized(generator->state, sizeof(struct exectuable));
+    executable->vtable = &lu_executable_vtable;
     executable->constants = generator->constants;
     executable->constants_size = arrlen(executable->constants);
     executable->max_register_count = generator->register_counter;
     executable->file_path = generator->program.filepath;
     executable->global_variable_count = generator->global_variable_count;
-    // generator_cfg_linearize(generator, executable);
+    executable->identifier_table = generator->identifier_table;
+    executable->identifier_table_size = generator->identifier_table_size;
     generator_basic_blocks_linearize(generator, executable);
     return executable;
 }
