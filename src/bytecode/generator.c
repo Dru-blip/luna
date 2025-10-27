@@ -506,8 +506,13 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
             uint32_t body_block = generator_basic_block_new(generator);
             uint32_t end_block = generator_basic_block_new(generator);
 
+            struct loop loop = {.start_block_id = test_block,
+                                .end_block_id = end_block};
+            arrput(generator->loop_stack, loop);
+
             generator_emit_jump_instruction(generator, test_block);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+            arrput(GET_CURRENT_BLOCK.instructions_spans,
+                   stmt->data.pair.fst->span);
 
             generator_switch_basic_block(generator, test_block);
             uint32_t test = generate_expr(generator, stmt->data.pair.fst);
@@ -526,8 +531,62 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
             generate_stmt(generator, stmt->data.pair.snd);
 
             generator_emit_jump_instruction(generator, test_block);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+            arrput(GET_CURRENT_BLOCK.instructions_spans,
+                   stmt->data.pair.fst->span);
 
+            arrpop(generator->loop_stack);
+            generator_switch_basic_block(generator, end_block);
+            break;
+        }
+        case AST_NODE_FOR_STMT: {
+            const struct ast_for_stmt* for_stmt = &stmt->data.for_stmt;
+            uint32_t init_block = generator_basic_block_new(generator);
+            uint32_t test_block = generator_basic_block_new(generator);
+            uint32_t body_block = generator_basic_block_new(generator);
+            uint32_t update_block = generator_basic_block_new(generator);
+            uint32_t end_block = generator_basic_block_new(generator);
+
+            struct loop loop = {.start_block_id = update_block,
+                                .end_block_id = end_block};
+            arrput(generator->loop_stack, loop);
+
+            generator_emit_jump_instruction(generator, init_block);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, for_stmt->init->span);
+
+            begin_scope(generator);
+            generator_switch_basic_block(generator, init_block);
+
+            generate_stmt(generator, for_stmt->init);
+            generator_emit_jump_instruction(generator, test_block);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, for_stmt->test->span);
+
+            generator_switch_basic_block(generator, test_block);
+            uint32_t test = generate_expr(generator, for_stmt->test);
+
+            struct instruction branch_instr = {
+                .opcode = OPCODE_JMP_IF,
+            };
+            branch_instr.jmp_if.condition_reg = test;
+            branch_instr.jmp_if.true_block_id = body_block;
+            branch_instr.jmp_if.false_block_id = end_block;
+
+            arrput(GET_CURRENT_BLOCK.instructions_spans, for_stmt->test->span);
+            arrput(GET_CURRENT_BLOCK.instructions, branch_instr);
+
+            generator_switch_basic_block(generator, body_block);
+            generate_stmt(generator, for_stmt->body);
+
+            generator_emit_jump_instruction(generator, update_block);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, for_stmt->test->span);
+
+            generator_switch_basic_block(generator, update_block);
+            generate_expr(generator, for_stmt->update);
+
+            generator_emit_jump_instruction(generator, test_block);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, for_stmt->test->span);
+
+            arrpop(generator->loop_stack);
+            end_scope(generator);
             generator_switch_basic_block(generator, end_block);
             break;
         }

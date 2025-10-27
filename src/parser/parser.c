@@ -406,7 +406,7 @@ static struct ast_node* parse_while_stmt(struct parser* parser) {
 static struct ast_node* parse_for_stmt(struct parser* parser) {
     struct token* token = parser_eat(parser);
     parse_expected(parser, TOKEN_LPAREN);
-    struct ast_node* init = parse_expression(parser, 0);
+    struct ast_node* init = parse_stmt(parser);
     struct ast_node *test, *update, *right = nullptr;
     if (!check(parser, TOKEN_SEMICOLON) && check(parser, TOKEN_KEYWORD_IN)) {
         parser_eat(parser);
