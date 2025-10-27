@@ -501,6 +501,36 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
             generator_switch_basic_block(generator, end_block);
             break;
         }
+        case AST_NODE_WHILE_STMT: {
+            uint32_t test_block = generator_basic_block_new(generator);
+            uint32_t body_block = generator_basic_block_new(generator);
+            uint32_t end_block = generator_basic_block_new(generator);
+
+            generator_emit_jump_instruction(generator, test_block);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+
+            generator_switch_basic_block(generator, test_block);
+            uint32_t test = generate_expr(generator, stmt->data.pair.fst);
+
+            struct instruction branch_instr = {
+                .opcode = OPCODE_JMP_IF,
+            };
+            branch_instr.jmp_if.condition_reg = test;
+            branch_instr.jmp_if.true_block_id = body_block;
+            branch_instr.jmp_if.false_block_id = end_block;
+
+            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+            arrput(GET_CURRENT_BLOCK.instructions, branch_instr);
+
+            generator_switch_basic_block(generator, body_block);
+            generate_stmt(generator, stmt->data.pair.snd);
+
+            generator_emit_jump_instruction(generator, test_block);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+
+            generator_switch_basic_block(generator, end_block);
+            break;
+        }
         default: {
         }
     }
