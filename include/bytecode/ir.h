@@ -51,6 +51,7 @@ enum opcode {
     OPCODE_RET,
 
     OPCODE_MAKE_FUNCTION,
+    OPCODE_CALL,
 };
 
 // this is high level representation of instruction
@@ -89,6 +90,13 @@ struct instruction {
             uint32_t snd;
         } pair;
 
+        struct {
+            uint32_t callee_reg;
+            uint32_t argc;
+            uint32_t args_start_reg;
+            uint32_t ret_reg;
+        } call;
+
         uint32_t destination_reg;
     };
 };
@@ -102,7 +110,7 @@ struct basic_block {
     bool visited;
 };
 
-struct exectuable {
+struct executable {
     LUNA_OBJECT_HEADER;
     struct instruction* instructions;
     size_t instructions_size;
@@ -158,8 +166,8 @@ struct generator {
 
 void generator_init(struct generator* generator, struct ast_program program);
 size_t generator_basic_block_new(struct generator* generator);
-struct exectuable* generator_generate(struct lu_istate* state,
+struct executable* generator_generate(struct lu_istate* state,
                                       struct ast_program program);
-struct exectuable* generator_make_executable(struct generator* generator);
+struct executable* generator_make_executable(struct generator* generator);
 
-void print_executable(struct exectuable* executable);
+void print_executable(struct executable* executable);

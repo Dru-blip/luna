@@ -1,4 +1,3 @@
-#include "ast.h"
 #include "bytecode/interpreter.h"
 
 int main(int argc, char* argv[]) {

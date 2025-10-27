@@ -2,12 +2,20 @@
 #include "ir.h"
 #include "value.h"
 
+struct lu_globals {
+    struct lu_value* fast_slots;
+    struct lu_object* named_slots;
+};
+
 struct activation_record {
-    struct exectuable* executable;
+    struct executable* executable;
     struct lu_value* registers;
     size_t max_register_count;
     size_t ip;
-    struct lu_value* globals;
+    // struct lu_value* globals;
+    struct lu_globals* globals;
+
+    size_t caller_ret_reg;
 };
 
 struct lu_vm {

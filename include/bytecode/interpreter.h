@@ -21,4 +21,4 @@ void lu_istate_destroy(struct lu_istate* state);
 struct lu_value lu_run_program(struct lu_istate* state, const char* filepath);
 
 struct lu_value lu_run_executable(struct lu_istate* state,
-                                  struct exectuable* executable);
+                                  struct executable* executable);

@@ -131,7 +131,7 @@ struct lu_function {
     size_t param_count;
     union {
         native_func_t func;
-        struct exectuable* executable;
+        struct executable* executable;
         struct {
             struct ast_node** params;
             struct ast_node* body;
@@ -253,8 +253,7 @@ struct lu_string* lu_string_concat(struct lu_istate* state, struct lu_value lhs,
 struct lu_function* lu_function_new(struct lu_istate* state,
                                     struct lu_string* name,
                                     struct lu_module* module,
-                                    struct ast_node** params,
-                                    struct ast_node* body);
+                                    struct executable* executable);
 
 struct lu_function* lu_native_function_new(struct lu_istate* state,
                                            struct lu_string* name,

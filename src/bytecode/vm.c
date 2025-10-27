@@ -26,13 +26,32 @@ void lu_vm_destroy(struct lu_vm* vm) {
     free(vm);
 }
 
-static void lu_vm_push_new_record(struct lu_vm* vm,
-                                  struct exectuable* executable) {
+static void lu_vm_push_new_record_with_globals(struct lu_vm* vm,
+                                               struct executable* executable,
+                                               struct lu_globals* globals) {
     struct activation_record record;
     record.executable = executable;
     record.ip = 0;
-    record.globals = nullptr;
-    arrsetlen(record.globals, executable->global_variable_count);
+
+    record.globals = globals;
+
+    record.max_register_count = executable->max_register_count;
+    record.registers = nullptr;
+    arrsetlen(record.registers, record.max_register_count);
+
+    arrput(vm->records, record);
+    vm->rp++;
+}
+
+static void lu_vm_push_new_record(struct lu_vm* vm,
+                                  struct executable* executable) {
+    struct activation_record record;
+    record.executable = executable;
+    record.ip = 0;
+    record.globals = malloc(sizeof(struct lu_globals));
+    record.globals->fast_slots = nullptr;
+    arrsetlen(record.globals->fast_slots, executable->global_variable_count);
+    record.globals->named_slots = lu_object_new(vm->istate);
     record.max_register_count = executable->max_register_count;
     record.registers = nullptr;
     arrsetlen(record.registers, record.max_register_count);
@@ -41,7 +60,7 @@ static void lu_vm_push_new_record(struct lu_vm* vm,
 }
 
 struct lu_value lu_run_executable(struct lu_istate* state,
-                                  struct exectuable* executable) {
+                                  struct executable* executable) {
     lu_vm_push_new_record(state->vm, executable);
     struct activation_record* record = &state->vm->records[state->vm->rp - 1];
     return lu_vm_run_record(state->vm, record);
@@ -49,8 +68,8 @@ struct lu_value lu_run_executable(struct lu_istate* state,
 
 struct lu_value lu_vm_run_record(struct lu_vm* vm,
                                  struct activation_record* record) {
-    size_t instruction_count = record->executable->instructions_size;
 record_start:
+    size_t instruction_count = record->executable->instructions_size;
     while (record->ip < instruction_count) {
         const struct instruction* instr =
             &record->executable->instructions[record->ip++];
@@ -81,12 +100,30 @@ record_start:
             }
             case OPCODE_LOAD_GLOBAL_BY_INDEX: {
                 record->registers[instr->mov.dest_reg] =
-                    record->globals[instr->mov.src_reg];
+                    record->globals->fast_slots[instr->mov.src_reg];
                 goto record_start;
             }
             case OPCODE_STORE_GLOBAL_BY_INDEX: {
-                record->globals[instr->mov.dest_reg] =
+                record->globals->fast_slots[instr->mov.dest_reg] =
                     record->registers[instr->mov.src_reg];
+                goto record_start;
+            }
+            case OPCODE_STORE_GLOBAL_BY_NAME: {
+                struct lu_string* name =
+                    record->executable->identifier_table[instr->pair.snd];
+                lu_obj_set(record->globals->named_slots, name,
+                           record->registers[instr->pair.fst]);
+                goto record_start;
+            }
+            case OPCODE_LOAD_GLOBAL_BY_NAME: {
+                struct lu_string* name =
+                    record->executable->identifier_table[instr->pair.fst];
+                struct lu_value value =
+                    lu_obj_get(record->globals->named_slots, name);
+                if (!lu_is_undefined(value)) {
+                    record->registers[instr->pair.snd] = value;
+                }
+                // TODO: raise error undeclared identifier
                 goto record_start;
             }
             case OPCODE_UNARY_PLUS: {
@@ -146,9 +183,6 @@ record_start:
                 HANDLE_BINARY_INSTRUCTION(OPCODE_TEST_EQUAL, lu_vm_op_eq);
                 HANDLE_BINARY_INSTRUCTION(OPCODE_TEST_NOT_EQUAL, lu_vm_op_neq);
 
-            case OPCODE_RET: {
-                return record->registers[instr->destination_reg];
-            }
             case OPCODE_JUMP: {
                 record->ip = instr->jmp.target_offset;
                 goto record_start;
@@ -160,6 +194,44 @@ record_start:
                 } else {
                     record->ip = instr->jmp_if.false_block_id;
                 }
+                goto record_start;
+            }
+            case OPCODE_MAKE_FUNCTION: {
+                struct executable* executable =
+                    record->executable->constants[instr->binary_op.left_reg]
+                        .object;
+                struct lu_string* func_name =
+                    record->executable
+                        ->identifier_table[instr->binary_op.right_reg];
+                struct lu_function* func =
+                    lu_function_new(vm->istate, func_name,
+                                    vm->istate->running_module, executable);
+                record->registers[instr->binary_op.result_reg] =
+                    lu_value_object(func);
+                goto record_start;
+            }
+            case OPCODE_CALL: {
+                struct lu_value callee_val =
+                    record->registers[instr->call.callee_reg];
+                struct lu_function* func = lu_as_function(callee_val);
+                lu_vm_push_new_record_with_globals(vm, func->executable,
+                                                   record->globals);
+                record = &vm->records[vm->rp - 1];
+                record->caller_ret_reg = instr->call.ret_reg;
+                goto record_start;
+            }
+            case OPCODE_RET: {
+                const struct activation_record child_record =
+                    arrpop(vm->records);
+                vm->rp--;
+
+                if (vm->rp == 1) {
+                    return child_record.registers[instr->destination_reg];
+                }
+
+                record = &vm->records[vm->rp - 1];
+                record->registers[record->caller_ret_reg] =
+                    child_record.registers[instr->destination_reg];
                 goto record_start;
             }
             default: {

@@ -45,19 +45,22 @@ static const char* opcode_names[] = {
     "Ret",     // OPCODE_RET
 
     "MakeFunction",
+    "Call",
 };
 
-static void print_instructions(struct exectuable* executable) {
+static void print_instructions(struct executable* executable) {
     printf("Executable (%s):{\n",
            executable->file_path ? executable->file_path : "unknown file");
-    printf("Max registers : %u\n", executable->max_register_count);
-    printf("Constants (%zu)\n", executable->constants_size);
+    printf("  Max registers : %u\n", executable->max_register_count);
+    printf("  Constants (%zu)\n", executable->constants_size);
 
     printf("\nInstructions:\n");
     for (size_t i = 0; i < executable->instructions_size; i++) {
         struct instruction* instr = &executable->instructions[i];
         printf("\t %04zu: %s ", i, opcode_names[instr->opcode]);
 
+        // REWRITE:  the instruction printing should be in  a more readable
+        // format
         switch (instr->opcode) {
             case OPCODE_LOAD_CONST: {
                 printf("r%u [const %u]", instr->load_const.destination_reg,
@@ -147,6 +150,11 @@ static void print_instructions(struct exectuable* executable) {
                        instr->binary_op.left_reg, instr->binary_op.right_reg);
                 break;
             }
+            case OPCODE_CALL: {
+                printf("r%u <- r%u()", instr->call.ret_reg,
+                       instr->call.callee_reg);
+                break;
+            }
             default: {
                 printf("unknown opcode");
                 break;
@@ -158,7 +166,7 @@ static void print_instructions(struct exectuable* executable) {
     printf("}\n");
 }
 
-void print_executable(struct exectuable* executable) {
+void print_executable(struct executable* executable) {
     for (size_t i = 0; i < executable->constants_size; i++) {
         struct lu_value constant = executable->constants[i];
         if (lu_is_executable(constant)) {

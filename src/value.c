@@ -448,16 +448,13 @@ struct lu_string* lu_string_concat(struct lu_istate* state, struct lu_value lhs,
 struct lu_function* lu_function_new(struct lu_istate* state,
                                     struct lu_string* name,
                                     struct lu_module* module,
-                                    struct ast_node** params,
-                                    struct ast_node* body) {
+                                    struct executable* executable) {
     struct lu_function* func =
         lu_object_new_sized(state, sizeof(struct lu_function));
     func->type = FUNCTION_USER;
     func->name = name;
-    func->body = body;
     func->module = module;
-    func->params = params;
-    func->param_count = params ? arrlen(params) : 0;
+    func->executable = executable;
     func->vtable = &lu_function_vtable;
 
     return func;

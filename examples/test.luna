@@ -1,7 +1,6 @@
 fn add(){
-    return 1+2
+    let a=3
+    return a+2
 }
 
-fn sub(){
-    return 2-1
-}
+return add()

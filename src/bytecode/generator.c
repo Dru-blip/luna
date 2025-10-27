@@ -167,8 +167,8 @@ static inline size_t generator_add_str_contant(struct generator* generator,
     return generator->constant_counter++;
 }
 
-static inline size_t generator_add_exectuable_contant(
-    struct generator* generator, struct exectuable* executable) {
+static inline size_t generator_add_executable_contant(
+    struct generator* generator, struct executable* executable) {
     arrput(generator->constants, lu_value_object(executable));
     return generator->constant_counter++;
 }
@@ -393,6 +393,52 @@ static uint32_t generate_expr(struct generator* generator,
             }
 
             return val_reg;
+        }
+        case AST_NODE_CALL: {
+            struct instruction call_instr;
+            call_instr.opcode = OPCODE_CALL;
+            call_instr.call.argc = expr->data.call.argc;
+            call_instr.call.args_start_reg = 0;
+
+            switch (expr->data.call.callee->kind) {
+                case AST_NODE_IDENTIFIER: {
+                    char* name = generator->program.source +
+                                 expr->data.call.callee->span.start;
+                    uint32_t name_len = expr->data.call.callee->span.end -
+                                        expr->data.call.callee->span.start;
+
+                    char* name_copy = malloc(name_len + 1);
+                    memcpy(name_copy, name, name_len);
+                    name_copy[name_len] = '\0';
+
+                    struct lu_string* name_string =
+                        lu_intern_string(generator->state, name_copy);
+
+                    uint32_t name_index =
+                        generator_add_identifier(generator, name_string);
+
+                    struct instruction calle_instr;
+                    calle_instr.opcode = OPCODE_LOAD_GLOBAL_BY_NAME;
+                    calle_instr.pair.fst = name_index;
+                    calle_instr.pair.snd =generator_allocate_register(generator);
+                    arrput(GET_CURRENT_BLOCK.instructions, calle_instr);
+                    arrput(GET_CURRENT_BLOCK.instructions_spans,
+                           expr->data.call.callee->span);
+                    call_instr.call.callee_reg = calle_instr.pair.snd;
+                    break;
+                }
+                default: {
+                    // TODO: raise uncallable expression error
+                    break;
+                }
+            }
+
+            call_instr.call.ret_reg = generator_allocate_register(generator);
+
+            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
+            arrput(GET_CURRENT_BLOCK.instructions, call_instr);
+
+            return call_instr.call.ret_reg;
         }
         default: {
             return 0;
@@ -639,14 +685,14 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
             uint32_t fn_entry_block = generator_basic_block_new(generator);
             generator_switch_basic_block(generator, fn_entry_block);
             generate_stmt(generator, stmt->data.fn_decl.body);
-            struct exectuable* fn_executable =
+            struct executable* fn_executable =
                 generator_make_executable(generator);
 
             generator = generator->prev;
             generator->global_variable_count =
                 fn_generator->global_variable_count;
             uint32_t executable_index =
-                generator_add_exectuable_contant(generator, fn_executable);
+                generator_add_executable_contant(generator, fn_executable);
 
             char* name =
                 generator->program.source + stmt->data.fn_decl.name_span.start;
@@ -674,8 +720,8 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
 
             struct instruction store_func_instr;
             store_func_instr.opcode = OPCODE_STORE_GLOBAL_BY_NAME;
-            store_func_instr.destination_reg =
-                make_fn_instr.binary_op.result_reg;
+            store_func_instr.pair.fst = make_fn_instr.binary_op.result_reg;
+            store_func_instr.pair.snd = name_index;
 
             arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
             arrput(GET_CURRENT_BLOCK.instructions, store_func_instr);
@@ -696,7 +742,7 @@ static void generate_stmts(struct generator* generator,
     }
 }
 
-struct exectuable* generator_generate(struct lu_istate* state,
+struct executable* generator_generate(struct lu_istate* state,
                                       struct ast_program program) {
     // Move to arena alloc
     struct generator* generator = malloc(sizeof(struct generator));
@@ -756,7 +802,7 @@ void instruction_array_copy(struct instruction_array* arr,
 }
 
 // static void generator_cfg_linearize(struct generator* generator,
-//                                     struct exectuable* executable) {
+//                                     struct executable* executable) {
 //     //
 //     size_t* block_start_offsets =
 //         malloc(sizeof(size_t) * generator->block_counter);
@@ -834,7 +880,7 @@ void instruction_array_copy(struct instruction_array* arr,
 // }
 
 static void generator_basic_blocks_linearize(struct generator* generator,
-                                             struct exectuable* executable) {
+                                             struct executable* executable) {
     // calculate block start offsets
     size_t* block_start_offsets =
         malloc(sizeof(size_t) * generator->block_counter);
@@ -898,9 +944,9 @@ static void generator_basic_blocks_linearize(struct generator* generator,
     executable->instructions_span = instructions_spans;
 }
 
-struct exectuable* generator_make_executable(struct generator* generator) {
-    struct exectuable* executable =
-        lu_object_new_sized(generator->state, sizeof(struct exectuable));
+struct executable* generator_make_executable(struct generator* generator) {
+    struct executable* executable =
+        lu_object_new_sized(generator->state, sizeof(struct executable));
     executable->vtable = &lu_executable_vtable;
     executable->constants = generator->constants;
     executable->constants_size = arrlen(executable->constants);
