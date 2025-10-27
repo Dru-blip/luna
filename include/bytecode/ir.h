@@ -93,7 +93,7 @@ struct instruction {
         struct {
             uint32_t callee_reg;
             uint32_t argc;
-            uint32_t args_start_reg;
+            uint32_t* args_reg;
             uint32_t ret_reg;
         } call;
 

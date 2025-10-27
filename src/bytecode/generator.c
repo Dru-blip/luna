@@ -137,6 +137,19 @@ static bool find_variable(struct generator* generator, char* name,
     return false;
 }
 
+static void declare_param(struct generator* generator, const char* name,
+                          uint32_t name_length) {
+    //
+    struct variable var;
+    var.scope = SCOPE_PARAM;
+    var.scope_depth = generator->scope_depth;
+    var.name = name;
+    var.name_length = name_length;
+    var.allocated_reg = generator_allocate_register(generator);
+    generator->local_variable_count++;
+    arrput(generator->local_variables, var);
+}
+
 static inline void generator_switch_basic_block(struct generator* generator,
                                                 size_t block_id) {
     generator->current_block_id = block_id;
@@ -295,7 +308,7 @@ static uint32_t generate_expr(struct generator* generator,
             if (!find_variable(generator, name, name_len, &var)) {
                 // raise error for undeclared variables
             }
-            if (var->scope == SCOPE_LOCAL) {
+            if (var->scope == SCOPE_LOCAL || var->scope == SCOPE_PARAM) {
                 return var->allocated_reg;
             }
             uint32_t dst_reg = generator_allocate_register(generator);
@@ -398,7 +411,7 @@ static uint32_t generate_expr(struct generator* generator,
             struct instruction call_instr;
             call_instr.opcode = OPCODE_CALL;
             call_instr.call.argc = expr->data.call.argc;
-            call_instr.call.args_start_reg = 0;
+            call_instr.call.args_reg = nullptr;
 
             switch (expr->data.call.callee->kind) {
                 case AST_NODE_IDENTIFIER: {
@@ -420,7 +433,8 @@ static uint32_t generate_expr(struct generator* generator,
                     struct instruction calle_instr;
                     calle_instr.opcode = OPCODE_LOAD_GLOBAL_BY_NAME;
                     calle_instr.pair.fst = name_index;
-                    calle_instr.pair.snd =generator_allocate_register(generator);
+                    calle_instr.pair.snd =
+                        generator_allocate_register(generator);
                     arrput(GET_CURRENT_BLOCK.instructions, calle_instr);
                     arrput(GET_CURRENT_BLOCK.instructions_spans,
                            expr->data.call.callee->span);
@@ -431,6 +445,12 @@ static uint32_t generate_expr(struct generator* generator,
                     // TODO: raise uncallable expression error
                     break;
                 }
+            }
+
+            for (uint8_t i = 0; i < expr->data.call.argc; ++i) {
+                uint32_t arg_reg =
+                    generate_expr(generator, expr->data.call.args[i]);
+                arrput(call_instr.call.args_reg, arg_reg);
             }
 
             call_instr.call.ret_reg = generator_allocate_register(generator);
@@ -680,9 +700,20 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
             fn_generator->global_variables = generator->global_variables;
             fn_generator->global_variable_count =
                 generator->global_variable_count;
+            fn_generator->scope_depth = 1;
 
             generator = fn_generator;
             uint32_t fn_entry_block = generator_basic_block_new(generator);
+
+            const size_t num_params = arrlen(stmt->data.fn_decl.params);
+            for (size_t i = 0; i < num_params; ++i) {
+                struct ast_node* param = stmt->data.fn_decl.params[i];
+                const char* param_name =
+                    generator->program.source + param->span.start;
+                uint32_t param_name_len = param->span.end - param->span.start;
+                declare_param(generator, param_name, param_name_len);
+            }
+
             generator_switch_basic_block(generator, fn_entry_block);
             generate_stmt(generator, stmt->data.fn_decl.body);
             struct executable* fn_executable =

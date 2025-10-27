@@ -1,6 +1,5 @@
-fn add(){
-    let a=3
-    return a+2
+fn add(a,b){
+    return a+b
 }
 
-return add()
+return add(5,5)

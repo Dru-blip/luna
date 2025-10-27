@@ -1,5 +1,6 @@
 #include "bytecode/vm.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -70,6 +71,7 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
                                  struct activation_record* record) {
 record_start:
     size_t instruction_count = record->executable->instructions_size;
+loop_start:
     while (record->ip < instruction_count) {
         const struct instruction* instr =
             &record->executable->instructions[record->ip++];
@@ -78,42 +80,42 @@ record_start:
                 record->registers[instr->load_const.destination_reg] =
                     record->executable
                         ->constants[instr->load_const.constant_index];
-                goto record_start;
+                goto loop_start;
             }
             case OPCODE_LOAD_NONE: {
                 record->registers[instr->destination_reg] = lu_value_none();
-                goto record_start;
+                goto loop_start;
             }
             case OPCODE_LOAD_TRUE: {
                 record->registers[instr->destination_reg] = lu_value_bool(true);
-                goto record_start;
+                goto loop_start;
             }
             case OPCODE_LOAD_FALSE: {
                 record->registers[instr->destination_reg] =
                     lu_value_bool(false);
-                goto record_start;
+                goto loop_start;
             }
             case OPCODE_MOV: {
                 record->registers[instr->mov.dest_reg] =
                     record->registers[instr->mov.src_reg];
-                goto record_start;
+                goto loop_start;
             }
             case OPCODE_LOAD_GLOBAL_BY_INDEX: {
                 record->registers[instr->mov.dest_reg] =
                     record->globals->fast_slots[instr->mov.src_reg];
-                goto record_start;
+                goto loop_start;
             }
             case OPCODE_STORE_GLOBAL_BY_INDEX: {
                 record->globals->fast_slots[instr->mov.dest_reg] =
                     record->registers[instr->mov.src_reg];
-                goto record_start;
+                goto loop_start;
             }
             case OPCODE_STORE_GLOBAL_BY_NAME: {
                 struct lu_string* name =
                     record->executable->identifier_table[instr->pair.snd];
                 lu_obj_set(record->globals->named_slots, name,
                            record->registers[instr->pair.fst]);
-                goto record_start;
+                goto loop_start;
             }
             case OPCODE_LOAD_GLOBAL_BY_NAME: {
                 struct lu_string* name =
@@ -124,12 +126,12 @@ record_start:
                     record->registers[instr->pair.snd] = value;
                 }
                 // TODO: raise error undeclared identifier
-                goto record_start;
+                goto loop_start;
             }
             case OPCODE_UNARY_PLUS: {
                 // Currently this is a no-op, but operation can be performed
                 // based on type.
-                goto record_start;
+                goto loop_start;
             }
             case OPCODE_UNARY_MINUS: {
                 struct lu_value argument =
@@ -137,7 +139,7 @@ record_start:
                 if (IS_NUMERIC(argument)) {
                     record->registers[instr->destination_reg] =
                         lu_value_int(-lu_as_int(argument));
-                    goto record_start;
+                    goto loop_start;
                 }
 
                 struct span span = lu_vm_current_ip_span(vm);
@@ -155,7 +157,7 @@ record_start:
             case OPCODE_UNARY_NOT: {
                 record->registers[instr->destination_reg] = lu_value_bool(
                     lu_is_falsy(record->registers[instr->destination_reg]));
-                goto record_start;
+                goto loop_start;
             }
 
 #define HANDLE_BINARY_INSTRUCTION(opcode, func)                    \
@@ -166,7 +168,7 @@ record_start:
         if (lu_has_error(vm)) {                                    \
             goto error_reporter;                                   \
         }                                                          \
-        goto record_start;                                         \
+        goto loop_start;                                           \
     }
                 HANDLE_BINARY_INSTRUCTION(OPCODE_ADD, lu_vm_op_add);
                 HANDLE_BINARY_INSTRUCTION(OPCODE_SUB, lu_vm_op_sub);
@@ -185,7 +187,7 @@ record_start:
 
             case OPCODE_JUMP: {
                 record->ip = instr->jmp.target_offset;
-                goto record_start;
+                goto loop_start;
             }
             case OPCODE_JMP_IF: {
                 if (lu_is_truthy(
@@ -194,7 +196,7 @@ record_start:
                 } else {
                     record->ip = instr->jmp_if.false_block_id;
                 }
-                goto record_start;
+                goto loop_start;
             }
             case OPCODE_MAKE_FUNCTION: {
                 struct executable* executable =
@@ -208,16 +210,21 @@ record_start:
                                     vm->istate->running_module, executable);
                 record->registers[instr->binary_op.result_reg] =
                     lu_value_object(func);
-                goto record_start;
+                goto loop_start;
             }
             case OPCODE_CALL: {
                 struct lu_value callee_val =
                     record->registers[instr->call.callee_reg];
                 struct lu_function* func = lu_as_function(callee_val);
+                struct activation_record* parent_record = record;
                 lu_vm_push_new_record_with_globals(vm, func->executable,
                                                    record->globals);
                 record = &vm->records[vm->rp - 1];
                 record->caller_ret_reg = instr->call.ret_reg;
+                for (uint32_t i = 0; i < instr->call.argc; i++) {
+                    record->registers[i] =
+                        parent_record->registers[instr->call.args_reg[i]];
+                }
                 goto record_start;
             }
             case OPCODE_RET: {
