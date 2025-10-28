@@ -159,6 +159,36 @@ loop_start:
                     lu_is_falsy(record->registers[instr->destination_reg]));
                 goto loop_start;
             }
+            case OPCODE_NEW_ARRAY: {
+                record->registers[instr->destination_reg] =
+                    lu_value_object(lu_array_new(vm->istate));
+                goto loop_start;
+            }
+            case OPCODE_ARRAY_APPEND: {
+                struct lu_array* array =
+                    lu_as_array(record->registers[instr->pair.fst]);
+                lu_array_push(array, record->registers[instr->pair.snd]);
+                goto loop_start;
+            }
+            case OPCODE_LOAD_SUBSCR: {
+                struct lu_value obj_val =
+                    record->registers[instr->binary_op.left_reg];
+                struct lu_value computed_index =
+                    record->registers[instr->binary_op.right_reg];
+                if (lu_is_array(obj_val)) {
+                    if (lu_is_int(computed_index)) {
+                        int64_t index = lu_as_int(computed_index);
+                        if (index < 0) {
+                            // TODO: raise invalid index error
+                            //
+                        }
+                        record->registers[instr->binary_op.result_reg] =
+                            lu_array_get(lu_as_array(obj_val), index);
+                        goto loop_start;
+                    }
+                }
+                goto loop_start;
+            }
 
 #define HANDLE_BINARY_INSTRUCTION(opcode, func)                    \
     case opcode: {                                                 \
@@ -232,7 +262,7 @@ loop_start:
                     arrpop(vm->records);
                 vm->rp--;
 
-                if (vm->rp == 1) {
+                if (vm->rp <= 1) {
                     return child_record.registers[instr->destination_reg];
                 }
 

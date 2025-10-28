@@ -46,6 +46,9 @@ static const char* opcode_names[] = {
 
     "MakeFunction",
     "Call",
+    "NewArray",
+    "ArrayAppend",
+    "LoadSubscript"
 };
 
 static void print_instructions(struct executable* executable) {
@@ -156,7 +159,6 @@ static void print_instructions(struct executable* executable) {
                 break;
             }
             default: {
-                printf("unknown opcode");
                 break;
             }
         }

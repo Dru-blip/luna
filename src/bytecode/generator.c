@@ -139,7 +139,6 @@ static bool find_variable(struct generator* generator, char* name,
 
 static void declare_param(struct generator* generator, const char* name,
                           uint32_t name_length) {
-    //
     struct variable var;
     var.scope = SCOPE_PARAM;
     var.scope_depth = generator->scope_depth;
@@ -301,6 +300,29 @@ static uint32_t generate_expr(struct generator* generator,
             arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
             return generator_emit_load_constant(generator, const_index);
         }
+        case AST_NODE_ARRAY_EXPR: {
+            uint32_t dst_reg = generator_allocate_register(generator);
+
+            struct instruction instr;
+            instr.opcode = OPCODE_NEW_ARRAY;
+            instr.destination_reg = dst_reg;
+
+            arrput(GET_CURRENT_BLOCK.instructions, instr);
+            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
+
+            for (uint32_t i = 0; i < arrlen(expr->data.list); i++) {
+                struct instruction instr;
+                instr.opcode = OPCODE_ARRAY_APPEND;
+                instr.pair.fst = dst_reg;
+                instr.pair.snd = generate_expr(generator, expr->data.list[i]);
+
+                arrput(GET_CURRENT_BLOCK.instructions, instr);
+                arrput(GET_CURRENT_BLOCK.instructions_spans,
+                       expr->data.list[i]->span);
+            }
+
+            return dst_reg;
+        }
         case AST_NODE_IDENTIFIER: {
             char* name = generator->program.source + expr->span.start;
             uint32_t name_len = expr->span.end - expr->span.start;
@@ -459,6 +481,21 @@ static uint32_t generate_expr(struct generator* generator,
             arrput(GET_CURRENT_BLOCK.instructions, call_instr);
 
             return call_instr.call.ret_reg;
+        }
+        case AST_NODE_COMPUTED_MEMBER_EXPR: {
+            struct instruction instr;
+            instr.opcode = OPCODE_LOAD_SUBSCR;
+            instr.binary_op.result_reg = generator_allocate_register(generator);
+
+            instr.binary_op.left_reg =
+                generate_expr(generator, expr->data.pair.fst);
+            instr.binary_op.right_reg =
+                generate_expr(generator, expr->data.pair.snd);
+
+            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
+            arrput(GET_CURRENT_BLOCK.instructions, instr);
+
+            return instr.binary_op.result_reg;
         }
         default: {
             return 0;
@@ -761,6 +798,7 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
             break;
         }
         default: {
+            break;
         }
     }
 }

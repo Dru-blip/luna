@@ -52,6 +52,11 @@ enum opcode {
 
     OPCODE_MAKE_FUNCTION,
     OPCODE_CALL,
+
+    OPCODE_NEW_ARRAY,
+    OPCODE_ARRAY_APPEND,
+    OPCODE_LOAD_SUBSCR,
+
 };
 
 // this is high level representation of instruction
@@ -93,8 +98,8 @@ struct instruction {
         struct {
             uint32_t callee_reg;
             uint32_t argc;
-            uint32_t* args_reg;
             uint32_t ret_reg;
+            uint32_t* args_reg;
         } call;
 
         uint32_t destination_reg;
