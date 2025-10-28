@@ -10,6 +10,7 @@
 #include "operator.h"
 #include "stb_ds.h"
 #include "string_interner.h"
+#include "tokenizer.h"
 #include "value.h"
 
 #define GET_CURRENT_BLOCK generator->blocks[generator->current_block_id]
@@ -226,6 +227,14 @@ static enum opcode unop_to_opcode[] = {
     OPCODE_UNARY_NOT,
 };
 
+static char* extract_name_and_len(struct generator* generator,
+                                  struct ast_node* node, uint32_t* out_len) {
+    char* name = generator->program.source + node->span.start;
+    uint32_t name_len = node->span.end - node->span.start;
+    if (out_len) *out_len = name_len;
+    return name;
+}
+
 static uint32_t generator_emit_binop_instruction(struct generator* generator,
                                                  enum binary_op binop,
                                                  uint32_t lhs_register_index,
@@ -253,262 +262,317 @@ static void generator_emit_mov_instruction(struct generator* generator,
 }
 
 static void generator_emit_jump_instruction(struct generator* generator,
-                                            uint32_t target_block_id) {
+                                            uint32_t target_block_id,
+                                            struct span span) {
     struct instruction instr = {
         .opcode = OPCODE_JUMP,
     };
     instr.jmp.target_offset = target_block_id;
-    arrput(generator->blocks[generator->current_block_id].instructions, instr);
+    arrput(GET_CURRENT_BLOCK.instructions, instr);
+    arrput(GET_CURRENT_BLOCK.instructions_spans, span);
 }
 
 static uint32_t generate_expr(struct generator* generator,
                               struct ast_node* expr);
 
+static inline void emit_instruction(struct generator* generator,
+                                    struct instruction instr,
+                                    struct span span) {
+    arrput(GET_CURRENT_BLOCK.instructions_spans, span);
+    arrput(GET_CURRENT_BLOCK.instructions, instr);
+}
+
+static inline uint32_t generate_simple_load(struct generator* generator,
+                                            enum opcode op, struct span span) {
+    const uint32_t dst_reg = generator_allocate_register(generator);
+    struct instruction instr = {.opcode = op, .destination_reg = dst_reg};
+    emit_instruction(generator, instr, span);
+    return dst_reg;
+}
+
+static inline uint32_t generate_constant_load(struct generator* generator,
+                                              size_t const_index,
+                                              struct span span) {
+    arrput(GET_CURRENT_BLOCK.instructions_spans, span);
+    return generator_emit_load_constant(generator, const_index);
+}
+
+static inline uint32_t generate_int_expr(struct generator* generator,
+                                         struct ast_node* expr) {
+    size_t const_index =
+        generator_add_int_contant(generator, expr->data.int_val);
+    return generate_constant_load(generator, const_index, expr->span);
+}
+
+static inline uint32_t generate_bool_expr(struct generator* generator,
+                                          struct ast_node* expr) {
+    enum opcode op = expr->data.int_val ? OPCODE_LOAD_TRUE : OPCODE_LOAD_FALSE;
+    return generate_simple_load(generator, op, expr->span);
+}
+
+static inline uint32_t generate_str_expr(struct generator* generator,
+                                         struct ast_node* expr) {
+    size_t const_index =
+        generator_add_str_contant(generator, expr->data.id, &expr->span);
+    return generate_constant_load(generator, const_index, expr->span);
+}
+
+static inline uint32_t generate_array_expr(struct generator* generator,
+                                           struct ast_node* expr) {
+    uint32_t dst_reg = generator_allocate_register(generator);
+
+    struct instruction new_array_instr = {.opcode = OPCODE_NEW_ARRAY,
+                                          .destination_reg = dst_reg};
+    emit_instruction(generator, new_array_instr, expr->span);
+
+    for (uint32_t i = 0; i < arrlen(expr->data.list); i++) {
+        struct ast_node* element = expr->data.list[i];
+        struct instruction append_instr = {
+            .opcode = OPCODE_ARRAY_APPEND,
+            .pair.fst = dst_reg,
+            .pair.snd = generate_expr(generator, element)};
+        emit_instruction(generator, append_instr, element->span);
+    }
+
+    return dst_reg;
+}
+
+static inline uint32_t generate_identifier_expr(struct generator* generator,
+                                                struct ast_node* expr) {
+    uint32_t name_len;
+    char* name = extract_name_and_len(generator, expr, &name_len);
+
+    struct variable* var;
+    if (!find_variable(generator, name, name_len, &var)) {
+        // TODO: raise error for undeclared variables or default to load global
+        // by name.
+        return 0;
+    }
+
+    // Local and parameter variables are accessed directly
+    if (var->scope == SCOPE_LOCAL || var->scope == SCOPE_PARAM) {
+        return var->allocated_reg;
+    }
+
+    // Global variables require a load instruction
+    uint32_t dst_reg = generator_allocate_register(generator);
+    struct instruction instr = {.opcode = OPCODE_LOAD_GLOBAL_BY_INDEX,
+                                .mov.dest_reg = dst_reg,
+                                .mov.src_reg = var->allocated_reg};
+    emit_instruction(generator, instr, expr->span);
+    return dst_reg;
+}
+
+static inline uint32_t generate_unop_expr(struct generator* generator,
+                                          struct ast_node* expr) {
+    uint32_t dst_reg = generate_expr(generator, expr->data.unop.argument);
+    struct instruction instr = {.opcode = unop_to_opcode[expr->data.unop.op],
+                                .destination_reg = dst_reg};
+    emit_instruction(generator, instr, expr->span);
+    return dst_reg;
+}
+
+static inline uint32_t generate_logical_binop(struct generator* generator,
+                                              struct ast_node* expr) {
+    uint32_t lhs = generate_expr(generator, expr->data.binop.lhs);
+    uint32_t dst = generator_allocate_register(generator);
+    const size_t rhs_block = generator_basic_block_new(generator);
+    const size_t end_block = generator_basic_block_new(generator);
+
+    generator_emit_mov_instruction(generator, dst, lhs);
+    arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
+
+    struct instruction branch_instr = {.opcode = OPCODE_JMP_IF,
+                                       .jmp_if.condition_reg = lhs,
+                                       .jmp_if.true_block_id = rhs_block,
+                                       .jmp_if.false_block_id = end_block};
+
+    if (expr->data.binop.op == OP_LOR) {
+        branch_instr.jmp_if.true_block_id = end_block;
+        branch_instr.jmp_if.false_block_id = rhs_block;
+    }
+
+    emit_instruction(generator, branch_instr, expr->span);
+
+    generator_switch_basic_block(generator, rhs_block);
+    uint32_t rhs = generate_expr(generator, expr->data.binop.rhs);
+    generator_emit_mov_instruction(generator, dst, rhs);
+    arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
+    generator_emit_jump_instruction(generator, end_block, expr->span);
+    arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
+
+    generator_switch_basic_block(generator, end_block);
+    return dst;
+}
+
+static inline uint32_t generate_binop(struct generator* generator,
+                                      struct ast_node* expr) {
+    if (expr->data.binop.op < OP_LAND) {
+        uint32_t lhs = generate_expr(generator, expr->data.binop.lhs);
+        uint32_t rhs = generate_expr(generator, expr->data.binop.rhs);
+        arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
+        return generator_emit_binop_instruction(generator, expr->data.binop.op,
+                                                lhs, rhs);
+    }
+    return generate_logical_binop(generator, expr);
+}
+
+static inline void generate_simple_assign(struct generator* generator,
+                                          struct ast_node* lhs,
+                                          uint32_t val_reg, struct span span) {
+    uint32_t name_len;
+    char* name = extract_name_and_len(generator, lhs, &name_len);
+
+    struct variable* var;
+    if (!find_variable(generator, name, name_len, &var)) {
+        // TODO: raise error for undeclared variables
+        // default to global load
+        return;
+    }
+
+    struct instruction instr = {.opcode = (var->scope == SCOPE_GLOBAL)
+                                              ? OPCODE_STORE_GLOBAL_BY_INDEX
+                                              : OPCODE_MOV,
+                                .mov.dest_reg = var->allocated_reg,
+                                .mov.src_reg = val_reg};
+    emit_instruction(generator, instr, span);
+}
+
+static inline void generate_subscript_assign(struct generator* generator,
+                                             struct ast_node* lhs,
+                                             uint32_t val_reg,
+                                             struct span span) {
+    struct instruction instr = {
+        .opcode = OPCODE_STORE_SUBSCR,
+        .binary_op.left_reg = generate_expr(generator, lhs->data.pair.fst),
+        .binary_op.right_reg = generate_expr(generator, lhs->data.pair.snd),
+        .binary_op.result_reg = val_reg};
+    emit_instruction(generator, instr, span);
+}
+
+static inline uint32_t generate_assign_expr(struct generator* generator,
+                                            struct ast_node* expr) {
+    uint32_t val_reg = generate_expr(generator, expr->data.binop.rhs);
+
+    switch (expr->data.binop.lhs->kind) {
+        case AST_NODE_IDENTIFIER: {
+            generate_simple_assign(generator, expr->data.binop.lhs, val_reg,
+                                   expr->span);
+            break;
+        }
+        case AST_NODE_COMPUTED_MEMBER_EXPR: {
+            generate_subscript_assign(generator, expr->data.binop.lhs, val_reg,
+                                      expr->span);
+            break;
+        }
+
+        default:
+            // TODO: raise invalid target assignment error
+            break;
+    }
+
+    return val_reg;
+}
+
+// Load function by name for call expression
+static inline uint32_t load_callee_by_name(struct generator* generator,
+                                           struct ast_node* callee) {
+    uint32_t name_len;
+    char* name = extract_name_and_len(generator, callee, &name_len);
+
+    char* name_copy = malloc(name_len + 1);
+    memcpy(name_copy, name, name_len);
+    name_copy[name_len] = '\0';
+
+    struct lu_string* name_string =
+        lu_intern_string(generator->state, name_copy);
+    uint32_t name_index = generator_add_identifier(generator, name_string);
+
+    struct instruction instr = {
+        .opcode = OPCODE_LOAD_GLOBAL_BY_NAME,
+        .pair.fst = name_index,
+        .pair.snd = generator_allocate_register(generator)};
+    emit_instruction(generator, instr, callee->span);
+    return instr.pair.snd;
+}
+
+static inline uint32_t generate_call_expr(struct generator* generator,
+                                          struct ast_node* expr) {
+    //
+    struct instruction call_instr;
+    call_instr.opcode = OPCODE_CALL;
+    call_instr.call.argc = expr->data.call.argc;
+    call_instr.call.args_reg = nullptr;
+
+    switch (expr->data.call.callee->kind) {
+        case AST_NODE_IDENTIFIER: {
+            call_instr.call.callee_reg =
+                load_callee_by_name(generator, expr->data.call.callee);
+            break;
+        }
+        default: {
+            // TODO: raise uncallable expression error.
+        }
+    }
+
+    for (uint8_t i = 0; i < expr->data.call.argc; ++i) {
+        uint32_t arg_reg = generate_expr(generator, expr->data.call.args[i]);
+        arrput(call_instr.call.args_reg, arg_reg);
+    }
+
+    call_instr.call.ret_reg = generator_allocate_register(generator);
+
+    emit_instruction(generator, call_instr, expr->span);
+    return call_instr.call.ret_reg;
+}
+
+static inline uint32_t generate_subscript_expr(struct generator* generator,
+                                               struct ast_node* expr) {
+    struct instruction instr = {
+        .opcode = OPCODE_LOAD_SUBSCR,
+        .binary_op.result_reg = generator_allocate_register(generator),
+        .binary_op.left_reg = generate_expr(generator, expr->data.pair.fst),
+        .binary_op.right_reg = generate_expr(generator, expr->data.pair.snd)};
+    emit_instruction(generator, instr, expr->span);
+    return instr.binary_op.result_reg;
+}
+
 static uint32_t generate_expr(struct generator* generator,
                               struct ast_node* expr) {
     switch (expr->kind) {
         case AST_NODE_INT: {
-            size_t const_index =
-                generator_add_int_contant(generator, expr->data.int_val);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-            return generator_emit_load_constant(generator, const_index);
+            return generate_int_expr(generator, expr);
         }
         case AST_NODE_NONE: {
-            const uint32_t dst_reg = generator_allocate_register(generator);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-            struct instruction instr = {
-                .opcode = OPCODE_LOAD_NONE,
-            };
-            instr.destination_reg = dst_reg;
-            arrput(GET_CURRENT_BLOCK.instructions, instr);
-            return dst_reg;
+            return generate_simple_load(generator, OPCODE_LOAD_NONE,
+                                        expr->span);
         }
         case AST_NODE_BOOL: {
-            const uint32_t dst_reg = generator_allocate_register(generator);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-            struct instruction instr = {
-                .opcode =
-                    expr->data.int_val ? OPCODE_LOAD_TRUE : OPCODE_LOAD_FALSE,
-            };
-            instr.destination_reg = dst_reg;
-            arrput(GET_CURRENT_BLOCK.instructions, instr);
-            return dst_reg;
+            return generate_bool_expr(generator, expr);
         }
         case AST_NODE_STR: {
-            size_t const_index = generator_add_str_contant(
-                generator, expr->data.id, &expr->span);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-            return generator_emit_load_constant(generator, const_index);
+            return generate_str_expr(generator, expr);
         }
         case AST_NODE_ARRAY_EXPR: {
-            uint32_t dst_reg = generator_allocate_register(generator);
-
-            struct instruction instr;
-            instr.opcode = OPCODE_NEW_ARRAY;
-            instr.destination_reg = dst_reg;
-
-            arrput(GET_CURRENT_BLOCK.instructions, instr);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-
-            for (uint32_t i = 0; i < arrlen(expr->data.list); i++) {
-                struct instruction instr;
-                instr.opcode = OPCODE_ARRAY_APPEND;
-                instr.pair.fst = dst_reg;
-                instr.pair.snd = generate_expr(generator, expr->data.list[i]);
-
-                arrput(GET_CURRENT_BLOCK.instructions, instr);
-                arrput(GET_CURRENT_BLOCK.instructions_spans,
-                       expr->data.list[i]->span);
-            }
-
-            return dst_reg;
+            return generate_array_expr(generator, expr);
         }
         case AST_NODE_IDENTIFIER: {
-            char* name = generator->program.source + expr->span.start;
-            uint32_t name_len = expr->span.end - expr->span.start;
-            struct variable* var;
-            if (!find_variable(generator, name, name_len, &var)) {
-                // raise error for undeclared variables
-            }
-            if (var->scope == SCOPE_LOCAL || var->scope == SCOPE_PARAM) {
-                return var->allocated_reg;
-            }
-            uint32_t dst_reg = generator_allocate_register(generator);
-            struct instruction instr = {
-                .opcode = OPCODE_LOAD_GLOBAL_BY_INDEX,
-            };
-
-            instr.mov.dest_reg = dst_reg;
-            instr.mov.src_reg = var->allocated_reg;
-
-            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-            arrput(GET_CURRENT_BLOCK.instructions, instr);
-            return dst_reg;
+            return generate_identifier_expr(generator, expr);
         }
         case AST_NODE_UNOP: {
-            uint32_t dst_reg =
-                generate_expr(generator, expr->data.unop.argument);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-            struct instruction instr = {
-                .opcode = unop_to_opcode[expr->data.unop.op],
-            };
-            instr.destination_reg = dst_reg;
-            arrput(GET_CURRENT_BLOCK.instructions, instr);
-            return dst_reg;
+            return generate_unop_expr(generator, expr);
         }
         case AST_NODE_BINOP: {
-            if (expr->data.binop.op < OP_LAND) {
-                uint32_t lhs = generate_expr(generator, expr->data.binop.lhs);
-                uint32_t rhs = generate_expr(generator, expr->data.binop.rhs);
-                arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-                return generator_emit_binop_instruction(
-                    generator, expr->data.binop.op, lhs, rhs);
-            }
-            uint32_t lhs = generate_expr(generator, expr->data.binop.lhs);
-            uint32_t dst = generator_allocate_register(generator);
-            const size_t rhs_block = generator_basic_block_new(generator);
-            const size_t end_block = generator_basic_block_new(generator);
-
-            generator_emit_mov_instruction(generator, dst, lhs);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-
-            struct instruction branch_instr = {
-                .opcode = OPCODE_JMP_IF,
-            };
-
-            branch_instr.jmp_if.condition_reg = lhs;
-            branch_instr.jmp_if.true_block_id = rhs_block;
-            branch_instr.jmp_if.false_block_id = end_block;
-
-            if (expr->data.binop.op == OP_LOR) {
-                branch_instr.jmp_if.true_block_id = end_block;
-                branch_instr.jmp_if.false_block_id = rhs_block;
-            }
-
-            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-            arrput(GET_CURRENT_BLOCK.instructions, branch_instr);
-            generator_switch_basic_block(generator, rhs_block);
-
-            uint32_t rhs = generate_expr(generator, expr->data.binop.rhs);
-            generator_emit_mov_instruction(generator, dst, rhs);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-            generator_emit_jump_instruction(generator, end_block);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-            generator_switch_basic_block(generator, end_block);
-            return dst;
+            return generate_binop(generator, expr);
         }
         case AST_NODE_ASSIGN: {
-            uint32_t val_reg = generate_expr(generator, expr->data.binop.rhs);
-            switch (expr->data.binop.lhs->kind) {
-                case AST_NODE_IDENTIFIER: {
-                    char* name = generator->program.source +
-                                 expr->data.binop.lhs->span.start;
-                    uint32_t name_len = expr->data.binop.lhs->span.end -
-                                        expr->data.binop.lhs->span.start;
-                    struct variable* var;
-                    if (!find_variable(generator, name, name_len, &var)) {
-                        // TODO: raise error for undeclared variables
-                    }
-
-                    struct instruction instr;
-                    instr.opcode = var->scope == SCOPE_GLOBAL
-                                       ? OPCODE_STORE_GLOBAL_BY_INDEX
-                                       : OPCODE_MOV;
-                    instr.mov.dest_reg = var->allocated_reg;
-                    instr.mov.src_reg = val_reg;
-
-                    arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-                    arrput(GET_CURRENT_BLOCK.instructions, instr);
-                    break;
-                }
-                case AST_NODE_COMPUTED_MEMBER_EXPR: {
-                    struct instruction instr;
-                    instr.opcode = OPCODE_STORE_SUBSCR;
-                    instr.binary_op.left_reg = generate_expr(
-                        generator, expr->data.binop.lhs->data.pair.fst);
-                    instr.binary_op.right_reg = generate_expr(
-                        generator, expr->data.binop.lhs->data.pair.snd);
-                    instr.binary_op.result_reg = val_reg;
-
-                    arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-                    arrput(GET_CURRENT_BLOCK.instructions, instr);
-                    break;
-                }
-                default: {
-                    // TODO: raise invalid target assignment error
-                    break;
-                }
-            }
-
-            return val_reg;
+            return generate_assign_expr(generator, expr);
         }
         case AST_NODE_CALL: {
-            struct instruction call_instr;
-            call_instr.opcode = OPCODE_CALL;
-            call_instr.call.argc = expr->data.call.argc;
-            call_instr.call.args_reg = nullptr;
-
-            switch (expr->data.call.callee->kind) {
-                case AST_NODE_IDENTIFIER: {
-                    char* name = generator->program.source +
-                                 expr->data.call.callee->span.start;
-                    uint32_t name_len = expr->data.call.callee->span.end -
-                                        expr->data.call.callee->span.start;
-
-                    char* name_copy = malloc(name_len + 1);
-                    memcpy(name_copy, name, name_len);
-                    name_copy[name_len] = '\0';
-
-                    struct lu_string* name_string =
-                        lu_intern_string(generator->state, name_copy);
-
-                    uint32_t name_index =
-                        generator_add_identifier(generator, name_string);
-
-                    struct instruction calle_instr;
-                    calle_instr.opcode = OPCODE_LOAD_GLOBAL_BY_NAME;
-                    calle_instr.pair.fst = name_index;
-                    calle_instr.pair.snd =
-                        generator_allocate_register(generator);
-                    arrput(GET_CURRENT_BLOCK.instructions, calle_instr);
-                    arrput(GET_CURRENT_BLOCK.instructions_spans,
-                           expr->data.call.callee->span);
-                    call_instr.call.callee_reg = calle_instr.pair.snd;
-                    break;
-                }
-                default: {
-                    // TODO: raise uncallable expression error
-                    break;
-                }
-            }
-
-            for (uint8_t i = 0; i < expr->data.call.argc; ++i) {
-                uint32_t arg_reg =
-                    generate_expr(generator, expr->data.call.args[i]);
-                arrput(call_instr.call.args_reg, arg_reg);
-            }
-
-            call_instr.call.ret_reg = generator_allocate_register(generator);
-
-            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-            arrput(GET_CURRENT_BLOCK.instructions, call_instr);
-
-            return call_instr.call.ret_reg;
+            return generate_call_expr(generator, expr);
         }
         case AST_NODE_COMPUTED_MEMBER_EXPR: {
-            struct instruction instr;
-            instr.opcode = OPCODE_LOAD_SUBSCR;
-            instr.binary_op.result_reg = generator_allocate_register(generator);
-
-            instr.binary_op.left_reg =
-                generate_expr(generator, expr->data.pair.fst);
-            instr.binary_op.right_reg =
-                generate_expr(generator, expr->data.pair.snd);
-
-            arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
-            arrput(GET_CURRENT_BLOCK.instructions, instr);
-
-            return instr.binary_op.result_reg;
+            return generate_subscript_expr(generator, expr);
         }
         default: {
             return 0;
@@ -516,7 +580,7 @@ static uint32_t generate_expr(struct generator* generator,
     }
 }
 
-static void begin_scope(struct generator* generator) {
+static inline void begin_scope(struct generator* generator) {
     generator->scope_depth++;
 }
 
@@ -540,57 +604,269 @@ static void end_scope(struct generator* generator) {
 
 static void generate_stmts(struct generator* generator,
                            struct ast_node** stmts);
+static void generate_stmt(struct generator* generator, struct ast_node* stmt);
+
+static inline void generate_let_decl(struct generator* generator,
+                                     struct ast_node* stmt) {
+    uint32_t value = generate_expr(generator, stmt->data.let_decl.value);
+    struct variable* var;
+
+    char* name =
+        generator->program.source + stmt->data.let_decl.name_span.start;
+    uint32_t name_len =
+        stmt->data.let_decl.name_span.end - stmt->data.let_decl.name_span.start;
+    declare_variable(generator, name, name_len, &var);
+
+    struct instruction store_instr = {
+        .opcode = var->scope == SCOPE_GLOBAL ? OPCODE_STORE_GLOBAL_BY_INDEX
+                                             : OPCODE_MOV,
+    };
+    store_instr.mov.dest_reg = var->allocated_reg;
+    store_instr.mov.src_reg = value;
+
+    emit_instruction(generator, store_instr, stmt->span);
+}
+
+static inline void generate_return_stmt(struct generator* generator,
+                                        struct ast_node* stmt) {
+    uint32_t value = generate_expr(generator, stmt->data.node);
+    struct instruction instr = {.opcode = OPCODE_RET, .destination_reg = value};
+    emit_instruction(generator, instr, stmt->span);
+}
+
+static inline void generate_break_stmt(struct generator* generator,
+                                       struct ast_node* stmt) {
+    generator_emit_jump_instruction(
+        generator,
+        generator->loop_stack[arrlen(generator->loop_stack) - 1].end_block_id,
+        stmt->span);
+    arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+}
+
+static inline void generate_continue_stmt(struct generator* generator,
+                                          struct ast_node* stmt) {
+    generator_emit_jump_instruction(
+        generator,
+        generator->loop_stack[arrlen(generator->loop_stack) - 1].start_block_id,
+        stmt->span);
+    arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+}
+
+static inline void generate_if_stmt(struct generator* generator,
+                                    struct ast_node* stmt) {
+    uint32_t true_block = generator_basic_block_new(generator);
+    uint32_t false_block = generator_basic_block_new(generator);
+    uint32_t end_block = stmt->data.if_stmt.alternate
+                             ? generator_basic_block_new(generator)
+                             : false_block;
+    uint32_t condition = generate_expr(generator, stmt->data.if_stmt.test);
+
+    struct instruction branch_instr = {
+        .opcode = OPCODE_JMP_IF,
+    };
+    branch_instr.jmp_if.condition_reg = condition;
+    branch_instr.jmp_if.true_block_id = true_block;
+    branch_instr.jmp_if.false_block_id = false_block;
+
+    emit_instruction(generator, branch_instr, stmt->span);
+
+    generator_switch_basic_block(generator, true_block);
+    generate_stmt(generator, stmt->data.if_stmt.consequent);
+
+    generator_emit_jump_instruction(generator, end_block, stmt->span);
+
+    if (stmt->data.if_stmt.alternate) {
+        generator_switch_basic_block(generator, false_block);
+        generate_stmt(generator, stmt->data.if_stmt.alternate);
+        generator_emit_jump_instruction(generator, end_block, stmt->span);
+    }
+
+    generator_switch_basic_block(generator, end_block);
+}
+
+static inline void generate_loop_stmt(struct generator* generator,
+                                      struct ast_node* stmt) {
+    uint32_t start_block = generator_basic_block_new(generator);
+    uint32_t end_block = generator_basic_block_new(generator);
+
+    generator_emit_jump_instruction(generator, start_block, stmt->span);
+    struct loop loop = {.start_block_id = start_block,
+                        .end_block_id = end_block};
+    arrput(generator->loop_stack, loop);
+    generator_switch_basic_block(generator, start_block);
+    generate_stmt(generator, stmt->data.node);
+
+    generator_emit_jump_instruction(generator, start_block, stmt->span);
+    arrpop(generator->loop_stack);
+    generator_switch_basic_block(generator, end_block);
+}
+
+static inline void generate_while_stmt(struct generator* generator,
+                                       struct ast_node* stmt) {
+    uint32_t test_block = generator_basic_block_new(generator);
+    uint32_t body_block = generator_basic_block_new(generator);
+    uint32_t end_block = generator_basic_block_new(generator);
+
+    struct loop loop = {.start_block_id = test_block,
+                        .end_block_id = end_block};
+    arrput(generator->loop_stack, loop);
+
+    generator_emit_jump_instruction(generator, test_block,
+                                    stmt->data.pair.fst->span);
+
+    generator_switch_basic_block(generator, test_block);
+    uint32_t test = generate_expr(generator, stmt->data.pair.fst);
+
+    struct instruction branch_instr = {
+        .opcode = OPCODE_JMP_IF,
+    };
+    branch_instr.jmp_if.condition_reg = test;
+    branch_instr.jmp_if.true_block_id = body_block;
+    branch_instr.jmp_if.false_block_id = end_block;
+
+    emit_instruction(generator, branch_instr, stmt->span);
+
+    generator_switch_basic_block(generator, body_block);
+    generate_stmt(generator, stmt->data.pair.snd);
+
+    generator_emit_jump_instruction(generator, test_block,
+                                    stmt->data.pair.fst->span);
+
+    arrpop(generator->loop_stack);
+    generator_switch_basic_block(generator, end_block);
+}
+
+static void generate_for_stmt(struct generator* generator,
+                              struct ast_node* stmt) {
+    const struct ast_for_stmt* for_stmt = &stmt->data.for_stmt;
+    uint32_t init_block = generator_basic_block_new(generator);
+    uint32_t test_block = generator_basic_block_new(generator);
+    uint32_t body_block = generator_basic_block_new(generator);
+    uint32_t update_block = generator_basic_block_new(generator);
+    uint32_t end_block = generator_basic_block_new(generator);
+
+    struct loop loop = {.start_block_id = update_block,
+                        .end_block_id = end_block};
+    arrput(generator->loop_stack, loop);
+
+    generator_emit_jump_instruction(generator, init_block,
+                                    for_stmt->init->span);
+
+    begin_scope(generator);
+    generator_switch_basic_block(generator, init_block);
+
+    generate_stmt(generator, for_stmt->init);
+    generator_emit_jump_instruction(generator, test_block,
+                                    for_stmt->test->span);
+
+    generator_switch_basic_block(generator, test_block);
+    uint32_t test = generate_expr(generator, for_stmt->test);
+
+    struct instruction branch_instr = {
+        .opcode = OPCODE_JMP_IF,
+    };
+    branch_instr.jmp_if.condition_reg = test;
+    branch_instr.jmp_if.true_block_id = body_block;
+    branch_instr.jmp_if.false_block_id = end_block;
+
+    emit_instruction(generator, branch_instr, for_stmt->test->span);
+
+    generator_switch_basic_block(generator, body_block);
+    generate_stmt(generator, for_stmt->body);
+
+    generator_emit_jump_instruction(generator, update_block,
+                                    for_stmt->test->span);
+
+    generator_switch_basic_block(generator, update_block);
+    generate_expr(generator, for_stmt->update);
+
+    generator_emit_jump_instruction(generator, test_block,
+                                    for_stmt->test->span);
+
+    arrpop(generator->loop_stack);
+    end_scope(generator);
+    generator_switch_basic_block(generator, end_block);
+}
+
+static inline void generate_fn_decl(struct generator* generator,
+                                    struct ast_node* stmt) {
+    struct generator* fn_generator = malloc(sizeof(struct generator));
+
+    generator_init(fn_generator, generator->program);
+    fn_generator->state = generator->state;
+    fn_generator->state->ir_generator = fn_generator;
+    fn_generator->prev = generator;
+    fn_generator->global_variables = generator->global_variables;
+    fn_generator->global_variable_count = generator->global_variable_count;
+    fn_generator->scope_depth = 1;
+
+    generator = fn_generator;
+    uint32_t fn_entry_block = generator_basic_block_new(generator);
+
+    const size_t num_params = arrlen(stmt->data.fn_decl.params);
+    for (size_t i = 0; i < num_params; ++i) {
+        struct ast_node* param = stmt->data.fn_decl.params[i];
+        const char* param_name = generator->program.source + param->span.start;
+        uint32_t param_name_len = param->span.end - param->span.start;
+        declare_param(generator, param_name, param_name_len);
+    }
+
+    generator_switch_basic_block(generator, fn_entry_block);
+    generate_stmt(generator, stmt->data.fn_decl.body);
+    struct executable* fn_executable = generator_make_executable(generator);
+
+    generator = generator->prev;
+    generator->global_variable_count = fn_generator->global_variable_count;
+    uint32_t executable_index =
+        generator_add_executable_contant(generator, fn_executable);
+
+    char* name = generator->program.source + stmt->data.fn_decl.name_span.start;
+    uint32_t name_len =
+        stmt->data.fn_decl.name_span.end - stmt->data.fn_decl.name_span.start;
+    char* name_copy = malloc(name_len + 1);
+    memcpy(name_copy, name, name_len);
+    name_copy[name_len] = '\0';
+
+    struct lu_string* name_string =
+        lu_intern_string(generator->state, name_copy);
+
+    uint32_t name_index = generator_add_identifier(generator, name_string);
+
+    struct instruction make_fn_instr;
+    make_fn_instr.opcode = OPCODE_MAKE_FUNCTION;
+    make_fn_instr.binary_op.result_reg = generator_allocate_register(generator);
+    make_fn_instr.binary_op.left_reg = executable_index;
+    make_fn_instr.binary_op.right_reg = name_index;
+
+    emit_instruction(generator, make_fn_instr, stmt->span);
+
+    struct instruction store_func_instr;
+    store_func_instr.opcode = OPCODE_STORE_GLOBAL_BY_NAME;
+    store_func_instr.pair.fst = make_fn_instr.binary_op.result_reg;
+    store_func_instr.pair.snd = name_index;
+
+    emit_instruction(generator, store_func_instr, stmt->span);
+
+    free(name_copy);
+}
 
 static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
     switch (stmt->kind) {
         case AST_NODE_LET_DECL: {
-            uint32_t value =
-                generate_expr(generator, stmt->data.let_decl.value);
-            struct variable* var;
-            char* name =
-                generator->program.source + stmt->data.let_decl.name_span.start;
-            uint32_t name_len = stmt->data.let_decl.name_span.end -
-                                stmt->data.let_decl.name_span.start;
-            declare_variable(generator, name, name_len, &var);
-
-            struct instruction store_instr = {
-                .opcode = var->scope == SCOPE_GLOBAL
-                              ? OPCODE_STORE_GLOBAL_BY_INDEX
-                              : OPCODE_MOV,
-            };
-            store_instr.mov.dest_reg = var->allocated_reg;
-            store_instr.mov.src_reg = value;
-            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
-            arrput(GET_CURRENT_BLOCK.instructions, store_instr);
-            break;
+            return generate_let_decl(generator, stmt);
         }
         case AST_NODE_RETURN: {
-            uint32_t value = generate_expr(generator, stmt->data.node);
-            struct instruction instr = {.opcode = OPCODE_RET};
-            instr.destination_reg = value;
-            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
-            arrput(GET_CURRENT_BLOCK.instructions, instr);
-            break;
+            return generate_return_stmt(generator, stmt);
         }
         case AST_NODE_EXPR_STMT: {
             generate_expr(generator, stmt->data.node);
             break;
         }
         case AST_NODE_BREAK_STMT: {
-            generator_emit_jump_instruction(
-                generator,
-                generator->loop_stack[arrlen(generator->loop_stack) - 1]
-                    .end_block_id);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
-            break;
+            return generate_break_stmt(generator, stmt);
         }
         case AST_NODE_CONTINUE_STMT: {
-            generator_emit_jump_instruction(
-                generator,
-                generator->loop_stack[arrlen(generator->loop_stack) - 1]
-                    .start_block_id);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
-            break;
+            return generate_continue_stmt(generator, stmt);
         }
         case AST_NODE_BLOCK: {
             begin_scope(generator);
@@ -599,216 +875,19 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
             break;
         }
         case AST_NODE_IF_STMT: {
-            uint32_t true_block = generator_basic_block_new(generator);
-            uint32_t false_block = generator_basic_block_new(generator);
-            uint32_t end_block = stmt->data.if_stmt.alternate
-                                     ? generator_basic_block_new(generator)
-                                     : false_block;
-            uint32_t condition =
-                generate_expr(generator, stmt->data.if_stmt.test);
-
-            struct instruction branch_instr = {
-                .opcode = OPCODE_JMP_IF,
-            };
-            branch_instr.jmp_if.condition_reg = condition;
-            branch_instr.jmp_if.true_block_id = true_block;
-            branch_instr.jmp_if.false_block_id = false_block;
-
-            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
-            arrput(GET_CURRENT_BLOCK.instructions, branch_instr);
-
-            generator_switch_basic_block(generator, true_block);
-            generate_stmt(generator, stmt->data.if_stmt.consequent);
-
-            generator_emit_jump_instruction(generator, end_block);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
-
-            if (stmt->data.if_stmt.alternate) {
-                generator_switch_basic_block(generator, false_block);
-                generate_stmt(generator, stmt->data.if_stmt.alternate);
-                generator_emit_jump_instruction(generator, end_block);
-                arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
-            }
-
-            generator_switch_basic_block(generator, end_block);
-            break;
+            return generate_if_stmt(generator, stmt);
         }
         case AST_NODE_LOOP_STMT: {
-            uint32_t start_block = generator_basic_block_new(generator);
-            uint32_t end_block = generator_basic_block_new(generator);
-
-            generator_emit_jump_instruction(generator, start_block);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
-            struct loop loop = {.start_block_id = start_block,
-                                .end_block_id = end_block};
-            arrput(generator->loop_stack, loop);
-            generator_switch_basic_block(generator, start_block);
-            generate_stmt(generator, stmt->data.node);
-
-            generator_emit_jump_instruction(generator, start_block);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
-            arrpop(generator->loop_stack);
-            generator_switch_basic_block(generator, end_block);
-            break;
+            return generate_loop_stmt(generator, stmt);
         }
         case AST_NODE_WHILE_STMT: {
-            uint32_t test_block = generator_basic_block_new(generator);
-            uint32_t body_block = generator_basic_block_new(generator);
-            uint32_t end_block = generator_basic_block_new(generator);
-
-            struct loop loop = {.start_block_id = test_block,
-                                .end_block_id = end_block};
-            arrput(generator->loop_stack, loop);
-
-            generator_emit_jump_instruction(generator, test_block);
-            arrput(GET_CURRENT_BLOCK.instructions_spans,
-                   stmt->data.pair.fst->span);
-
-            generator_switch_basic_block(generator, test_block);
-            uint32_t test = generate_expr(generator, stmt->data.pair.fst);
-
-            struct instruction branch_instr = {
-                .opcode = OPCODE_JMP_IF,
-            };
-            branch_instr.jmp_if.condition_reg = test;
-            branch_instr.jmp_if.true_block_id = body_block;
-            branch_instr.jmp_if.false_block_id = end_block;
-
-            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
-            arrput(GET_CURRENT_BLOCK.instructions, branch_instr);
-
-            generator_switch_basic_block(generator, body_block);
-            generate_stmt(generator, stmt->data.pair.snd);
-
-            generator_emit_jump_instruction(generator, test_block);
-            arrput(GET_CURRENT_BLOCK.instructions_spans,
-                   stmt->data.pair.fst->span);
-
-            arrpop(generator->loop_stack);
-            generator_switch_basic_block(generator, end_block);
-            break;
+            return generate_while_stmt(generator, stmt);
         }
         case AST_NODE_FOR_STMT: {
-            const struct ast_for_stmt* for_stmt = &stmt->data.for_stmt;
-            uint32_t init_block = generator_basic_block_new(generator);
-            uint32_t test_block = generator_basic_block_new(generator);
-            uint32_t body_block = generator_basic_block_new(generator);
-            uint32_t update_block = generator_basic_block_new(generator);
-            uint32_t end_block = generator_basic_block_new(generator);
-
-            struct loop loop = {.start_block_id = update_block,
-                                .end_block_id = end_block};
-            arrput(generator->loop_stack, loop);
-
-            generator_emit_jump_instruction(generator, init_block);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, for_stmt->init->span);
-
-            begin_scope(generator);
-            generator_switch_basic_block(generator, init_block);
-
-            generate_stmt(generator, for_stmt->init);
-            generator_emit_jump_instruction(generator, test_block);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, for_stmt->test->span);
-
-            generator_switch_basic_block(generator, test_block);
-            uint32_t test = generate_expr(generator, for_stmt->test);
-
-            struct instruction branch_instr = {
-                .opcode = OPCODE_JMP_IF,
-            };
-            branch_instr.jmp_if.condition_reg = test;
-            branch_instr.jmp_if.true_block_id = body_block;
-            branch_instr.jmp_if.false_block_id = end_block;
-
-            arrput(GET_CURRENT_BLOCK.instructions_spans, for_stmt->test->span);
-            arrput(GET_CURRENT_BLOCK.instructions, branch_instr);
-
-            generator_switch_basic_block(generator, body_block);
-            generate_stmt(generator, for_stmt->body);
-
-            generator_emit_jump_instruction(generator, update_block);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, for_stmt->test->span);
-
-            generator_switch_basic_block(generator, update_block);
-            generate_expr(generator, for_stmt->update);
-
-            generator_emit_jump_instruction(generator, test_block);
-            arrput(GET_CURRENT_BLOCK.instructions_spans, for_stmt->test->span);
-
-            arrpop(generator->loop_stack);
-            end_scope(generator);
-            generator_switch_basic_block(generator, end_block);
-            break;
+            return generate_for_stmt(generator, stmt);
         }
         case AST_NODE_FN_DECL: {
-            struct generator* fn_generator = malloc(sizeof(struct generator));
-
-            generator_init(fn_generator, generator->program);
-            fn_generator->state = generator->state;
-            fn_generator->state->ir_generator = fn_generator;
-            fn_generator->prev = generator;
-            fn_generator->global_variables = generator->global_variables;
-            fn_generator->global_variable_count =
-                generator->global_variable_count;
-            fn_generator->scope_depth = 1;
-
-            generator = fn_generator;
-            uint32_t fn_entry_block = generator_basic_block_new(generator);
-
-            const size_t num_params = arrlen(stmt->data.fn_decl.params);
-            for (size_t i = 0; i < num_params; ++i) {
-                struct ast_node* param = stmt->data.fn_decl.params[i];
-                const char* param_name =
-                    generator->program.source + param->span.start;
-                uint32_t param_name_len = param->span.end - param->span.start;
-                declare_param(generator, param_name, param_name_len);
-            }
-
-            generator_switch_basic_block(generator, fn_entry_block);
-            generate_stmt(generator, stmt->data.fn_decl.body);
-            struct executable* fn_executable =
-                generator_make_executable(generator);
-
-            generator = generator->prev;
-            generator->global_variable_count =
-                fn_generator->global_variable_count;
-            uint32_t executable_index =
-                generator_add_executable_contant(generator, fn_executable);
-
-            char* name =
-                generator->program.source + stmt->data.fn_decl.name_span.start;
-            uint32_t name_len = stmt->data.fn_decl.name_span.end -
-                                stmt->data.fn_decl.name_span.start;
-            char* name_copy = malloc(name_len + 1);
-            memcpy(name_copy, name, name_len);
-            name_copy[name_len] = '\0';
-
-            struct lu_string* name_string =
-                lu_intern_string(generator->state, name_copy);
-
-            uint32_t name_index =
-                generator_add_identifier(generator, name_string);
-
-            struct instruction make_fn_instr;
-            make_fn_instr.opcode = OPCODE_MAKE_FUNCTION;
-            make_fn_instr.binary_op.result_reg =
-                generator_allocate_register(generator);
-            make_fn_instr.binary_op.left_reg = executable_index;
-            make_fn_instr.binary_op.right_reg = name_index;
-
-            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
-            arrput(GET_CURRENT_BLOCK.instructions, make_fn_instr);
-
-            struct instruction store_func_instr;
-            store_func_instr.opcode = OPCODE_STORE_GLOBAL_BY_NAME;
-            store_func_instr.pair.fst = make_fn_instr.binary_op.result_reg;
-            store_func_instr.pair.snd = name_index;
-
-            arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
-            arrput(GET_CURRENT_BLOCK.instructions, store_func_instr);
-
-            free(name_copy);
-            break;
+            return generate_fn_decl(generator, stmt);
         }
         default: {
             break;
@@ -836,130 +915,6 @@ struct executable* generator_generate(struct lu_istate* state,
     generate_stmts(generator, program.nodes);
     return generator_make_executable(generator);
 }
-
-///
-
-struct instruction_array {
-    struct instruction* data;
-    size_t len;
-    size_t cap;
-};
-
-void instruction_array_init(struct instruction_array* arr, size_t cap) {
-    arr->cap = cap;
-    arr->data = malloc(sizeof(struct instruction) * arr->cap);
-    arr->len = 0;
-}
-
-size_t instruction_array_len(struct instruction_array* arr) {
-    return arr ? arr->len : 0;
-}
-
-void instruction_array_put(struct instruction_array* arr,
-                           struct instruction* item) {
-    if (arr->len >= arr->cap) {
-        size_t new_cap = arr->cap * 2;
-        struct instruction* new_data =
-            realloc(arr->data, sizeof(struct instruction) * new_cap);
-        arr->data = new_data;
-        arr->cap = new_cap;
-    }
-
-    arr->data[arr->len++] = *item;
-}
-
-void instruction_array_copy(struct instruction_array* arr,
-                            struct instruction* src, size_t count) {
-    size_t needed = arr->len + count;
-
-    if (needed > arr->cap) {
-        struct instruction* new_data =
-            realloc(arr->data, sizeof(struct instruction) * needed);
-        arr->data = new_data;
-        arr->cap = needed;
-    }
-
-    memcpy(arr->data + arr->len, src, sizeof(struct instruction) * count);
-    arr->len += count;
-}
-
-// static void generator_cfg_linearize(struct generator* generator,
-//                                     struct executable* executable) {
-//     //
-//     size_t* block_start_offsets =
-//         malloc(sizeof(size_t) * generator->block_counter);
-//     size_t offset = 0;
-//     struct basic_block** stack = nullptr;
-//     assert(generator->block_counter > 0);
-//     arrput(stack, &generator->blocks[0]);
-
-//     struct instruction_array inst_arr;
-//     instruction_array_init(&inst_arr,
-//                            arrlen(generator->blocks[0].instructions));
-
-//     while (arrlen(stack) > 0) {
-//         struct basic_block* curr_block = arrpop(stack);
-//         if (curr_block->visited) {
-//             continue;
-//         }
-//         block_start_offsets[curr_block->id] = offset;
-//         curr_block->start_offset = offset;
-//         curr_block->visited = true;
-
-//         instruction_array_copy(&inst_arr, curr_block->instructions,
-//                                arrlen(curr_block->instructions));
-
-//         offset += arrlen(curr_block->instructions);
-//         struct instruction* terminator =
-//             &curr_block->instructions[arrlen(curr_block->instructions) - 1];
-//         assert(terminator->opcode == OPCODE_JMP_IF ||
-//                terminator->opcode == OPCODE_JUMP);
-
-//         if (terminator->opcode == OPCODE_JUMP &&
-//             !generator->blocks[terminator->jmp.target_offset].visited) {
-//             arrput(stack, &generator->blocks[terminator->jmp.target_offset]);
-//         } else {
-//             if
-//             (!generator->blocks[terminator->jmp_if.false_block_id].visited) {
-//                 arrput(stack,
-//                        &generator->blocks[terminator->jmp_if.false_block_id]);
-//             }
-//             if (!generator->blocks[terminator->jmp_if.true_block_id].visited)
-//             {
-//                 arrput(stack,
-//                        &generator->blocks[terminator->jmp_if.true_block_id]);
-//             }
-//         }
-//     }
-
-//     struct instruction* instructions = inst_arr.data;
-
-//     for (size_t i = 0; i < offset; i++) {
-//         struct instruction* instr = &instructions[i];
-//         switch (instr->opcode) {
-//             case OPCODE_JUMP: {
-//                 instr->jmp.target_offset =
-//                     block_start_offsets[instr->jmp.target_offset];
-//                 break;
-//             }
-//             case OPCODE_JMP_IF: {
-//                 instr->jmp_if.true_block_id =
-//                     block_start_offsets[instr->jmp_if.true_block_id];
-//                 instr->jmp_if.false_block_id =
-//                     block_start_offsets[instr->jmp_if.false_block_id];
-//                 break;
-//             }
-//             default:
-//                 break;
-//         }
-//     }
-
-//     free(block_start_offsets);
-
-//     executable->instructions = instructions;
-//     executable->instructions_size = inst_arr.len;
-//     // executable->instructions_span = ;
-// }
 
 static void generator_basic_blocks_linearize(struct generator* generator,
                                              struct executable* executable) {
