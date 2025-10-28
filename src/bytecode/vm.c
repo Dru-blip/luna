@@ -189,6 +189,26 @@ loop_start:
                 }
                 goto loop_start;
             }
+            case OPCODE_STORE_SUBSCR: {
+                struct lu_value obj_val =
+                    record->registers[instr->binary_op.left_reg];
+                struct lu_value computed_index =
+                    record->registers[instr->binary_op.right_reg];
+                if (lu_is_array(obj_val)) {
+                    if (lu_is_int(computed_index)) {
+                        int64_t index = lu_as_int(computed_index);
+                        if (index < 0) {
+                            // TODO: raise invalid index error
+                            //
+                        }
+                        lu_array_set(
+                            lu_as_array(obj_val), index,
+                            record->registers[instr->binary_op.result_reg]);
+                        goto loop_start;
+                    }
+                }
+                goto loop_start;
+            }
 
 #define HANDLE_BINARY_INSTRUCTION(opcode, func)                    \
     case opcode: {                                                 \

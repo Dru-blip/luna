@@ -48,7 +48,8 @@ static const char* opcode_names[] = {
     "Call",
     "NewArray",
     "ArrayAppend",
-    "LoadSubscript"
+    "LoadSubscript",
+    "StoreSubscript",
 };
 
 static void print_instructions(struct executable* executable) {

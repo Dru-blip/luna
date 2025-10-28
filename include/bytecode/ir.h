@@ -56,6 +56,7 @@ enum opcode {
     OPCODE_NEW_ARRAY,
     OPCODE_ARRAY_APPEND,
     OPCODE_LOAD_SUBSCR,
+    OPCODE_STORE_SUBSCR,
 
 };
 

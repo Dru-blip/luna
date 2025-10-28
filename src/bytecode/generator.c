@@ -421,6 +421,19 @@ static uint32_t generate_expr(struct generator* generator,
                     arrput(GET_CURRENT_BLOCK.instructions, instr);
                     break;
                 }
+                case AST_NODE_COMPUTED_MEMBER_EXPR: {
+                    struct instruction instr;
+                    instr.opcode = OPCODE_STORE_SUBSCR;
+                    instr.binary_op.left_reg = generate_expr(
+                        generator, expr->data.binop.lhs->data.pair.fst);
+                    instr.binary_op.right_reg = generate_expr(
+                        generator, expr->data.binop.lhs->data.pair.snd);
+                    instr.binary_op.result_reg = val_reg;
+
+                    arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
+                    arrput(GET_CURRENT_BLOCK.instructions, instr);
+                    break;
+                }
                 default: {
                     // TODO: raise invalid target assignment error
                     break;
