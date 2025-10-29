@@ -44,6 +44,7 @@ static const char* opcode_names[] = {
     "JumpIf",  // OPCODE_JMP_IF
     "Ret",     // OPCODE_RET
 
+    "RetNone",
     "MakeFunction",
     "Call",
     "NewArray",
@@ -56,7 +57,7 @@ static const char* opcode_names[] = {
 };
 
 static void print_instructions(struct executable* executable) {
-    printf("Executable (%s):{\n",
+    printf("Executable<%s> (%s):{\n", lu_string_get_cstring(executable->name),
            executable->file_path ? executable->file_path : "unknown file");
     printf("  Max registers : %u\n", executable->max_register_count);
     printf("  Constants (%zu)\n", executable->constants_size);
@@ -96,12 +97,11 @@ static void print_instructions(struct executable* executable) {
                        instr->mov.src_reg);
                 break;
             }
-            case OPCODE_STORE_GLOBAL_BY_NAME:{
+            case OPCODE_STORE_GLOBAL_BY_NAME: {
                 break;
             }
             case OPCODE_LOAD_GLOBAL_BY_NAME: {
-                printf("r%u, names[%u]", instr->pair.snd,
-                       instr->pair.fst);
+                printf("r%u, names[%u]", instr->pair.snd, instr->pair.fst);
                 break;
             }
             case OPCODE_MOV: {

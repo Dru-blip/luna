@@ -57,7 +57,8 @@ enum lu_object_state {
     bool is_marked;                  \
     enum lu_object_state state;      \
     struct lu_object_vtable* vtable; \
-    struct property_map properties;
+    struct property_map properties;  \
+    struct lu_object* prototype;
 
 struct lu_object {
     LUNA_OBJECT_HEADER;
@@ -86,6 +87,7 @@ struct lu_object_vtable {
     bool is_string;
     bool is_array;
     enum object_tag tag;
+    const char* dbg_name;
     void (*finalize)(struct lu_object*);
     void (*visit)(struct lu_object*, struct lu_objectset*);
 };

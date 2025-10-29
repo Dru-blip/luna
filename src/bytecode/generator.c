@@ -20,6 +20,13 @@ static void executable_finalize(struct lu_object* obj) {
 }
 
 static void executable_visit(struct lu_object* obj, struct lu_objectset* set) {
+    struct executable* exe = lu_cast(struct executable, obj);
+    for (size_t i = 0; i < exe->constants_size; i++) {
+        if (lu_is_object(exe->constants[i])) {
+            lu_objectset_add(set, exe->constants[i].object);
+        }
+    }
+
     lu_object_get_default_vtable()->visit(obj, set);
 }
 
@@ -388,7 +395,7 @@ static inline uint32_t generate_identifier_expr(struct generator* generator,
                                     .pair.fst = name_index,
                                     .pair.snd = dst_reg};
         emit_instruction(generator, instr, expr->span);
-        return 0;
+        return instr.pair.snd;
     }
 
     // Local and parameter variables are accessed directly
@@ -1067,6 +1074,15 @@ static inline void generate_fn_decl(struct generator* generator,
 
     generator_switch_basic_block(generator, fn_entry_block);
     generate_stmt(generator, stmt->data.fn_decl.body);
+
+    uint32_t none_reg = generator_allocate_register(generator);
+    struct instruction none_instr = {.opcode = OPCODE_LOAD_NONE,
+                                     .destination_reg = none_reg};
+    struct instruction instr = {.opcode = OPCODE_RET,
+                                .destination_reg = none_reg};
+    emit_instruction(generator, none_instr, stmt->span);
+
+    emit_instruction(generator, instr, stmt->span);
 
     struct executable* fn_executable = generator_make_executable(generator);
     fn_executable->name = name_string;

@@ -1,4 +1,3 @@
-
 #include "strbuf.h"
 
 #include <stdarg.h>

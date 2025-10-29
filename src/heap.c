@@ -1,10 +1,12 @@
 #include "heap.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
 #include "bytecode/interpreter.h"
+#include "bytecode/vm.h"
 #include "stb_ds.h"
 #include "value.h"
 
@@ -138,10 +140,32 @@ static void collect_roots(struct heap* heap, struct lu_objectset* roots) {
     printf("Collecting roots...\n");
 #endif
     lu_objectset_add(roots, heap->istate->global_object);
+    lu_objectset_add(roots, heap->istate->vm->global_object);
     lu_objectset_add(roots, heap->istate->module_cache);
+    lu_objectset_add(roots, heap->istate->running_module);
+    lu_objectset_add(roots, heap->istate->main_module);
 
     if (heap->istate->error) {
         lu_objectset_add(roots, heap->istate->error);
+    }
+
+    for (uint32_t i = heap->istate->vm->rp; i > 0; --i) {
+        struct activation_record* record = &heap->istate->vm->records[i - 1];
+        lu_objectset_add(roots, record->executable);
+        lu_objectset_add(roots, record->function);
+        lu_objectset_add(roots, record->globals->named_slots);
+        size_t len = arrlen(record->globals->fast_slots);
+        for (uint32_t j = 0; j < len; ++j) {
+            if (lu_is_object(record->globals->fast_slots[j])) {
+                lu_objectset_add(roots, record->globals->fast_slots[j].object);
+            }
+        }
+        len = arrlen(record->registers);
+        for (uint32_t j = 0; j < len; ++j) {
+            if (lu_is_object(record->registers[j])) {
+                lu_objectset_add(roots, record->registers[j].object);
+            }
+        }
     }
 
     // adding interned strings to roots if any missed

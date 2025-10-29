@@ -50,6 +50,7 @@ enum opcode {
     OPCODE_JUMP,    // uses instruction.jmp
     OPCODE_JMP_IF,  // uses instruction.jmp_if
     OPCODE_RET,     // uses instruction.destination_reg
+    OPCODE_RET_NONE,
 
     OPCODE_MAKE_FUNCTION,  // uses instruction.binary_op
     OPCODE_CALL,           // uses instruction.call
@@ -62,6 +63,7 @@ enum opcode {
     OPCODE_NEW_OBJECT,           // uses instruction.destination_reg
     OPCODE_OBJECT_SET_PROPERTY,  // uses instruction.binary_op
     OPCODE_OBJECT_GET_PROPERTY,
+
 };
 
 // this is high level representation of instruction

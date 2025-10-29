@@ -75,6 +75,7 @@ static void lu_object_visit(struct lu_object* self, struct lu_objectset* set) {
 static void lu_function_visit(struct lu_object* self,
                               struct lu_objectset* set) {
     lu_objectset_add(set, lu_cast(struct lu_function, self)->name);
+    lu_objectset_add(set, lu_cast(struct lu_function, self)->executable);
     lu_object_visit(self, set);
 }
 
@@ -132,6 +133,7 @@ static struct lu_object_vtable lu_object_default_vtable = {
     .is_array = false,
     .finalize = lu_object_finalize,
     .visit = lu_object_visit,
+    .dbg_name = "Object",
 };
 
 static struct lu_object_vtable lu_string_vtable = {
@@ -140,6 +142,7 @@ static struct lu_object_vtable lu_string_vtable = {
     .is_array = false,
     .finalize = lu_string_finalize,
     .visit = lu_object_visit,
+    .dbg_name = "String",
 };
 
 static struct lu_object_vtable lu_function_vtable = {
@@ -148,14 +151,16 @@ static struct lu_object_vtable lu_function_vtable = {
     .is_array = false,
     .finalize = lu_object_finalize,
     .visit = lu_function_visit,
+    .dbg_name = "Function",
 };
 
 static struct lu_object_vtable lu_array_vtable = {
-    .is_function = true,
+    .is_function = false,
     .is_string = false,
     .is_array = true,
     .finalize = lu_array_finalize,
     .visit = lu_array_visit,
+    .dbg_name = "Array",
 };
 
 static struct lu_object_vtable lu_module_vtable = {
@@ -164,6 +169,7 @@ static struct lu_object_vtable lu_module_vtable = {
     .is_array = false,
     .finalize = lu_module_finalize,
     .visit = lu_module_visit,
+    .dbg_name = "Module",
 };
 
 bool lu_string_equal(struct lu_string* a, struct lu_string* b) {

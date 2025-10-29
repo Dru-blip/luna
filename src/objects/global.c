@@ -142,30 +142,23 @@ LU_NATIVE_FN(import_module) {
     return result;
 }
 
-// LU_NATIVE_FN(console_read_int) {
-//     size_t arg_count = LU_ARG_COUNT(state);
-//     if (arg_count <= 0) goto read_impl;
-//     struct lu_value help = LU_ARG_GET(args, 0);
-//     if (!lu_is_string(help)) {
-//         lu_raise_error(state,
-//                        lu_string_new(state, "Expected a string argument"),
-//                        &state->context_stack->call_stack->call_location);
-//         LU_RETURN_NONE();
-//     }
-//     printf("%s", lu_string_get_cstring(lu_as_string(help)));
-// read_impl:
-//     // Maybe find a better way to handle input
-//     // or leave it as is
-//     int64_t in;
-//     scanf("%ld", &in);
-//     LU_RETURN_INT(in);
-// }
-
-static void lu_init_console_object(struct lu_istate* state) {
-    struct lu_object* console_obj = lu_object_new(state);
-    // lu_define_native(console_obj, "read_int", console_read_int, 1);
-    // lu_obj_set(state->global_object, lu_intern_string(state, "console"),
-    // lu_value_object(console_obj));
+LU_NATIVE_FN(console_read_int) {
+    // size_t arg_count = LU_ARG_COUNT(vm);
+    // if (arg_count <= 0) goto read_impl;
+    struct lu_value help = LU_ARG_GET(args, 0);
+    if (!lu_is_string(help)) {
+        lu_raise_error(vm->istate,
+                       lu_string_new(vm->istate, "Expected a string argument"),
+                       &lu_vm_current_ip_span(vm));
+        LU_RETURN_NONE();
+    }
+    printf("%s", lu_string_get_cstring(lu_as_string(help)));
+read_impl:
+    // Maybe find a better way to handle input
+    // or leave it as is
+    int64_t in;
+    scanf("%ld", &in);
+    LU_RETURN_INT(in);
 }
 
 void lu_init_global_object(struct lu_istate* state) {
@@ -174,5 +167,9 @@ void lu_init_global_object(struct lu_istate* state) {
     lu_define_native(state->vm->global_object, "import", import_module, 1);
     // lu_define_native(state->global_object, "len", len, 1);
 
+    struct lu_object* console_obj = lu_object_new(state);
+    lu_define_native(console_obj, "read_int", console_read_int, 1);
+    lu_obj_set(state->vm->global_object, lu_intern_string(state, "console"),
+               lu_value_object(console_obj));
     // lu_init_console_object(state);
 }

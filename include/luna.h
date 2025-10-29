@@ -23,5 +23,4 @@ typedef struct lu_value lu_value;
 #define LU_RETURN_OBJ(x) \
     return ((lu_value){.type = VALUE_OBJECT, .object = (x)})
 
-#define LU_ARG_COUNT(state) ((state)->context_stack->call_stack->arg_count)
 #define LU_ARG_GET(args, index) (args[index])
