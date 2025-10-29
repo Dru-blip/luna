@@ -10,9 +10,8 @@ typedef struct lu_value lu_value;
 
 #define LU_EXPORT __attribute__((visibility("default")))
 
-#define LU_NATIVE_FN(NAME)                                  \
-    LU_EXPORT struct lu_value NAME(struct lu_istate* state, \
-                                   struct argument* args)
+#define LU_NATIVE_FN(NAME) \
+    LU_EXPORT struct lu_value NAME(struct lu_vm* vm, struct lu_value* args)
 
 #define LU_RETURN_NONE() return ((lu_value){VALUE_NONE})
 #define LU_RETURN_UNDEF() return ((lu_value){VALUE_UNDEFINED})
@@ -24,4 +23,4 @@ typedef struct lu_value lu_value;
     return ((lu_value){.type = VALUE_OBJECT, .object = (x)})
 
 #define LU_ARG_COUNT(state) ((state)->context_stack->call_stack->arg_count)
-#define LU_ARG_GET(args, index) (args[index]).value
+#define LU_ARG_GET(args, index) (args[index])

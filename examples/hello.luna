@@ -1,8 +1,1 @@
-a={
-    name:"john",
-    call:fn(){
-        return self.name
-    }
-}
-
-return a
+return [5]

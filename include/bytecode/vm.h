@@ -7,18 +7,30 @@ struct lu_globals {
     struct lu_object* named_slots;
 };
 
+enum activation_record_type {
+    ACTIVATION_RECORD_TYPE_USER,
+    ACTIVATION_RECORD_TYPE_NATIVE,
+};
+
 struct activation_record {
+    enum activation_record_type type;  // unused
     struct executable* executable;
+    struct lu_function* function;
     struct lu_value* registers;
     size_t max_register_count;
     size_t ip;
     // struct lu_value* globals;
     struct lu_globals* globals;
-
     size_t caller_ret_reg;
 };
 
+enum lu_vm_status {
+    VM_STATUS_RUNNING,
+    VM_STATUS_HALT,
+};
+
 struct lu_vm {
+    enum lu_vm_status status;
     struct activation_record* records;
     struct lu_object* global_object;
     size_t rp;

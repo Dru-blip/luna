@@ -8,7 +8,7 @@ ds_srcs = ['src/stb_ds.c','src/arena.c','src/strbuf.c','src/worklist.c']
 parser_srcs=['src/parser/tokenizer.c','src/parser/parser.c','src/parser/ast.c']
 
 runtime_srcs=['src/heap.c','src/value.c','src/string_interner.c','src/bytecode/generator.c',
-            'src/bytecode/interpreter.c','src/bytecode/vm.c','src/bytecode/ir.c']
+            'src/bytecode/interpreter.c','src/bytecode/vm.c','src/bytecode/ir.c','src/objects/global.c']
 
 main_srcs=['src/main.c']
 

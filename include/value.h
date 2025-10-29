@@ -121,7 +121,9 @@ struct argument {
     struct lu_value value;
 };
 
-typedef struct lu_value (*native_func_t)(struct lu_istate*, struct argument*);
+struct lu_vm;
+
+typedef struct lu_value (*native_func_t)(struct lu_vm*, struct lu_value*);
 
 struct lu_function {
     LUNA_OBJECT_HEADER;
@@ -259,6 +261,7 @@ struct lu_function* lu_native_function_new(struct lu_istate* state,
                                            struct lu_string* name,
                                            native_func_t native_func,
                                            size_t param_count);
+
 struct lu_module* lu_module_new(struct lu_istate* state, struct lu_string* name,
                                 struct ast_program* program);
 

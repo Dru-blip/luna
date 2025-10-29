@@ -1,21 +1,7 @@
-fn a() {
-    return none + 2
+fn im(){
+    let a=import("hello")
+    print(a[1])
 }
 
-fn b() {
-    return a()
-}
 
-fn c() {
-    return b()
-}
-
-fn d() {
-    return c()
-}
-
-fn e() {
-    return d()
-}
-
-return e()
+im()

@@ -4,6 +4,7 @@
 
 #include "ast.h"
 #include "bytecode/ir.h"
+#include "bytecode/vm.h"
 #include "heap.h"
 #include "parser.h"
 #include "value.h"
@@ -31,9 +32,11 @@ struct lu_istate* lu_istate_new() {
     state->global_object = lu_object_new(state);
     state->module_cache = lu_object_new(state);
     state->running_module = nullptr;
+    state->main_module = nullptr;
     state->vm = lu_vm_new(state);
     state->error = nullptr;
     arena_init(&state->args_buffer);
+    lu_init_global_object(state);
     return state;
 }
 
@@ -74,10 +77,20 @@ struct lu_value lu_run_program(struct lu_istate* state, const char* filepath) {
     struct ast_program program = parse_program(filepath, source);
     struct lu_module* module =
         lu_module_new(state, lu_string_new(state, filepath), &program);
+
+    struct lu_module* prev_module = state->running_module;
     state->running_module = module;
+
+    if (!state->main_module) {
+        state->main_module = module;
+    }
 
     struct executable* executable = generator_generate(state, program);
     if (state->error) {
+        if (state->running_module != state->main_module) {
+            state->vm->status = VM_STATUS_HALT;
+            return lu_value_undefined();
+        }
         struct lu_string* str = lu_as_string(
             lu_obj_get(state->error, lu_intern_string(state, "message")));
         struct lu_string* traceback = lu_as_string(
@@ -89,9 +102,10 @@ struct lu_value lu_run_program(struct lu_istate* state, const char* filepath) {
         return lu_value_undefined();
     }
     print_executable(executable);
-
     lu_obj_set(state->module_cache, module->name, lu_value_object(module));
     struct lu_value result = lu_run_executable(state, executable);
-    print_value(result);
-    return lu_value_undefined();
+    // print_value(result);
+    state->running_module = prev_module;
+
+    return result;
 }

@@ -12,6 +12,7 @@ struct lu_istate {
     struct lu_object* error;
     struct span error_location;
     struct lu_module* running_module;
+    struct lu_module* main_module;
     struct lu_vm* vm;
     struct generator* ir_generator;
 };

@@ -19,6 +19,7 @@ struct lu_vm* lu_vm_new(struct lu_istate* istate) {
     vm->records = nullptr;
     vm->rp = 0;
     vm->istate = istate;
+    vm->global_object = lu_object_new(istate);
     return vm;
 }
 
@@ -118,6 +119,12 @@ loop_start:
                     record->executable->identifier_table[instr->pair.fst];
                 struct lu_value value =
                     lu_obj_get(record->globals->named_slots, name);
+                if (!lu_is_undefined(value)) {
+                    record->registers[instr->pair.snd] = value;
+                    goto loop_start;
+                }
+
+                value = lu_obj_get(vm->global_object, name);
                 if (!lu_is_undefined(value)) {
                     record->registers[instr->pair.snd] = value;
                     goto loop_start;
@@ -300,7 +307,23 @@ loop_start:
                                    &lu_vm_current_ip_span(vm));
                     goto error_reporter;
                 }
+
                 struct lu_function* func = lu_as_function(callee_val);
+
+                if (func->type == FUNCTION_NATIVE) {
+                    struct lu_value* args = nullptr;
+                    arrsetlen(args, func->param_count);
+                    for (uint32_t i = 0; i < instr->call.argc; i++) {
+                        args[i] = record->registers[instr->call.args_reg[i]];
+                    }
+                    record->registers[instr->call.ret_reg] =
+                        func->func(vm, args);
+                    if (lu_has_error(vm)) {
+                        goto error_reporter;
+                    }
+                    goto record_start;
+                }
+
                 struct activation_record* parent_record = record;
                 lu_vm_push_new_record_with_globals(vm, func->executable,
                                                    record->globals);
@@ -317,7 +340,8 @@ loop_start:
                     arrpop(vm->records);
                 vm->rp--;
 
-                if (vm->rp <= 1) {
+                if (vm->rp <= 1 ||
+                    vm->istate->running_module != vm->istate->main_module) {
                     return child_record.registers[instr->destination_reg];
                 }
 
@@ -339,6 +363,9 @@ invalid_array_index:
                    &lu_vm_current_ip_span(vm));
 #include "ansi_color_codes.h"
 error_reporter:
+    if (vm->istate->running_module != vm->istate->main_module) {
+        return lu_value_none();
+    }
     struct lu_string* str = lu_as_string(
         lu_obj_get(vm->istate->error, lu_intern_string(vm->istate, "message")));
     struct lu_string* traceback = lu_as_string(lu_obj_get(
