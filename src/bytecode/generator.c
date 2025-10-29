@@ -342,10 +342,23 @@ static inline uint32_t generate_identifier_expr(struct generator* generator,
     uint32_t name_len;
     char* name = extract_name_and_len(generator, expr, &name_len);
 
+    uint32_t dst_reg = generator_allocate_register(generator);
+
     struct variable* var;
     if (!find_variable(generator, name, name_len, &var)) {
-        // TODO: raise error for undeclared variables or default to load global
-        // by name.
+        char* name_copy = malloc(name_len + 1);
+        memcpy(name_copy, name, name_len);
+        name_copy[name_len] = '\0';
+
+        struct lu_string* name_string =
+            lu_intern_string(generator->state, name_copy);
+
+        uint32_t name_index = generator_add_identifier(generator, name_string);
+
+        struct instruction instr = {.opcode = OPCODE_LOAD_GLOBAL_BY_NAME,
+                                    .pair.fst = name_index,
+                                    .pair.snd = dst_reg};
+        emit_instruction(generator, instr, expr->span);
         return 0;
     }
 
@@ -355,7 +368,6 @@ static inline uint32_t generate_identifier_expr(struct generator* generator,
     }
 
     // Global variables require a load instruction
-    uint32_t dst_reg = generator_allocate_register(generator);
     struct instruction instr = {.opcode = OPCODE_LOAD_GLOBAL_BY_INDEX,
                                 .mov.dest_reg = dst_reg,
                                 .mov.src_reg = var->allocated_reg};
@@ -425,8 +437,9 @@ static inline void generate_simple_assign(struct generator* generator,
 
     struct variable* var;
     if (!find_variable(generator, name, name_len, &var)) {
-        // TODO: raise error for undeclared variables
-        // default to global load
+        lu_raise_error(generator->state,
+                       lu_string_new(generator->state, "undeclared variable"),
+                       &span);
         return;
     }
 
@@ -467,7 +480,10 @@ static inline uint32_t generate_assign_expr(struct generator* generator,
         }
 
         default:
-            // TODO: raise invalid target assignment error
+            lu_raise_error(
+                generator->state,
+                lu_string_new(generator->state, "invalid assignment target"),
+                &expr->span);
             break;
     }
 
@@ -496,9 +512,19 @@ static inline uint32_t load_callee_by_name(struct generator* generator,
     return instr.pair.snd;
 }
 
+static inline uint32_t generate_subscript_expr(struct generator* generator,
+                                               struct ast_node* expr) {
+    struct instruction instr = {
+        .opcode = OPCODE_LOAD_SUBSCR,
+        .binary_op.result_reg = generator_allocate_register(generator),
+        .binary_op.left_reg = generate_expr(generator, expr->data.pair.fst),
+        .binary_op.right_reg = generate_expr(generator, expr->data.pair.snd)};
+    emit_instruction(generator, instr, expr->span);
+    return instr.binary_op.result_reg;
+}
+
 static inline uint32_t generate_call_expr(struct generator* generator,
                                           struct ast_node* expr) {
-    //
     struct instruction call_instr;
     call_instr.opcode = OPCODE_CALL;
     call_instr.call.argc = expr->data.call.argc;
@@ -510,8 +536,18 @@ static inline uint32_t generate_call_expr(struct generator* generator,
                 load_callee_by_name(generator, expr->data.call.callee);
             break;
         }
+        case AST_NODE_COMPUTED_MEMBER_EXPR: {
+            call_instr.call.callee_reg =
+                generate_subscript_expr(generator, expr->data.call.callee);
+            break;
+        }
         default: {
-            // TODO: raise uncallable expression error.
+            lu_raise_error(
+                generator->state,
+                lu_string_new(generator->state,
+                              "attempt to call a non function value"),
+                &expr->span);
+            break;
         }
     }
 
@@ -524,17 +560,6 @@ static inline uint32_t generate_call_expr(struct generator* generator,
 
     emit_instruction(generator, call_instr, expr->span);
     return call_instr.call.ret_reg;
-}
-
-static inline uint32_t generate_subscript_expr(struct generator* generator,
-                                               struct ast_node* expr) {
-    struct instruction instr = {
-        .opcode = OPCODE_LOAD_SUBSCR,
-        .binary_op.result_reg = generator_allocate_register(generator),
-        .binary_op.left_reg = generate_expr(generator, expr->data.pair.fst),
-        .binary_op.right_reg = generate_expr(generator, expr->data.pair.snd)};
-    emit_instruction(generator, instr, expr->span);
-    return instr.binary_op.result_reg;
 }
 
 static uint32_t generate_expr(struct generator* generator,

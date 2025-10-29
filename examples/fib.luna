@@ -1,9 +1,8 @@
-fn fib(x) {
-    if (x < 2) {
-        return x
+fn fib(n){
+    if(n<2){
+        return n
     }
-    return fib(x-1)+fib(x-2)
+    return fib(n-1)+fib(n-2)
 }
 
-f = fib(10)
-print("10th Fibonacci number is: " + f)
+return fib(35)

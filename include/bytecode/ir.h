@@ -9,55 +9,56 @@ enum opcode {
     // still not implemented
     OPCODE_LOAD_SMI,
     // Load constant value
-    OPCODE_LOAD_CONST,
-    OPCODE_LOAD_NONE,
-    OPCODE_LOAD_TRUE,
-    OPCODE_LOAD_FALSE,
+    OPCODE_LOAD_CONST,  // uses instruction.load_const
+    OPCODE_LOAD_NONE,   // uses instruction.destination_reg
+    OPCODE_LOAD_TRUE,   // uses instruction.destination_reg
+    OPCODE_LOAD_FALSE,  // uses instruction.destination_reg
 
-    OPCODE_LOAD_GLOBAL_BY_INDEX,
-    OPCODE_LOAD_GLOBAL_BY_NAME,
-    OPCODE_STORE_GLOBAL_BY_INDEX,
-    OPCODE_STORE_GLOBAL_BY_NAME,
-    OPCODE_STORE_LOCAL,
-    OPCODE_LOAD_LOCAL,
+    OPCODE_LOAD_GLOBAL_BY_INDEX,   // uses instruction.mov
+                                   // ({.dest_reg,.src_reg})
+    OPCODE_LOAD_GLOBAL_BY_NAME,    // uses instruction.pair ({fst,snd})
+    OPCODE_STORE_GLOBAL_BY_INDEX,  // uses instruction.pair ({.fst,.snd})
+    OPCODE_STORE_GLOBAL_BY_NAME,   // uses instruction.pair ({.fst,.snd})
+    OPCODE_STORE_LOCAL,            // [unused] replaced with  OPCODE_MOV
+    OPCODE_LOAD_LOCAL,             // [unused] replaced with OPCODE_MOV
 
-    OPCODE_MOV,
+    OPCODE_MOV,  // uses instruction.mov ({.dest_reg,.src_reg})
 
-    OPCODE_ADD,
-    OPCODE_SUB,
-    OPCODE_MUL,
+    OPCODE_ADD,  // uses instruction.binary_op
+                 // ({.result_reg,.left_reg,.right_reg})
+    OPCODE_SUB,  // instruction.binary_op
+    OPCODE_MUL,  // instruction.binary_op
 
-    OPCODE_DIV,
-    OPCODE_MOD,
+    OPCODE_DIV,  // instruction.binary_op
+    OPCODE_MOD,  // instruction.binary_op
 
-    OPCODE_TEST_GREATER_THAN,
-    OPCODE_TEST_GREATER_THAN_EQUAL,
+    OPCODE_TEST_GREATER_THAN,        // instruction.binary_op
+    OPCODE_TEST_GREATER_THAN_EQUAL,  // instruction.binary_op
 
-    OPCODE_TEST_LESS_THAN,
-    OPCODE_TEST_LESS_THAN_EQUAL,
+    OPCODE_TEST_LESS_THAN,        // instruction.binary_op
+    OPCODE_TEST_LESS_THAN_EQUAL,  // instruction.binary_op
 
-    OPCODE_TEST_EQUAL,
-    OPCODE_TEST_NOT_EQUAL,
+    OPCODE_TEST_EQUAL,      // instruction.binary_op
+    OPCODE_TEST_NOT_EQUAL,  // instruction.binary_op
 
-    OPCODE_SHIFT_LEFT,
-    OPCODE_SHIFT_RIGHT,
+    OPCODE_SHIFT_LEFT,   // still not implemented
+    OPCODE_SHIFT_RIGHT,  // still not implemented
 
-    OPCODE_UNARY_MINUS,
-    OPCODE_UNARY_PLUS,
-    OPCODE_UNARY_NOT,
+    OPCODE_UNARY_MINUS,  // uses instruction.destination_reg
+    OPCODE_UNARY_PLUS,   // uses instruction.destination_reg
+    OPCODE_UNARY_NOT,    // uses instruction.destination_reg
 
-    OPCODE_JUMP,
-    OPCODE_JMP_IF,
-    OPCODE_RET,
+    OPCODE_JUMP,    // uses instruction.jmp
+    OPCODE_JMP_IF,  // uses instruction.jmp_if
+    OPCODE_RET,     // uses instruction.destination_reg
 
-    OPCODE_MAKE_FUNCTION,
-    OPCODE_CALL,
+    OPCODE_MAKE_FUNCTION,  // uses instruction.binary_op
+    OPCODE_CALL,           // uses instruction.call
 
-    OPCODE_NEW_ARRAY,
-    OPCODE_ARRAY_APPEND,
-    OPCODE_LOAD_SUBSCR,
-    OPCODE_STORE_SUBSCR,
-
+    OPCODE_NEW_ARRAY,     // uses instruction.destination_reg
+    OPCODE_ARRAY_APPEND,  // uses instruction.pair
+    OPCODE_LOAD_SUBSCR,   // uses instruction.binary_op
+    OPCODE_STORE_SUBSCR,  // uses instruction.binary_op
 };
 
 // this is high level representation of instruction

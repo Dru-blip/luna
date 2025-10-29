@@ -72,12 +72,25 @@ static void print_value(struct lu_value value) {
 struct lu_value lu_run_program(struct lu_istate* state, const char* filepath) {
     const char* source = read_file(filepath);
     struct ast_program program = parse_program(filepath, source);
-    struct executable* executable = generator_generate(state, program);
-    print_executable(executable);
     struct lu_module* module =
         lu_module_new(state, lu_string_new(state, filepath), &program);
-    lu_obj_set(state->module_cache, module->name, lu_value_object(module));
     state->running_module = module;
+
+    struct executable* executable = generator_generate(state, program);
+    if (state->error) {
+        struct lu_string* str = lu_as_string(
+            lu_obj_get(state->error, lu_intern_string(state, "message")));
+        struct lu_string* traceback = lu_as_string(
+            lu_obj_get(state->error, lu_intern_string(state, "traceback")));
+        printf("Error: %s\n", lu_string_get_cstring(str));
+        if (traceback) {
+            printf("%s\n", traceback->block->data);
+        }
+        return lu_value_undefined();
+    }
+    print_executable(executable);
+
+    lu_obj_set(state->module_cache, module->name, lu_value_object(module));
     struct lu_value result = lu_run_executable(state, executable);
     print_value(result);
     return lu_value_undefined();
