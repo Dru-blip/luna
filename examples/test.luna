@@ -1,3 +1,5 @@
 let a={name:"john"}
+a.name="doe"
+a.age=40
 
-return a.name
+return a.age

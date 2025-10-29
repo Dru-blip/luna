@@ -492,6 +492,34 @@ static inline void generate_subscript_assign(struct generator* generator,
     emit_instruction(generator, instr, span);
 }
 
+static inline void generate_object_property_assign(struct generator* generator,
+                                                   struct ast_node* lhs,
+                                                   uint32_t val_reg,
+                                                   struct span span) {
+    uint32_t obj = generate_expr(generator, lhs->data.member_expr.object);
+    char* name =
+        generator->program.source + lhs->data.member_expr.property_name.start;
+    uint32_t name_len = lhs->data.member_expr.property_name.end -
+                        lhs->data.member_expr.property_name.start;
+
+    char* name_copy = malloc(name_len + 1);
+    memcpy(name_copy, name, name_len);
+    name_copy[name_len] = '\0';
+
+    struct lu_string* name_string =
+        lu_intern_string(generator->state, name_copy);
+    free(name_copy);
+    uint32_t name_index = generator_add_identifier(generator, name_string);
+
+    struct instruction instr = {
+        .opcode = OPCODE_OBJECT_SET_PROPERTY,
+        .binary_op.left_reg = name_index,
+        .binary_op.right_reg = val_reg,
+        .binary_op.result_reg = obj,
+    };
+    emit_instruction(generator, instr, span);
+}
+
 static inline uint32_t generate_assign_expr(struct generator* generator,
                                             struct ast_node* expr) {
     uint32_t val_reg = generate_expr(generator, expr->data.binop.rhs);
@@ -505,6 +533,11 @@ static inline uint32_t generate_assign_expr(struct generator* generator,
         case AST_NODE_COMPUTED_MEMBER_EXPR: {
             generate_subscript_assign(generator, expr->data.binop.lhs, val_reg,
                                       expr->span);
+            break;
+        }
+        case AST_NODE_MEMBER_EXPR: {
+            generate_object_property_assign(generator, expr->data.binop.lhs,
+                                            val_reg, expr->span);
             break;
         }
         default:
