@@ -50,6 +50,8 @@ static const char* opcode_names[] = {
     "ArrayAppend",
     "LoadSubscript",
     "StoreSubscript",
+    "NewObject",
+    "ObjectSetProperty",
 };
 
 static void print_instructions(struct executable* executable) {

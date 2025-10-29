@@ -177,6 +177,22 @@ loop_start:
                 lu_array_push(array, record->registers[instr->pair.snd]);
                 goto loop_start;
             }
+            case OPCODE_NEW_OBJECT: {
+                record->registers[instr->destination_reg] =
+                    lu_value_object(lu_object_new(vm->istate));
+                goto loop_start;
+            }
+            case OPCODE_OBJECT_SET_PROPERTY: {
+                struct lu_object* obj = lu_as_object(
+                    record->registers[instr->binary_op.result_reg]);
+                struct lu_string* key =
+                    record->executable
+                        ->identifier_table[instr->binary_op.left_reg];
+                struct lu_value value =
+                    record->registers[instr->binary_op.right_reg];
+                lu_obj_set(obj, key, value);
+                goto loop_start;
+            }
             case OPCODE_LOAD_SUBSCR: {
                 struct lu_value obj_val =
                     record->registers[instr->binary_op.left_reg];

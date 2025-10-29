@@ -15,10 +15,9 @@ enum opcode {
     OPCODE_LOAD_FALSE,  // uses instruction.destination_reg
 
     OPCODE_LOAD_GLOBAL_BY_INDEX,   // uses instruction.mov
-                                   // ({.dest_reg,.src_reg})
-    OPCODE_LOAD_GLOBAL_BY_NAME,    // uses instruction.pair ({fst,snd})
-    OPCODE_STORE_GLOBAL_BY_INDEX,  // uses instruction.pair ({.fst,.snd})
-    OPCODE_STORE_GLOBAL_BY_NAME,   // uses instruction.pair ({.fst,.snd})
+    OPCODE_LOAD_GLOBAL_BY_NAME,    // uses instruction.pair
+    OPCODE_STORE_GLOBAL_BY_INDEX,  // uses instruction.pair
+    OPCODE_STORE_GLOBAL_BY_NAME,   // uses instruction.pair
     OPCODE_STORE_LOCAL,            // [unused] replaced with  OPCODE_MOV
     OPCODE_LOAD_LOCAL,             // [unused] replaced with OPCODE_MOV
 
@@ -59,6 +58,9 @@ enum opcode {
     OPCODE_ARRAY_APPEND,  // uses instruction.pair
     OPCODE_LOAD_SUBSCR,   // uses instruction.binary_op
     OPCODE_STORE_SUBSCR,  // uses instruction.binary_op
+
+    OPCODE_NEW_OBJECT,           // uses instruction.destination_reg
+    OPCODE_OBJECT_SET_PROPERTY,  // uses instruction.binary_op
 };
 
 // this is high level representation of instruction

@@ -7,10 +7,12 @@ struct lu_globals {
     struct lu_object* named_slots;
 };
 
+// unused
 enum activation_record_type {
     ACTIVATION_RECORD_TYPE_USER,
     ACTIVATION_RECORD_TYPE_NATIVE,
 };
+//
 
 struct activation_record {
     enum activation_record_type type;  // unused

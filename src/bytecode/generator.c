@@ -543,6 +543,7 @@ static inline uint32_t load_callee_by_name(struct generator* generator,
                                     .pair.fst = name_index,
                                     .pair.snd = dst_reg};
         emit_instruction(generator, instr, callee->span);
+        free(name_copy);
         return instr.pair.snd;
     }
 
@@ -660,6 +661,46 @@ static inline uint32_t generate_function_expr(struct generator* generator,
     return make_fn_instr.binary_op.result_reg;
 }
 
+static uint32_t generate_object_expr(struct generator* generator,
+                                     struct ast_node* expr) {
+    //
+    uint32_t dst_reg = generator_allocate_register(generator);
+
+    struct instruction new_object_instr = {.opcode = OPCODE_NEW_OBJECT,
+                                           .destination_reg = dst_reg};
+    emit_instruction(generator, new_object_instr, expr->span);
+
+    const size_t len = arrlen(expr->data.list);
+    struct ast_node* prop;
+    for (size_t i = 0; i < len; i++) {
+        prop = expr->data.list[i];
+        char* name =
+            generator->program.source + prop->data.property.property_name.start;
+        uint32_t name_len = prop->data.property.property_name.end -
+                            prop->data.property.property_name.start;
+
+        char* name_copy = malloc(name_len + 1);
+        memcpy(name_copy, name, name_len);
+        name_copy[name_len] = '\0';
+
+        struct lu_string* name_string =
+            lu_intern_string(generator->state, name_copy);
+        free(name_copy);
+        uint32_t name_index = generator_add_identifier(generator, name_string);
+        uint32_t prop_value =
+            generate_expr(generator, prop->data.property.value);
+        struct instruction set_prop_instr = {
+            .opcode = OPCODE_OBJECT_SET_PROPERTY,
+            .binary_op.left_reg = name_index,
+            .binary_op.right_reg = prop_value,
+            .binary_op.result_reg = dst_reg,
+        };
+        emit_instruction(generator, set_prop_instr, prop->span);
+    }
+
+    return dst_reg;
+}
+
 static uint32_t generate_expr(struct generator* generator,
                               struct ast_node* expr) {
     switch (expr->kind) {
@@ -699,6 +740,9 @@ static uint32_t generate_expr(struct generator* generator,
         }
         case AST_NODE_FN_EXPR: {
             return generate_function_expr(generator, expr);
+        }
+        case AST_NODE_OBJECT_EXPR: {
+            return generate_object_expr(generator, expr);
         }
         default: {
             return 0;
@@ -964,10 +1008,12 @@ static inline void generate_fn_decl(struct generator* generator,
 
     emit_instruction(generator, make_fn_instr, stmt->span);
 
+    struct variable* var;
+    declare_variable(generator, name, name_len, &var);
     struct instruction store_func_instr;
     store_func_instr.opcode = OPCODE_STORE_GLOBAL_BY_INDEX;
     store_func_instr.mov.src_reg = make_fn_instr.binary_op.result_reg;
-    store_func_instr.mov.dest_reg = declare_global(generator, name, name_len);
+    store_func_instr.mov.dest_reg = var->allocated_reg;
     emit_instruction(generator, store_func_instr, stmt->span);
 
     free(name_copy);
