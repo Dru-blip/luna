@@ -1,5 +1,3 @@
-let a={name:"john"}
-a.name="doe"
-a.age=40
+let a={name:"john", print_age:fn(){print("age: "+40)}}
 
-return a.age
+return a.print_age()
