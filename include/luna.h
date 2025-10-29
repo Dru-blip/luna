@@ -10,8 +10,9 @@ typedef struct lu_value lu_value;
 
 #define LU_EXPORT __attribute__((visibility("default")))
 
-#define LU_NATIVE_FN(NAME) \
-    LU_EXPORT struct lu_value NAME(struct lu_vm* vm, struct lu_value* args)
+#define LU_NATIVE_FN(NAME)                                                   \
+    LU_EXPORT struct lu_value NAME(struct lu_vm* vm, struct lu_object* self, \
+                                   struct lu_value* args)
 
 #define LU_RETURN_NONE() return ((lu_value){VALUE_NONE})
 #define LU_RETURN_UNDEF() return ((lu_value){VALUE_UNDEFINED})

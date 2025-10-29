@@ -9,6 +9,7 @@
 #include "stb_ds.h"
 // #include "value.h"
 #include "bytecode/vm_ops.h"
+#include "strbuf.h"
 #include "value.h"
 
 #define lu_has_error(vm) (vm)->istate->error != nullptr
@@ -218,7 +219,19 @@ loop_start:
                     goto error_reporter;
                 }
                 struct lu_value value = lu_obj_get(lu_as_object(obj_val), key);
+                if (lu_is_undefined(value)) {
+                    char buffer[256];
+                    struct strbuf sb;
+                    strbuf_init_static(&sb, buffer, sizeof(buffer));
+                    strbuf_appendf(&sb, "object has no property '%s'",
+                                   lu_string_get_cstring(key));
+                    lu_raise_error(vm->istate,
+                                   lu_string_new(vm->istate, buffer),
+                                   &lu_vm_current_ip_span(vm));
+                    goto error_reporter;
+                }
                 record->registers[instr->binary_op.result_reg] = value;
+
                 goto loop_start;
             }
             case OPCODE_LOAD_SUBSCR: {
@@ -351,9 +364,11 @@ loop_start:
                                    &lu_vm_current_ip_span(vm));
                     goto error_reporter;
                 }
+                struct activation_record* parent_record = record;
 
                 struct lu_function* func = lu_as_function(callee_val);
-
+                struct lu_value self =
+                    parent_record->registers[instr->call.self_reg];
                 if (func->type == FUNCTION_NATIVE) {
                     // should refactor allocating and free may slow down the
                     // execution
@@ -363,7 +378,7 @@ loop_start:
                         args[i] = record->registers[instr->call.args_reg[i]];
                     }
                     record->registers[instr->call.ret_reg] =
-                        func->func(vm, args);
+                        func->func(vm, lu_as_object(self), args);
                     arrfree(args);
                     if (lu_has_error(vm)) {
                         goto error_reporter;
@@ -371,13 +386,15 @@ loop_start:
                     goto record_start;
                 }
 
-                struct activation_record* parent_record = record;
                 lu_vm_push_new_record_with_globals(vm, func->executable,
                                                    record->globals);
                 record = &vm->records[vm->rp - 1];
                 record->caller_ret_reg = instr->call.ret_reg;
+
+                record->registers[0] =
+                    parent_record->registers[instr->call.self_reg];
                 for (uint32_t i = 0; i < instr->call.argc; i++) {
-                    record->registers[i] =
+                    record->registers[i + 1] =
                         parent_record->registers[instr->call.args_reg[i]];
                 }
                 goto record_start;

@@ -123,7 +123,8 @@ struct argument {
 
 struct lu_vm;
 
-typedef struct lu_value (*native_func_t)(struct lu_vm*, struct lu_value*);
+typedef struct lu_value (*native_func_t)(struct lu_vm*, struct lu_object*,
+                                         struct lu_value*);
 
 struct lu_function {
     LUNA_OBJECT_HEADER;

@@ -104,6 +104,7 @@ struct instruction {
             uint32_t callee_reg;
             uint32_t argc;
             uint32_t ret_reg;
+            uint32_t self_reg;
             uint32_t* args_reg;
         } call;
 

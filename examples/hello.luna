@@ -1,1 +1,8 @@
-return [5]
+let a={name:"john",
+        age:35,
+        print_age:fn(){
+            print("age: "+ self.age)
+        }
+}
+
+return a

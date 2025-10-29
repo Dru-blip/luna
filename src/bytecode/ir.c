@@ -96,10 +96,12 @@ static void print_instructions(struct executable* executable) {
                        instr->mov.src_reg);
                 break;
             }
-            case OPCODE_STORE_GLOBAL_BY_NAME:
+            case OPCODE_STORE_GLOBAL_BY_NAME:{
+                break;
+            }
             case OPCODE_LOAD_GLOBAL_BY_NAME: {
-                printf("r%u, names[%u]", instr->destination_reg,
-                       instr->load_const.constant_index);
+                printf("r%u, names[%u]", instr->pair.snd,
+                       instr->pair.fst);
                 break;
             }
             case OPCODE_MOV: {
@@ -160,6 +162,11 @@ static void print_instructions(struct executable* executable) {
             case OPCODE_CALL: {
                 printf("r%u <- r%u()", instr->call.ret_reg,
                        instr->call.callee_reg);
+                break;
+            }
+            case OPCODE_OBJECT_GET_PROPERTY: {
+                printf("r%u <- r%u[names[%u]]", instr->binary_op.result_reg,
+                       instr->binary_op.left_reg, instr->binary_op.right_reg);
                 break;
             }
             default: {

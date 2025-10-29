@@ -37,7 +37,7 @@ void generator_init(struct generator* generator, struct ast_program program) {
     generator->current_block_id = 0;
     generator->block_counter = 0;
     generator->constant_counter = 0;
-    generator->register_counter = 0;
+    generator->register_counter = 1;
     generator->blocks = nullptr;
     generator->node = nullptr;
     generator->prev = nullptr;
@@ -641,16 +641,22 @@ static inline uint32_t generate_call_expr(struct generator* generator,
         case AST_NODE_IDENTIFIER: {
             call_instr.call.callee_reg =
                 load_callee_by_name(generator, expr->data.call.callee);
+            call_instr.call.self_reg = call_instr.call.callee_reg;
             break;
         }
         case AST_NODE_COMPUTED_MEMBER_EXPR: {
+            call_instr.call.self_reg =
+                generate_expr(generator, expr->data.call.callee->data.pair.fst);
             call_instr.call.callee_reg =
                 generate_subscript_expr(generator, expr->data.call.callee);
             break;
         }
         case AST_NODE_MEMBER_EXPR: {
+            uint32_t object_reg = generate_expr(
+                generator, expr->data.call.callee->data.member_expr.object);
             call_instr.call.callee_reg =
                 generate_member_expr(generator, expr->data.call.callee);
+            call_instr.call.self_reg = object_reg;
             break;
         }
         default: {
@@ -769,6 +775,9 @@ static uint32_t generate_object_expr(struct generator* generator,
 static uint32_t generate_expr(struct generator* generator,
                               struct ast_node* expr) {
     switch (expr->kind) {
+        case AST_NODE_SELF_EXPR: {
+            return 0;
+        }
         case AST_NODE_INT: {
             return generate_int_expr(generator, expr);
         }
