@@ -311,6 +311,8 @@ loop_start:
                 struct lu_function* func = lu_as_function(callee_val);
 
                 if (func->type == FUNCTION_NATIVE) {
+                    // should refactor allocating and free may slow down the
+                    // execution
                     struct lu_value* args = nullptr;
                     arrsetlen(args, func->param_count);
                     for (uint32_t i = 0; i < instr->call.argc; i++) {
@@ -318,6 +320,7 @@ loop_start:
                     }
                     record->registers[instr->call.ret_reg] =
                         func->func(vm, args);
+                    arrfree(args);
                     if (lu_has_error(vm)) {
                         goto error_reporter;
                     }
@@ -340,7 +343,7 @@ loop_start:
                     arrpop(vm->records);
                 vm->rp--;
 
-                if (vm->rp <= 1 ||
+                if (vm->rp < 1 ||
                     vm->istate->running_module != vm->istate->main_module) {
                     return child_record.registers[instr->destination_reg];
                 }

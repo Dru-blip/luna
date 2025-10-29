@@ -138,6 +138,31 @@ static bool find_variable(struct generator* generator, char* name,
     return false;
 }
 
+static uint32_t declare_global(struct generator* generator, const char* name,
+                               uint32_t name_length) {
+    //
+    struct variable* var;
+    for (uint32_t i = generator->global_variable_count; i > 0; i--) {
+        var = &generator->global_variables[i - 1];
+        if (var->name_length == name_length &&
+            strncmp(var->name, name, name_length) == 0) {
+            return var->allocated_reg;
+        }
+    }
+
+    struct variable new_variable = {
+        .name = name,
+        .name_length = name_length,
+        .scope = SCOPE_GLOBAL,
+        .scope_depth = generator->scope_depth,
+        .allocated_reg = generator->global_variable_count++,
+    };
+
+    arrput(generator->global_variables, new_variable);
+
+    return new_variable.allocated_reg;
+}
+
 static void declare_param(struct generator* generator, const char* name,
                           uint32_t name_length) {
     struct variable var;
@@ -272,9 +297,13 @@ static void generator_emit_jump_instruction(struct generator* generator,
     arrput(GET_CURRENT_BLOCK.instructions_spans, span);
 }
 
+//
 static uint32_t generate_expr(struct generator* generator,
                               struct ast_node* expr);
-
+static void generate_stmts(struct generator* generator,
+                           struct ast_node** stmts);
+static void generate_stmt(struct generator* generator, struct ast_node* stmt);
+//
 static inline void emit_instruction(struct generator* generator,
                                     struct instruction instr,
                                     struct span span) {
@@ -493,23 +522,40 @@ static inline uint32_t generate_assign_expr(struct generator* generator,
 // Load function by name for call expression
 static inline uint32_t load_callee_by_name(struct generator* generator,
                                            struct ast_node* callee) {
+    // Duplicate block of code from generate_identifier expr
+    // ---------------------------------------------------
     uint32_t name_len;
     char* name = extract_name_and_len(generator, callee, &name_len);
 
-    char* name_copy = malloc(name_len + 1);
-    memcpy(name_copy, name, name_len);
-    name_copy[name_len] = '\0';
+    struct variable* var;
 
-    struct lu_string* name_string =
-        lu_intern_string(generator->state, name_copy);
-    uint32_t name_index = generator_add_identifier(generator, name_string);
+    uint32_t dst_reg = generator_allocate_register(generator);
+    if (!find_variable(generator, name, name_len, &var)) {
+        char* name_copy = malloc(name_len + 1);
+        memcpy(name_copy, name, name_len);
+        name_copy[name_len] = '\0';
 
-    struct instruction instr = {
-        .opcode = OPCODE_LOAD_GLOBAL_BY_NAME,
-        .pair.fst = name_index,
-        .pair.snd = generator_allocate_register(generator)};
+        struct lu_string* name_string =
+            lu_intern_string(generator->state, name_copy);
+        uint32_t name_index = generator_add_identifier(generator, name_string);
+
+        struct instruction instr = {.opcode = OPCODE_LOAD_GLOBAL_BY_NAME,
+                                    .pair.fst = name_index,
+                                    .pair.snd = dst_reg};
+        emit_instruction(generator, instr, callee->span);
+        return instr.pair.snd;
+    }
+
+    if (var->scope == SCOPE_LOCAL || var->scope == SCOPE_PARAM) {
+        return var->allocated_reg;
+    }
+
+    struct instruction instr = {.opcode = OPCODE_LOAD_GLOBAL_BY_INDEX,
+                                .mov.dest_reg = dst_reg,
+                                .mov.src_reg = var->allocated_reg};
     emit_instruction(generator, instr, callee->span);
-    return instr.pair.snd;
+    return dst_reg;
+    // ---------------------------------------------------
 }
 
 static inline uint32_t generate_subscript_expr(struct generator* generator,
@@ -562,6 +608,58 @@ static inline uint32_t generate_call_expr(struct generator* generator,
     return call_instr.call.ret_reg;
 }
 
+static inline uint32_t generate_function_expr(struct generator* generator,
+                                              struct ast_node* expr) {
+    // Duplicate block of code from generate_fn_decl
+    //---------------------------------------------
+
+    struct generator* fn_generator = malloc(sizeof(struct generator));
+    generator_init(fn_generator, generator->program);
+    fn_generator->state = generator->state;
+    fn_generator->state->ir_generator = fn_generator;
+    fn_generator->prev = generator;
+    fn_generator->global_variables = generator->global_variables;
+    fn_generator->global_variable_count = generator->global_variable_count;
+    fn_generator->scope_depth = 1;
+
+    generator = fn_generator;
+    uint32_t fn_entry_block = generator_basic_block_new(generator);
+
+    const size_t num_params = arrlen(expr->data.fn_decl.params);
+
+    for (size_t i = 0; i < num_params; ++i) {
+        struct ast_node* param = expr->data.fn_decl.params[i];
+        const char* param_name = generator->program.source + param->span.start;
+        uint32_t param_name_len = param->span.end - param->span.start;
+        declare_param(generator, param_name, param_name_len);
+    }
+
+    struct lu_string* name_string =
+        lu_intern_string(generator->state, "<anonymous>");
+
+    generator_switch_basic_block(generator, fn_entry_block);
+    generate_stmt(generator, expr->data.fn_decl.body);
+
+    struct executable* fn_executable = generator_make_executable(generator);
+    fn_executable->name = name_string;
+    generator = generator->prev;
+    generator->global_variable_count = fn_generator->global_variable_count;
+    uint32_t executable_index =
+        generator_add_executable_contant(generator, fn_executable);
+
+    uint32_t name_index = generator_add_identifier(generator, name_string);
+
+    struct instruction make_fn_instr;
+    make_fn_instr.opcode = OPCODE_MAKE_FUNCTION;
+    make_fn_instr.binary_op.result_reg = generator_allocate_register(generator);
+    make_fn_instr.binary_op.left_reg = executable_index;
+    make_fn_instr.binary_op.right_reg = name_index;
+
+    emit_instruction(generator, make_fn_instr, expr->span);
+    //-----------------------------------------------
+    return make_fn_instr.binary_op.result_reg;
+}
+
 static uint32_t generate_expr(struct generator* generator,
                               struct ast_node* expr) {
     switch (expr->kind) {
@@ -599,6 +697,9 @@ static uint32_t generate_expr(struct generator* generator,
         case AST_NODE_COMPUTED_MEMBER_EXPR: {
             return generate_subscript_expr(generator, expr);
         }
+        case AST_NODE_FN_EXPR: {
+            return generate_function_expr(generator, expr);
+        }
         default: {
             return 0;
         }
@@ -626,10 +727,6 @@ static void end_scope(struct generator* generator) {
     }
     generator->scope_depth--;
 }
-
-static void generate_stmts(struct generator* generator,
-                           struct ast_node** stmts);
-static void generate_stmt(struct generator* generator, struct ast_node* stmt);
 
 static inline void generate_let_decl(struct generator* generator,
                                      struct ast_node* stmt) {
@@ -829,6 +926,7 @@ static inline void generate_fn_decl(struct generator* generator,
     uint32_t fn_entry_block = generator_basic_block_new(generator);
 
     const size_t num_params = arrlen(stmt->data.fn_decl.params);
+
     for (size_t i = 0; i < num_params; ++i) {
         struct ast_node* param = stmt->data.fn_decl.params[i];
         const char* param_name = generator->program.source + param->span.start;
@@ -867,10 +965,9 @@ static inline void generate_fn_decl(struct generator* generator,
     emit_instruction(generator, make_fn_instr, stmt->span);
 
     struct instruction store_func_instr;
-    store_func_instr.opcode = OPCODE_STORE_GLOBAL_BY_NAME;
-    store_func_instr.pair.fst = make_fn_instr.binary_op.result_reg;
-    store_func_instr.pair.snd = name_index;
-
+    store_func_instr.opcode = OPCODE_STORE_GLOBAL_BY_INDEX;
+    store_func_instr.mov.src_reg = make_fn_instr.binary_op.result_reg;
+    store_func_instr.mov.dest_reg = declare_global(generator, name, name_len);
     emit_instruction(generator, store_func_instr, stmt->span);
 
     free(name_copy);

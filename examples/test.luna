@@ -1,7 +1,0 @@
-fn im(){
-    let a=import("hello")
-    print(a[1])
-}
-
-
-im()
