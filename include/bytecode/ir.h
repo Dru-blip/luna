@@ -61,6 +61,7 @@ enum opcode {
 
     OPCODE_NEW_OBJECT,           // uses instruction.destination_reg
     OPCODE_OBJECT_SET_PROPERTY,  // uses instruction.binary_op
+    OPCODE_OBJECT_GET_PROPERTY,
 };
 
 // this is high level representation of instruction

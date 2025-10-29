@@ -193,6 +193,25 @@ loop_start:
                 lu_obj_set(obj, key, value);
                 goto loop_start;
             }
+            case OPCODE_OBJECT_GET_PROPERTY: {
+                struct lu_value obj_val =
+                    record->registers[instr->binary_op.left_reg];
+                struct lu_string* key =
+                    record->executable
+                        ->identifier_table[instr->binary_op.right_reg];
+                if (!lu_is_object(obj_val)) {
+                    lu_raise_error(
+                        vm->istate,
+                        lu_string_new(
+                            vm->istate,
+                            "invalid member access on non object value"),
+                        &lu_vm_current_ip_span(vm));
+                    goto error_reporter;
+                }
+                struct lu_value value = lu_obj_get(lu_as_object(obj_val), key);
+                record->registers[instr->binary_op.result_reg] = value;
+                goto loop_start;
+            }
             case OPCODE_LOAD_SUBSCR: {
                 struct lu_value obj_val =
                     record->registers[instr->binary_op.left_reg];

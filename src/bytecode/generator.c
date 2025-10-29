@@ -507,7 +507,6 @@ static inline uint32_t generate_assign_expr(struct generator* generator,
                                       expr->span);
             break;
         }
-
         default:
             lu_raise_error(
                 generator->state,
@@ -701,6 +700,34 @@ static uint32_t generate_object_expr(struct generator* generator,
     return dst_reg;
 }
 
+static uint32_t generate_member_expr(struct generator* generator,
+                                     struct ast_node* expr) {
+    uint32_t obj = generate_expr(generator, expr->data.member_expr.object);
+    uint32_t dst_reg = generator_allocate_register(generator);
+    char* name =
+        generator->program.source + expr->data.member_expr.property_name.start;
+    uint32_t name_len = expr->data.member_expr.property_name.end -
+                        expr->data.member_expr.property_name.start;
+
+    char* name_copy = malloc(name_len + 1);
+    memcpy(name_copy, name, name_len);
+    name_copy[name_len] = '\0';
+
+    struct lu_string* name_string =
+        lu_intern_string(generator->state, name_copy);
+    free(name_copy);
+    uint32_t name_index = generator_add_identifier(generator, name_string);
+
+    struct instruction get_prop_instr = {
+        .opcode = OPCODE_OBJECT_GET_PROPERTY,
+        .binary_op.left_reg = obj,
+        .binary_op.right_reg = name_index,
+        .binary_op.result_reg = dst_reg,
+    };
+    emit_instruction(generator, get_prop_instr, expr->span);
+    return dst_reg;
+}
+
 static uint32_t generate_expr(struct generator* generator,
                               struct ast_node* expr) {
     switch (expr->kind) {
@@ -734,6 +761,9 @@ static uint32_t generate_expr(struct generator* generator,
         }
         case AST_NODE_CALL: {
             return generate_call_expr(generator, expr);
+        }
+        case AST_NODE_MEMBER_EXPR: {
+            return generate_member_expr(generator, expr);
         }
         case AST_NODE_COMPUTED_MEMBER_EXPR: {
             return generate_subscript_expr(generator, expr);

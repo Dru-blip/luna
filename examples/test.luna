@@ -1,4 +1,3 @@
 let a={name:"john"}
 
-
-return a
+return a.name

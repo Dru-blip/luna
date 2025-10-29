@@ -52,6 +52,7 @@ static const char* opcode_names[] = {
     "StoreSubscript",
     "NewObject",
     "ObjectSetProperty",
+    "ObjectGetProperty",
 };
 
 static void print_instructions(struct executable* executable) {
