@@ -1,15 +1,18 @@
 #include "value.h"
 
 #include <stdarg.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
+#include "ansi_color_codes.h"
 #include "arena.h"
 #include "ast.h"
 #include "bytecode/interpreter.h"
+#include "bytecode/vm.h"
 #include "heap.h"
 #include "stb_ds.h"
 #include "strbuf.h"
@@ -548,13 +551,25 @@ void lu_raise_error(struct lu_istate* state, struct lu_string* message,
 
     strbuf_append(&sb, "    ");
     for (size_t i = 0; i < line_length; i++) {
-        strbuf_append(&sb, "^");
+        strbuf_appendf(&sb, "%s^", RED);
     }
-    strbuf_append(&sb, "\n");
+    strbuf_appendf(&sb, "%s\n", reset);
 
-    strbuf_appendf(&sb, "in %s:%d:%d",
-                   lu_string_get_cstring(state->running_module->name),
-                   location->line, location->col);
+    // strbuf_appendf(&sb, "in %s:%d:%d\n",
+    //                lu_string_get_cstring(state->running_module->name),
+    //                location->line, location->col);
+
+    strbuf_appendf(&sb, "%sTraceback (most recent call first):\n%s", YEL,
+                   reset);
+    for (size_t i = state->vm->rp; i > 0; i--) {
+        struct activation_record* record = &state->vm->records[i - 1];
+        struct span* span =
+            &record->executable->instructions_span[record->ip - 1];
+        strbuf_appendf(&sb, "\tat %s%s%s (%s%s:%d:%d%s)\n", BLU,
+                       lu_string_get_cstring(record->executable->name), reset,
+                       BLU, record->executable->file_path, span->line,
+                       span->col, reset);
+    }
 
     lu_obj_set(error, lu_intern_string(state, "traceback"),
                lu_value_object(lu_string_new(state, buffer)));

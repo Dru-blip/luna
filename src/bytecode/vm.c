@@ -337,15 +337,13 @@ loop_start:
 invalid_array_index:
     lu_raise_error(vm->istate, lu_string_new(vm->istate, "invalid index"),
                    &lu_vm_current_ip_span(vm));
-
+#include "ansi_color_codes.h"
 error_reporter:
     struct lu_string* str = lu_as_string(
         lu_obj_get(vm->istate->error, lu_intern_string(vm->istate, "message")));
     struct lu_string* traceback = lu_as_string(lu_obj_get(
         vm->istate->error, lu_intern_string(vm->istate, "traceback")));
-    printf("Error: %s\n", lu_string_get_cstring(str));
-    if (traceback) {
-        printf("%s\n", traceback->block->data);
-    }
+    printf(BRED "Error" WHT ": %s\n" reset, lu_string_get_cstring(str));
+    printf("%s\n", traceback->block->data);
     return lu_value_none();
 }

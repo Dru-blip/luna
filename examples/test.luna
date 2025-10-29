@@ -1,1 +1,21 @@
-return -true
+fn a() {
+    return none + 2
+}
+
+fn b() {
+    return a()
+}
+
+fn c() {
+    return b()
+}
+
+fn d() {
+    return c()
+}
+
+fn e() {
+    return d()
+}
+
+return e()

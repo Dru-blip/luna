@@ -119,6 +119,7 @@ struct basic_block {
 
 struct executable {
     LUNA_OBJECT_HEADER;
+    struct lu_string* name;
     struct instruction* instructions;
     size_t instructions_size;
     size_t constants_size;

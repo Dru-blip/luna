@@ -836,15 +836,6 @@ static inline void generate_fn_decl(struct generator* generator,
         declare_param(generator, param_name, param_name_len);
     }
 
-    generator_switch_basic_block(generator, fn_entry_block);
-    generate_stmt(generator, stmt->data.fn_decl.body);
-    struct executable* fn_executable = generator_make_executable(generator);
-
-    generator = generator->prev;
-    generator->global_variable_count = fn_generator->global_variable_count;
-    uint32_t executable_index =
-        generator_add_executable_contant(generator, fn_executable);
-
     char* name = generator->program.source + stmt->data.fn_decl.name_span.start;
     uint32_t name_len =
         stmt->data.fn_decl.name_span.end - stmt->data.fn_decl.name_span.start;
@@ -854,6 +845,16 @@ static inline void generate_fn_decl(struct generator* generator,
 
     struct lu_string* name_string =
         lu_intern_string(generator->state, name_copy);
+
+    generator_switch_basic_block(generator, fn_entry_block);
+    generate_stmt(generator, stmt->data.fn_decl.body);
+
+    struct executable* fn_executable = generator_make_executable(generator);
+    fn_executable->name = name_string;
+    generator = generator->prev;
+    generator->global_variable_count = fn_generator->global_variable_count;
+    uint32_t executable_index =
+        generator_add_executable_contant(generator, fn_executable);
 
     uint32_t name_index = generator_add_identifier(generator, name_string);
 
@@ -938,7 +939,9 @@ struct executable* generator_generate(struct lu_istate* state,
     size_t entry_block_id = generator_basic_block_new(generator);
     generator->current_block_id = entry_block_id;
     generate_stmts(generator, program.nodes);
-    return generator_make_executable(generator);
+    struct executable* executable = generator_make_executable(generator);
+    executable->name = lu_intern_string(state, "<module>");
+    return executable;
 }
 
 static void generator_basic_blocks_linearize(struct generator* generator,
