@@ -46,6 +46,18 @@ static void lu_vm_push_new_record_with_globals(struct lu_vm* vm,
     vm->rp++;
 }
 
+static void lu_vm_push_new_native_record_with_globals(
+    struct lu_vm* vm, struct lu_globals* globals, struct span* span) {
+    struct activation_record record;
+    record.type = ACTIVATION_RECORD_TYPE_NATIVE;
+    record.native_call_site = *span;
+
+    record.globals = globals;
+
+    arrput(vm->records, record);
+    vm->rp++;
+}
+
 static void lu_vm_push_new_record(struct lu_vm* vm,
                                   struct executable* executable) {
     struct activation_record record;
@@ -371,8 +383,9 @@ loop_start:
                 struct lu_value self =
                     parent_record->registers[instr->call.self_reg];
                 if (func->type == FUNCTION_NATIVE) {
-                    // should refactor allocating and free may slow down the
-                    // execution
+                    // should refactor, issue: allocating and freeing args may
+                    // slow down the execution , should move to a preallocated
+                    // buffer.
                     struct lu_value* args = nullptr;
                     arrsetlen(args, func->param_count);
                     for (uint32_t i = 0; i < instr->call.argc; i++) {

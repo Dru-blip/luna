@@ -15,7 +15,7 @@ enum activation_record_type {
 //
 
 struct activation_record {
-    enum activation_record_type type;  // unused
+    enum activation_record_type type;  // (unused)
     struct executable* executable;
     struct lu_function* function;
     struct lu_value* registers;
@@ -24,6 +24,8 @@ struct activation_record {
     // struct lu_value* globals;
     struct lu_globals* globals;
     size_t caller_ret_reg;
+    struct span native_call_site;  // (unused) used for native
+                                   // activation records
 };
 
 enum lu_vm_status {

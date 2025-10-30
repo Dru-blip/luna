@@ -144,6 +144,8 @@ static void collect_roots(struct heap* heap, struct lu_objectset* roots) {
     lu_objectset_add(roots, heap->istate->module_cache);
     lu_objectset_add(roots, heap->istate->running_module);
     lu_objectset_add(roots, heap->istate->main_module);
+    lu_objectset_add(roots, heap->istate->object_prototype);
+    lu_objectset_add(roots, heap->istate->array_prototype);
 
     if (heap->istate->error) {
         lu_objectset_add(roots, heap->istate->error);
