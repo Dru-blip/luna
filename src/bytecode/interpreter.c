@@ -6,7 +6,10 @@
 #include "bytecode/ir.h"
 #include "bytecode/vm.h"
 #include "heap.h"
+#include "objects/array.h"
+#include "objects/object_prototype.h"
 #include "parser.h"
+#include "stb_ds.h"
 #include "value.h"
 
 static char* read_file(const char* filename) {
@@ -29,12 +32,15 @@ struct lu_istate* lu_istate_new() {
     struct lu_istate* state = malloc(sizeof(struct lu_istate));
     state->heap = heap_create(state);
     string_interner_init(state);
+    state->object_prototype = lu_object_prototype_new(state);
+    state->array_prototype = lu_array_prototype_new(state);
     state->global_object = lu_object_new(state);
     state->module_cache = lu_object_new(state);
     state->running_module = nullptr;
     state->main_module = nullptr;
     state->vm = lu_vm_new(state);
     state->error = nullptr;
+
     arena_init(&state->args_buffer);
     lu_init_global_object(state);
     return state;
@@ -110,4 +116,28 @@ struct lu_value lu_run_program(struct lu_istate* state, const char* filepath) {
 
     return result;
     // return lu_value_none();
+}
+
+struct lu_value lu_call(struct lu_vm* vm, struct lu_object* self,
+                        struct lu_function* function, struct lu_value* args,
+                        uint8_t argc, bool as_callback) {
+    if (function->type == FUNCTION_NATIVE) {
+        return function->func(vm, self, args, argc);
+    }
+    // Duplicate block of code from "vm.c" (lu_vm_push_new_record)
+    // ---------------------------------------
+    struct activation_record record;
+    record.executable = function->executable;
+    record.ip = 0;
+    record.globals = vm->records[vm->rp - 1].globals;
+    record.max_register_count = function->executable->max_register_count;
+    record.registers = nullptr;
+    arrsetlen(record.registers, record.max_register_count);
+    record.registers[0] = lu_value_object(self);
+    arrput(vm->records, record);
+    vm->rp++;
+    //-------------------------------------------
+
+    struct activation_record* rec = &vm->records[vm->rp - 1];
+    return lu_vm_run_record(vm, rec, as_callback);
 }

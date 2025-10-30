@@ -15,6 +15,9 @@ struct lu_istate {
     struct lu_module* main_module;
     struct lu_vm* vm;
     struct generator* ir_generator;
+
+    struct lu_object* object_prototype;
+    struct lu_object* array_prototype;
 };
 
 struct lu_istate* lu_istate_new();
@@ -23,3 +26,6 @@ struct lu_value lu_run_program(struct lu_istate* state, const char* filepath);
 
 struct lu_value lu_run_executable(struct lu_istate* state,
                                   struct executable* executable);
+struct lu_value lu_call(struct lu_vm* vm, struct lu_object* self,
+                        struct lu_function* function, struct lu_value* args,
+                        uint8_t argc, bool as_callback);

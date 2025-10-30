@@ -58,6 +58,7 @@ enum lu_object_state {
     enum lu_object_state state;      \
     struct lu_object_vtable* vtable; \
     struct property_map properties;  \
+    bool is_sealed;                  \
     struct lu_object* prototype;
 
 struct lu_object {
@@ -126,7 +127,7 @@ struct argument {
 struct lu_vm;
 
 typedef struct lu_value (*native_func_t)(struct lu_vm*, struct lu_object*,
-                                         struct lu_value*);
+                                         struct lu_value*, uint8_t);
 
 struct lu_function {
     LUNA_OBJECT_HEADER;
@@ -203,7 +204,7 @@ struct lu_array_iter {
 #define lu_as_string(v) ((struct lu_string*)lu_as_object(v))
 #define lu_as_array(v) ((struct lu_array*)lu_as_object(v))
 
-#define lu_obj_get(obj, key) lu_property_map_get(&(obj)->properties, key)
+#define lu_obj_get(obj, key) lu_object_get_property(obj, key)
 #define lu_obj_set(obj, key, value) \
     lu_property_map_set(&(obj)->properties, key, value)
 #define lu_obj_remove(obj, key) lu_property_map_remove(&(obj)->properties, key)
@@ -241,13 +242,17 @@ void lu_property_map_init(struct property_map* map, size_t capacity);
 void lu_property_map_deinit(struct property_map* map);
 void lu_property_map_set(struct property_map* map, struct lu_string* key,
                          struct lu_value value);
+bool lu_property_map_has(struct property_map* map, struct lu_string* key);
 struct lu_value lu_property_map_get(struct property_map* map,
                                     struct lu_string* key);
+
 // TODO: implement property remove
 void lu_property_map_remove(struct property_map* map, struct lu_string* key);
 
 struct lu_object* lu_object_new(struct lu_istate* state);
 struct lu_object* lu_object_new_sized(struct lu_istate* state, size_t size);
+struct lu_value lu_object_get_property(struct lu_object* obj,
+                                       struct lu_string* key);
 struct lu_object_vtable* lu_object_get_default_vtable();
 struct lu_string* lu_string_new(struct lu_istate* state, char* data);
 struct lu_string* lu_small_string_new(struct lu_istate* state, char* data,

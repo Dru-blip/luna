@@ -29,7 +29,7 @@ static int strbuf_reserve(struct strbuf* sb, size_t add) {
     if (!sb->dynamic) return (sb->len + add + 1 <= sb->cap) ? 0 : -1;
 
     need = sb->len + add + 1;
-    if (need <= sb->cap) return 0;
+    if (need <= sb->cap) return 1;
 
     size_t new_cap = sb->cap * STRBUF_GROWTH_FACTOR;
     if (new_cap < need) new_cap = need;

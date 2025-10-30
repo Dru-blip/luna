@@ -66,11 +66,12 @@ struct lu_value lu_run_executable(struct lu_istate* state,
                                   struct executable* executable) {
     lu_vm_push_new_record(state->vm, executable);
     struct activation_record* record = &state->vm->records[state->vm->rp - 1];
-    return lu_vm_run_record(state->vm, record);
+    return lu_vm_run_record(state->vm, record, false);
 }
 
 struct lu_value lu_vm_run_record(struct lu_vm* vm,
-                                 struct activation_record* record) {
+                                 struct activation_record* record,
+                                 bool as_callback) {
 record_start:
     size_t instruction_count = record->executable->instructions_size;
 loop_start:
@@ -377,8 +378,8 @@ loop_start:
                     for (uint32_t i = 0; i < instr->call.argc; i++) {
                         args[i] = record->registers[instr->call.args_reg[i]];
                     }
-                    record->registers[instr->call.ret_reg] =
-                        func->func(vm, lu_as_object(self), args);
+                    record->registers[instr->call.ret_reg] = func->func(
+                        vm, lu_as_object(self), args, instr->call.argc);
                     arrfree(args);
                     if (lu_has_error(vm)) {
                         goto error_reporter;
@@ -405,7 +406,8 @@ loop_start:
                 vm->rp--;
 
                 if (vm->rp < 1 ||
-                    vm->istate->running_module != vm->istate->main_module) {
+                    vm->istate->running_module != vm->istate->main_module ||
+                    as_callback) {
                     return child_record.registers[instr->destination_reg];
                 }
 

@@ -312,6 +312,22 @@ struct lu_value lu_property_map_get(struct property_map* map,
 
     return lu_value_undefined();
 }
+
+bool lu_property_map_has(struct property_map* map, struct lu_string* key) {
+    size_t index = (key->hash) & (map->capacity - 1);
+
+    struct property_map_entry* entry = map->entries[index];
+    while (entry) {
+        if (lu_string_equal(entry->key, key)) {
+            return true;
+        }
+        entry = entry->next;
+    }
+
+    return false;
+}
+
+// TODO: remove implement
 void lu_property_map_remove(struct property_map* map, struct lu_string* key) {}
 
 inline struct lu_object* lu_object_new(struct lu_istate* state) {
@@ -319,6 +335,7 @@ inline struct lu_object* lu_object_new(struct lu_istate* state) {
         heap_allocate_object(state->heap, sizeof(struct lu_object));
     lu_property_map_init(&obj->properties, 4);
     obj->vtable = &lu_object_default_vtable;
+    obj->prototype = state->object_prototype;
     return obj;
 }
 
@@ -327,7 +344,21 @@ inline struct lu_object* lu_object_new_sized(struct lu_istate* state,
     struct lu_object* obj = heap_allocate_object(state->heap, size);
     lu_property_map_init(&obj->properties, 4);
     obj->vtable = &lu_object_default_vtable;
+    obj->prototype = state->object_prototype;
     return obj;
+}
+
+struct lu_value lu_object_get_property(struct lu_object* obj,
+                                       struct lu_string* key) {
+    struct lu_object* curr = obj;
+    while (curr) {
+        struct lu_value value = lu_property_map_get(&curr->properties, key);
+        if (!lu_is_undefined(value)) {
+            return value;
+        }
+        curr = curr->prototype;
+    }
+    return lu_value_undefined();
 }
 
 inline struct lu_object_vtable* lu_object_get_default_vtable() {
@@ -376,7 +407,7 @@ struct lu_string* lu_string_new(struct lu_istate* state, char* data) {
         str->type = STRING_SIMPLE;
         str->block = block;
     }
-    lu_obj_set(str, lu_intern_string(state, "length"), lu_value_int(len));
+    // lu_obj_set(str, lu_intern_string(state, "length"), lu_value_int(len));
     return str;
 }
 
@@ -490,6 +521,7 @@ struct lu_array* lu_array_new(struct lu_istate* state) {
     array->capacity = 4;
     array->size = 0;
     array->vtable = &lu_array_vtable;
+    array->prototype = state->array_prototype;
     array->elements = calloc(array->capacity, sizeof(struct lu_value));
     return array;
 }

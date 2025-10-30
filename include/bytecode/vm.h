@@ -37,6 +37,7 @@ struct lu_vm {
     struct lu_object* global_object;
     size_t rp;
     struct lu_istate* istate;
+    struct lu_globals* globals;
 };
 
 #define lu_vm_active_record(vm) ((vm)->records[(vm)->rp - 1])
@@ -49,4 +50,5 @@ struct lu_vm* lu_vm_new(struct lu_istate* istate);
 void lu_vm_destroy(struct lu_vm* vm);
 
 struct lu_value lu_vm_run_record(struct lu_vm* vm,
-                                 struct activation_record* record);
+                                 struct activation_record* record,
+                                 bool as_callback);
