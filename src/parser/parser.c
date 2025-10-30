@@ -350,6 +350,8 @@ static struct ast_node* parse_block(struct parser* parser) {
 }
 
 static struct ast_node* parse_if_stmt(struct parser* parser) {
+    // TODO: flatten the if else if recursive chains into array of if
+    // statements.
     struct token* token = parser_eat(parser);
     if (check(parser, TOKEN_LPAREN)) parser_advance(parser);
     struct ast_node* test = parse_expression(parser, 0);

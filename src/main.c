@@ -1,6 +1,6 @@
 #include "bytecode/interpreter.h"
 
-// TODO: compiler errors
+// TODO: support for if else if.
 int main(int argc, char* argv[]) {
     //
     struct lu_istate* state = lu_istate_new();

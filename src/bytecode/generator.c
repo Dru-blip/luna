@@ -904,30 +904,37 @@ static inline void generate_continue_stmt(struct generator* generator,
 
 static inline void generate_if_stmt(struct generator* generator,
                                     struct ast_node* stmt) {
-    uint32_t true_block = generator_basic_block_new(generator);
-    uint32_t false_block = generator_basic_block_new(generator);
-    uint32_t end_block = stmt->data.if_stmt.alternate
-                             ? generator_basic_block_new(generator)
-                             : false_block;
-    uint32_t condition = generate_expr(generator, stmt->data.if_stmt.test);
+    struct ast_node* current = stmt;
+    uint32_t end_block = generator_basic_block_new(generator);
+    while (current && current->kind == AST_NODE_IF_STMT) {
+        uint32_t true_block = generator_basic_block_new(generator);
+        uint32_t false_block = generator_basic_block_new(generator);
 
-    struct instruction branch_instr = {
-        .opcode = OPCODE_JMP_IF,
-    };
-    branch_instr.jmp_if.condition_reg = condition;
-    branch_instr.jmp_if.true_block_id = true_block;
-    branch_instr.jmp_if.false_block_id = false_block;
+        uint32_t condition =
+            generate_expr(generator, current->data.if_stmt.test);
 
-    emit_instruction(generator, branch_instr, stmt->span);
+        struct instruction branch_instr = {
+            .opcode = OPCODE_JMP_IF,
+        };
+        branch_instr.jmp_if.condition_reg = condition;
+        branch_instr.jmp_if.true_block_id = true_block;
+        branch_instr.jmp_if.false_block_id = false_block;
 
-    generator_switch_basic_block(generator, true_block);
-    generate_stmt(generator, stmt->data.if_stmt.consequent);
+        emit_instruction(generator, branch_instr, current->span);
 
-    generator_emit_jump_instruction(generator, end_block, stmt->span);
+        generator_switch_basic_block(generator, true_block);
+        generate_stmt(generator, current->data.if_stmt.consequent);
 
-    if (stmt->data.if_stmt.alternate) {
+        generator_emit_jump_instruction(generator, end_block, current->span);
+
+        current = current->data.if_stmt.alternate;
         generator_switch_basic_block(generator, false_block);
-        generate_stmt(generator, stmt->data.if_stmt.alternate);
+    }
+
+    if (current) {
+        generate_stmt(generator, current);
+        generator_emit_jump_instruction(generator, end_block, current->span);
+    } else {
         generator_emit_jump_instruction(generator, end_block, stmt->span);
     }
 
