@@ -565,10 +565,10 @@ struct lu_module* lu_module_new(struct lu_istate* state, struct lu_string* name,
     return mod;
 }
 
-void lu_raise_error(struct lu_istate* state, struct lu_string* message,
-                    struct span* location) {
+void lu_raise_error(struct lu_istate* state, struct lu_string* message) {
     struct lu_object* error = lu_object_new(state);
 
+    struct span* loc = &lu_vm_current_ip_span(state->vm);
     char buffer[1024];
     struct strbuf sb;
     strbuf_init_static(&sb, buffer, sizeof(buffer));
@@ -577,12 +577,11 @@ void lu_raise_error(struct lu_istate* state, struct lu_string* message,
                lu_value_object(message));
 
     // // TODO: include call stack information
-    const char* line_start =
-        state->running_module->program.source + location->start;
-    int line_length = location->end - location->start;
+    const char* line_start = state->running_module->program.source + loc->start;
+    int line_length = loc->end - loc->start;
 
     strbuf_append(&sb, "  | \n");
-    strbuf_appendf(&sb, "%d | ", location->line);
+    strbuf_appendf(&sb, "%d | ", loc->line);
     strbuf_append_n(&sb, line_start, line_length);
     strbuf_append(&sb, "\n");
     strbuf_append(&sb, "  | \n");
@@ -595,7 +594,7 @@ void lu_raise_error(struct lu_istate* state, struct lu_string* message,
 
     // strbuf_appendf(&sb, "in %s:%d:%d\n",
     //                lu_string_get_cstring(state->running_module->name),
-    //                location->line, location->col);
+    //                loc->line, loc->col);
 
     strbuf_appendf(&sb, "%sTraceback (most recent call first):\n%s", YEL,
                    reset);
@@ -612,7 +611,7 @@ void lu_raise_error(struct lu_istate* state, struct lu_string* message,
     lu_obj_set(error, lu_intern_string(state, "traceback"),
                lu_value_object(lu_string_new(state, buffer)));
 
-    state->error_location = *location;
+    state->error_location = *loc;
     state->error = error;
 }
 

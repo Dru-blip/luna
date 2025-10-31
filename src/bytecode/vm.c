@@ -144,9 +144,9 @@ loop_start:
                     goto loop_start;
                 }
 
-                lu_raise_error(vm->istate,
-                               lu_string_new(vm->istate, "undeclared variable"),
-                               &lu_vm_current_ip_span(vm));
+                lu_raise_error(
+                    vm->istate,
+                    lu_string_new(vm->istate, "undeclared variable"));
                 goto error_reporter;
             }
             case OPCODE_UNARY_PLUS: {
@@ -163,15 +163,13 @@ loop_start:
                     goto loop_start;
                 }
 
-                struct span span = lu_vm_current_ip_span(vm);
                 const char* argument_type_name =
                     lu_value_get_type_name(argument);
                 char buffer[256];
                 snprintf(buffer, sizeof(buffer),
                          "invalid operand type for unary (-) : '%s'",
                          argument_type_name);
-                lu_raise_error(vm->istate, lu_string_new(vm->istate, buffer),
-                               &span);
+                lu_raise_error(vm->istate, lu_string_new(vm->istate, buffer));
 
                 goto error_reporter;
             }
@@ -204,8 +202,7 @@ loop_start:
                         vm->istate,
                         lu_string_new(
                             vm->istate,
-                            "invalid member access on non object value"),
-                        &lu_vm_current_ip_span(vm));
+                            "invalid member access on non object value"));
                     goto error_reporter;
                 }
                 struct lu_string* key =
@@ -227,8 +224,7 @@ loop_start:
                         vm->istate,
                         lu_string_new(
                             vm->istate,
-                            "invalid member access on non object value"),
-                        &lu_vm_current_ip_span(vm));
+                            "invalid member access on non object value"));
                     goto error_reporter;
                 }
                 struct lu_value value = lu_obj_get(lu_as_object(obj_val), key);
@@ -239,8 +235,7 @@ loop_start:
                     strbuf_appendf(&sb, "object has no property '%s'",
                                    lu_string_get_cstring(key));
                     lu_raise_error(vm->istate,
-                                   lu_string_new(vm->istate, buffer),
-                                   &lu_vm_current_ip_span(vm));
+                                   lu_string_new(vm->istate, buffer));
                     goto error_reporter;
                 }
                 record->registers[instr->binary_op.result_reg] = value;
@@ -267,8 +262,7 @@ loop_start:
                                 "index %ld out of bounds (array length %ld)",
                                 index, lu_array_length(lu_as_array(obj_val)));
                             lu_raise_error(vm->istate,
-                                           lu_string_new(vm->istate, buffer),
-                                           &lu_vm_current_ip_span(vm));
+                                           lu_string_new(vm->istate, buffer));
                             goto error_reporter;
                         }
                         record->registers[instr->binary_op.result_reg] = value;
@@ -299,8 +293,7 @@ loop_start:
                                 "index %ld out of bounds (array length %ld)",
                                 index, lu_array_length(lu_as_array(obj_val)));
                             lu_raise_error(vm->istate,
-                                           lu_string_new(vm->istate, buffer),
-                                           &lu_vm_current_ip_span(vm));
+                                           lu_string_new(vm->istate, buffer));
                             goto error_reporter;
                         }
                         goto loop_start;
@@ -373,8 +366,7 @@ loop_start:
                              " (%s)",
                              calle_type_name);
                     lu_raise_error(vm->istate,
-                                   lu_string_new(vm->istate, buffer),
-                                   &lu_vm_current_ip_span(vm));
+                                   lu_string_new(vm->istate, buffer));
                     goto error_reporter;
                 }
                 struct activation_record* parent_record = record;
@@ -438,8 +430,7 @@ loop_start:
     return lu_value_none();
 
 invalid_array_index:
-    lu_raise_error(vm->istate, lu_string_new(vm->istate, "invalid index"),
-                   &lu_vm_current_ip_span(vm));
+    lu_raise_error(vm->istate, lu_string_new(vm->istate, "invalid index"));
 #include "ansi_color_codes.h"
 error_reporter:
     if (vm->istate->running_module != vm->istate->main_module) {

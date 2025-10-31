@@ -47,8 +47,7 @@ LU_NATIVE_FN(print_func) {
 LU_NATIVE_FN(raise_func) {
     lu_raise_error(
         vm->istate,
-        lu_string_new(vm->istate, "raised error from native function"),
-        &lu_vm_current_ip_span(vm));
+        lu_string_new(vm->istate, "raised error from native function"));
     LU_RETURN_NONE();
 }
 
@@ -127,8 +126,7 @@ LU_NATIVE_FN(import_module) {
     if (path_buffer == nullptr) {
         closedir(dir);
         strbuf_appendf(&sb, "failed to read file: '%s'", file_path);
-        lu_raise_error(vm->istate, lu_string_new(vm->istate, err_buffer),
-                       &lu_vm_current_ip_span(vm));
+        lu_raise_error(vm->istate, lu_string_new(vm->istate, err_buffer));
         return lu_value_undefined();
     }
 
@@ -145,8 +143,7 @@ LU_NATIVE_FN(console_read_int) {
     struct lu_value help = LU_ARG_GET(args, 0);
     if (!lu_is_string(help)) {
         lu_raise_error(vm->istate,
-                       lu_string_new(vm->istate, "Expected a string argument"),
-                       &lu_vm_current_ip_span(vm));
+                       lu_string_new(vm->istate, "Expected a string argument"));
         LU_RETURN_NONE();
     }
     printf("%s", lu_string_get_cstring(lu_as_string(help)));

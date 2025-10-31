@@ -31,38 +31,36 @@ typedef struct lu_value lu_value;
 #define LU_UNPACK_OBJ(args, idx) ((args)[(idx)].obj)
 #define LU_UNPACK_VAL(args, idx) ((args)[(idx)])
 
-#define LU_TRY_UNPACK_INT(vm, args, idx, dest)                                \
-    do {                                                                      \
-        if (!lu_is_int((args)[(idx)])) {                                      \
-            const char* got_type_str_name =                                   \
-                lu_value_get_type_name((args)[(idx)]);                        \
-            const char* expected_type_str_name = "integer";                   \
-            char buffer[256];                                                 \
-            snprintf(buffer, sizeof(buffer),                                  \
-                     "bad argument #%d: expected '%s', got '%s'", (idx),      \
-                     expected_type_str_name, got_type_str_name);              \
-            lu_raise_error((vm)->istate, lu_string_new((vm)->istate, buffer), \
-                           &lu_vm_current_ip_span(vm));                       \
-            return lu_value_none();                                           \
-        }                                                                     \
-        *(int64_t*)(dest) = (args)[(idx)].integer;                            \
+#define LU_TRY_UNPACK_INT(vm, args, idx, dest)                                 \
+    do {                                                                       \
+        if (!lu_is_int((args)[(idx)])) {                                       \
+            const char* got_type_str_name =                                    \
+                lu_value_get_type_name((args)[(idx)]);                         \
+            const char* expected_type_str_name = "integer";                    \
+            char buffer[256];                                                  \
+            snprintf(buffer, sizeof(buffer),                                   \
+                     "bad argument #%d: expected '%s', got '%s'", (idx),       \
+                     expected_type_str_name, got_type_str_name);               \
+            lu_raise_error((vm)->istate, lu_string_new((vm)->istate, buffer)); \
+            return lu_value_none();                                            \
+        }                                                                      \
+        *(int64_t*)(dest) = (args)[(idx)].integer;                             \
     } while (0)
 
-#define LU_TRY_UNPACK_OBJ(vm, args, idx, dest)                                \
-    do {                                                                      \
-        if (!lu_is_obj((args)[(idx)])) {                                      \
-            const char* got_type_str_name =                                   \
-                lu_value_get_type_name((args)[(idx)]);                        \
-            const char* expected_type_str_name = "object";                    \
-            char buffer[256];                                                 \
-            snprintf(buffer, sizeof(buffer),                                  \
-                     "bad argument #%d: expected '%s', got '%s'", (idx),      \
-                     expected_type_str_name, got_type_str_name);              \
-            lu_raise_error((vm)->istate, lu_string_new((vm)->istate, buffer), \
-                           &lu_vm_current_ip_span(vm));                       \
-            return lu_value_none();                                           \
-        }                                                                     \
-        *(struct lu_obj**)(dest) = (args)[(idx)].obj;                         \
+#define LU_TRY_UNPACK_OBJ(vm, args, idx, dest)                                 \
+    do {                                                                       \
+        if (!lu_is_obj((args)[(idx)])) {                                       \
+            const char* got_type_str_name =                                    \
+                lu_value_get_type_name((args)[(idx)]);                         \
+            const char* expected_type_str_name = "object";                     \
+            char buffer[256];                                                  \
+            snprintf(buffer, sizeof(buffer),                                   \
+                     "bad argument #%d: expected '%s', got '%s'", (idx),       \
+                     expected_type_str_name, got_type_str_name);               \
+            lu_raise_error((vm)->istate, lu_string_new((vm)->istate, buffer)); \
+            return lu_value_none();                                            \
+        }                                                                      \
+        *(struct lu_obj**)(dest) = (args)[(idx)].obj;                          \
     } while (0)
 
 #define LU_TRY_UNPACK_ARGS(vm, typespec, argc, args, ...)                  \
@@ -94,8 +92,7 @@ typedef struct lu_value lu_value;
         snprintf(buffer, sizeof(buffer),                                   \
                  "bad argument #%d : expected '%s' got '%s'", __i,         \
                  expected_type_str_name, got_type_str_name);               \
-        lu_raise_error(vm->istate, lu_string_new(vm->istate, buffer),      \
-                       &lu_vm_current_ip_span(vm));                        \
+        lu_raise_error(vm->istate, lu_string_new(vm->istate, buffer));     \
         return lu_value_none();                                            \
     arg_type_check_complete:                                               \
     } while (0);

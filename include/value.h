@@ -278,8 +278,7 @@ void lu_array_push(struct lu_array* array, struct lu_value value);
 struct lu_value lu_array_get(struct lu_array* array, size_t index);
 int lu_array_set(struct lu_array* array, size_t index, struct lu_value value);
 
-void lu_raise_error(struct lu_istate* state, struct lu_string* message,
-                    struct span* location);
+void lu_raise_error(struct lu_istate* state, struct lu_string* message);
 
 void lu_init_global_object(struct lu_istate* state);
 

@@ -1,8 +1,21 @@
-let a={name:"john",
-        age:35,
-        print_age:fn(){
-            print("age: "+ self.age)
-        }
+fn a(){
+    return none+1
 }
 
-return a
+fn b(){
+    return a()
+}
+
+fn c(){
+    return b()
+}
+
+fn d(){
+    return c()
+}
+
+fn e(){
+    return d()
+}
+
+return e()

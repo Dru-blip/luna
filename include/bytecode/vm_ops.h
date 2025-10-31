@@ -6,14 +6,13 @@
 #define IS_NUMERIC(a) (lu_is_int(a) || lu_is_bool(a))
 
 #define RAISE_TYPE_ERROR(vm, op, a, b)                                       \
-    struct span span = lu_vm_current_ip_span(vm);                            \
     const char* lhs_type_name = lu_value_get_type_name(a);                   \
     const char* rhs_type_name = lu_value_get_type_name(b);                   \
     char buffer[256];                                                        \
     snprintf(buffer, sizeof(buffer),                                         \
              "invalid operand types for operation (%s) : '%s' and '%s'", op, \
              lhs_type_name, rhs_type_name);                                  \
-    lu_raise_error(vm->istate, lu_string_new(vm->istate, buffer), &span);    \
+    lu_raise_error(vm->istate, lu_string_new(vm->istate, buffer));           \
     return lu_value_none();
 
 static inline struct lu_value lu_vm_op_add(struct lu_vm* vm, struct lu_value a,
@@ -54,8 +53,7 @@ static inline struct lu_value lu_vm_op_div(struct lu_vm* vm, struct lu_value a,
         if (b.integer == 0) {
             struct span span = lu_vm_current_ip_span(vm);
             lu_raise_error(vm->istate,
-                           lu_string_new(vm->istate, "Division by zero"),
-                           &span);
+                           lu_string_new(vm->istate, "Division by zero"));
             return lu_value_none();
         }
         return lu_value_int(a.integer * b.integer);

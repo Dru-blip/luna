@@ -45,8 +45,7 @@ LU_NATIVE_FN(Array_insert) {
             buffer, sizeof(buffer),
             "bad argument #%d (index %ld) out of bounds (array length %ld)", 0,
             index, lu_array_length(arr));
-        lu_raise_error(vm->istate, lu_string_new(vm->istate, buffer),
-                       &lu_vm_current_ip_span(vm));
+        lu_raise_error(vm->istate, lu_string_new(vm->istate, buffer));
         return lu_value_none();
     }
 
@@ -78,8 +77,7 @@ LU_NATIVE_FN(Array_remove) {
             buffer, sizeof(buffer),
             "bad argument #%d (index %ld) out of bounds (array length %ld)", 0,
             index, lu_array_length(arr));
-        lu_raise_error(vm->istate, lu_string_new(vm->istate, buffer),
-                       &lu_vm_current_ip_span(vm));
+        lu_raise_error(vm->istate, lu_string_new(vm->istate, buffer));
     }
 
     for (uint32_t i = index; i < arr->size - 1; ++i) {

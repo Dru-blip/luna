@@ -15,8 +15,7 @@ LU_NATIVE_FN(Object_has_property) {
     struct lu_value key_val = args[0];
     if (!lu_is_string(key_val)) {
         lu_raise_error(vm->istate,
-                       lu_string_new(vm->istate, "Key must be a string"),
-                       &lu_vm_current_ip_span(vm));
+                       lu_string_new(vm->istate, "Key must be a string"));
     }
     struct lu_object* curr = self;
     while (curr) {
