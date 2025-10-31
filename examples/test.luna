@@ -1,1 +1,7 @@
-let a=import("hello")
+let a={
+    sayHello:fn(){
+        return ad()
+    }
+}
+
+a.sayHello()

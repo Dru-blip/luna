@@ -48,7 +48,6 @@ fn play() {
         print("Player " + current + ", enter position (0-8): ")
         let pos = console.readInt("pos: ")
 
-        // convert input to integer if needed
         if (board[pos] != EMPTY_CELL) {
             print("Spot already taken!")
             continue

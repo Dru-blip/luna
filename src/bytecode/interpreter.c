@@ -12,7 +12,7 @@
 #include "stb_ds.h"
 #include "value.h"
 
-static char* read_file(const char* filename) {
+static char* read_file(const char* filename, size_t* source_length) {
     FILE* f = fopen(filename, "r");
     if (!f) {
         printf("Error: could not open file %s\n", filename);
@@ -25,6 +25,7 @@ static char* read_file(const char* filename) {
     buffer[len] = '\0';
     fread(buffer, 1, len, f);
     fclose(f);
+    *source_length = len;
     return buffer;
 }
 
@@ -79,8 +80,10 @@ static void print_value(struct lu_value value) {
 }
 
 struct lu_value lu_run_program(struct lu_istate* state, const char* filepath) {
-    const char* source = read_file(filepath);
+    size_t source_length;
+    const char* source = read_file(filepath, &source_length);
     struct ast_program program = parse_program(filepath, source);
+    program.source_length = source_length;
     struct lu_module* module =
         lu_module_new(state, lu_string_new(state, filepath), &program);
 

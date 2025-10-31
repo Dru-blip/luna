@@ -553,7 +553,6 @@ int lu_array_set(struct lu_array* array, size_t index, struct lu_value value) {
 
 struct lu_module* lu_module_new(struct lu_istate* state, struct lu_string* name,
                                 struct ast_program* program) {
-    //
     struct lu_module* mod =
         lu_object_new_sized(state, sizeof(struct lu_module));
     mod->program = *program;
@@ -563,6 +562,18 @@ struct lu_module* lu_module_new(struct lu_istate* state, struct lu_string* name,
     mod->exported = lu_value_undefined();
 
     return mod;
+}
+
+static void extract_source_line_info(struct lu_istate* state, struct span* loc,
+                                     size_t* line_start_offset,
+                                     size_t* line_length) {
+    int64_t line_start = loc->start, line_end = loc->end;
+    const char* source = state->running_module->program.source;
+    size_t source_length = state->running_module->program.source_length;
+    while (line_start > 0 && source[line_start - 1] != '\n') line_start--;
+    while (line_end < source_length && source[line_end] != '\n') line_end++;
+    *line_length = line_end - line_start;
+    *line_start_offset = line_start;
 }
 
 void lu_raise_error(struct lu_istate* state, struct lu_string* message) {
@@ -576,25 +587,25 @@ void lu_raise_error(struct lu_istate* state, struct lu_string* message) {
     lu_obj_set(error, lu_intern_string(state, "message"),
                lu_value_object(message));
 
-    // // TODO: include call stack information
-    const char* line_start = state->running_module->program.source + loc->start;
-    int line_length = loc->end - loc->start;
+    size_t line_start_offset, line_length;
+    extract_source_line_info(state, loc, &line_start_offset, &line_length);
+    const char* src_line_start =
+        state->running_module->program.source + line_start_offset;
 
     strbuf_append(&sb, "  | \n");
     strbuf_appendf(&sb, "%d | ", loc->line);
-    strbuf_append_n(&sb, line_start, line_length);
+    strbuf_append_n(&sb, src_line_start, line_length);
     strbuf_append(&sb, "\n");
     strbuf_append(&sb, "  | \n");
 
     strbuf_append(&sb, "    ");
-    for (size_t i = 0; i < line_length; i++) {
+    for (size_t i = 0; i < loc->start - line_start_offset; i++) {
+        strbuf_append(&sb, " ");
+    }
+    for (size_t i = 0; i < loc->end - loc->start; i++) {
         strbuf_appendf(&sb, "%s^", RED);
     }
     strbuf_appendf(&sb, "%s\n", reset);
-
-    // strbuf_appendf(&sb, "in %s:%d:%d\n",
-    //                lu_string_get_cstring(state->running_module->name),
-    //                loc->line, loc->col);
 
     strbuf_appendf(&sb, "%sTraceback (most recent call first):\n%s", YEL,
                    reset);

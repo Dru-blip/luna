@@ -138,6 +138,7 @@ struct ast_node {
 struct ast_program {
     const char* source;
     const char* filepath;
+    size_t source_length;
     struct ast_node** nodes;
     struct token* tokens;
     struct arena allocator;
