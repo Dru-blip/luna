@@ -15,7 +15,8 @@ main_srcs=['src/main.c']
 
 luna_runtime=shared_library('lunarun',
     parser_srcs+ds_srcs+runtime_srcs,
-    include_directories:includedir
+    include_directories:includedir,
+    link_args:['-lm']
 )
 
 executable('luna',

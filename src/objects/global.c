@@ -1,7 +1,9 @@
 #include <dirent.h>
 #include <linux/limits.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -162,6 +164,39 @@ LU_NATIVE_FN(Array) {
     return lu_value_object(array);
 }
 
+//------------------
+// Math functions
+
+LU_NATIVE_FN(Math_min) {
+    int64_t a, b;
+    LU_TRY_UNPACK_ARGS(vm, "ii", argc, args, &a, &b);
+
+    return lu_value_int(a < b ? a : b);
+}
+
+LU_NATIVE_FN(Math_max) {
+    int64_t a, b;
+    LU_TRY_UNPACK_ARGS(vm, "ii", argc, args, &a, &b);
+
+    return lu_value_int(a > b ? a : b);
+}
+
+LU_NATIVE_FN(Math_pow) {
+    int64_t a, b;
+    LU_TRY_UNPACK_ARGS(vm, "ii", argc, args, &a, &b);
+
+    return lu_value_int(powl(a, b));
+}
+
+LU_NATIVE_FN(Math_abs) {
+    int64_t a;
+    LU_TRY_UNPACK_ARGS(vm, "i", 1, args, &a);
+
+    return lu_value_int(abs(a));
+}
+
+// --------------------
+
 void lu_init_global_object(struct lu_istate* state) {
     lu_register_native_fn(state, state->vm->global_object, "print", print_func,
                           UINT8_MAX);
@@ -177,4 +212,12 @@ void lu_init_global_object(struct lu_istate* state) {
     lu_register_native_fn(state, console_obj, "readInt", console_read_int, 1);
     lu_obj_set(state->vm->global_object, lu_intern_string(state, "console"),
                lu_value_object(console_obj));
+
+    struct lu_object* math_obj = lu_object_new(state);
+    lu_register_native_fn(state, math_obj, "min", Math_min, 2);
+    lu_register_native_fn(state, math_obj, "max", Math_max, 2);
+    lu_register_native_fn(state, math_obj, "pow", Math_pow, 2);
+    lu_register_native_fn(state, math_obj, "abs", Math_abs, 1);
+    lu_obj_set(state->vm->global_object, lu_intern_string(state, "Math"),
+               lu_value_object(math_obj));
 }
