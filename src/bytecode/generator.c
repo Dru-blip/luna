@@ -1047,6 +1047,19 @@ static void generate_for_stmt(struct generator* generator,
 
 static inline void generate_fn_decl(struct generator* generator,
                                     struct ast_node* stmt) {
+    char* name = generator->program.source + stmt->data.fn_decl.name_span.start;
+    uint32_t name_len =
+        stmt->data.fn_decl.name_span.end - stmt->data.fn_decl.name_span.start;
+    char* name_copy = malloc(name_len + 1);
+    memcpy(name_copy, name, name_len);
+    name_copy[name_len] = '\0';
+
+    struct lu_string* name_string =
+        lu_intern_string(generator->state, name_copy);
+
+    struct variable* var;
+    declare_variable(generator, name, name_len, &var);
+
     struct generator* fn_generator = malloc(sizeof(struct generator));
 
     generator_init(fn_generator, generator->program);
@@ -1068,16 +1081,6 @@ static inline void generate_fn_decl(struct generator* generator,
         uint32_t param_name_len = param->span.end - param->span.start;
         declare_param(generator, param_name, param_name_len);
     }
-
-    char* name = generator->program.source + stmt->data.fn_decl.name_span.start;
-    uint32_t name_len =
-        stmt->data.fn_decl.name_span.end - stmt->data.fn_decl.name_span.start;
-    char* name_copy = malloc(name_len + 1);
-    memcpy(name_copy, name, name_len);
-    name_copy[name_len] = '\0';
-
-    struct lu_string* name_string =
-        lu_intern_string(generator->state, name_copy);
 
     generator_switch_basic_block(generator, fn_entry_block);
     generate_stmt(generator, stmt->data.fn_decl.body);
@@ -1108,10 +1111,9 @@ static inline void generate_fn_decl(struct generator* generator,
 
     emit_instruction(generator, make_fn_instr, stmt->span);
 
-    struct variable* var;
-    declare_variable(generator, name, name_len, &var);
     struct instruction store_func_instr;
-    store_func_instr.opcode = OPCODE_STORE_GLOBAL_BY_INDEX;
+    store_func_instr.opcode =
+        var->scope == SCOPE_GLOBAL ? OPCODE_STORE_GLOBAL_BY_INDEX : OPCODE_MOV;
     store_func_instr.mov.src_reg = make_fn_instr.binary_op.result_reg;
     store_func_instr.mov.dest_reg = var->allocated_reg;
     emit_instruction(generator, store_func_instr, stmt->span);

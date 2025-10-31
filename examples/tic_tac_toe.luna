@@ -46,7 +46,7 @@ fn play() {
 
     while (true) {
         print("Player " + current + ", enter position (0-8): ")
-        let pos = console.read_int("pos: ")
+        let pos = console.readInt("pos: ")
 
         // convert input to integer if needed
         if (board[pos] != EMPTY_CELL) {

@@ -1,1 +1,11 @@
-print(Math.pow(2,4))
+fn fib(n){
+    if(n<2){
+        return n
+    }
+    return fib(n-1)+fib(n-2)
+}
+
+let a=fib(35)
+
+print(a)
+return a
