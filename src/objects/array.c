@@ -146,6 +146,37 @@ LU_NATIVE_FN(Array_to_string) {
     return lu_value_object(lu_string_new(vm->istate, sb.buf));
 }
 
+LU_NATIVE_FN(Array_iterator_next) {
+    struct lu_value* index_val =
+        lu_obj_get_ref(self, lu_intern_string(vm->istate, "index"));
+    struct lu_array* arr =
+        lu_as_array(lu_obj_get(self, lu_intern_string(vm->istate, "data")));
+    struct lu_object* obj = lu_object_new(vm->istate);
+
+    bool done = index_val->integer >= arr->size;
+    struct lu_value value = lu_value_none();
+    if (!done) {
+        value = lu_array_get(arr, index_val->integer++);
+    }
+
+    lu_obj_set(obj, lu_intern_string(vm->istate, "done"), lu_value_bool(done));
+    lu_obj_set(obj, lu_intern_string(vm->istate, "value"), value);
+
+    LU_RETURN_OBJ(obj);
+}
+
+LU_NATIVE_FN(Array_iterator) {
+    struct lu_object* obj = lu_object_new(vm->istate);
+
+    lu_obj_set(obj, lu_intern_string(vm->istate, "data"),
+               lu_value_object(self));
+    lu_obj_set(obj, lu_intern_string(vm->istate, "index"), lu_value_int(0));
+
+    lu_register_native_fn(vm->istate, obj, "next", Array_iterator_next, 0);
+
+    LU_RETURN_OBJ(obj);
+}
+
 struct lu_object* lu_array_prototype_new(struct lu_istate* state) {
     struct lu_object* obj = lu_object_new(state);
 
@@ -154,6 +185,7 @@ struct lu_object* lu_array_prototype_new(struct lu_istate* state) {
     lu_register_native_fn(state, obj, "insert", Array_insert, 2);
     lu_register_native_fn(state, obj, "remove", Array_remove, 1);
     lu_register_native_fn(state, obj, "clear", Array_clear, 0);
+    lu_register_native_fn(state, obj, "iterator", Array_iterator, 0);
     lu_register_native_fn(state, obj, "toString", Array_to_string, 0);
     return obj;
 }

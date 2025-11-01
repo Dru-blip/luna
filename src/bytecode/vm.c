@@ -10,6 +10,7 @@
 // #include "value.h"
 #include "bytecode/vm_ops.h"
 #include "strbuf.h"
+#include "string_interner.h"
 #include "value.h"
 
 #define lu_has_error(vm) (vm)->istate->error != nullptr
@@ -338,6 +339,78 @@ loop_start:
                 } else {
                     record->ip = instr->jmp_if.false_block_id;
                 }
+                goto loop_start;
+            }
+            case OPCODE_GET_ITER: {
+                struct lu_value iterable = record->registers[instr->pair.fst];
+                if (!lu_is_object(iterable)) {
+                    lu_raise_error(
+                        vm->istate,
+                        lu_string_new(vm->istate,
+                                      "cannot iterate over non-object"));
+                    goto error_reporter;
+                }
+
+                struct lu_value iterator_val =
+                    lu_obj_get(lu_as_object(iterable),
+                               lu_intern_string(vm->istate, "iterator"));
+                if (lu_is_undefined(iterator_val) ||
+                    !lu_is_function(iterator_val)) {
+                    lu_raise_error(
+                        vm->istate,
+                        lu_string_new(vm->istate, "object is not iterable"));
+                    goto error_reporter;
+                }
+
+                record->registers[instr->pair.snd] =
+                    lu_call(vm, lu_as_object(iterable),
+                            lu_as_function(iterator_val), nullptr, 0, false);
+                if (lu_has_error(vm)) {
+                    goto error_reporter;
+                }
+
+                goto loop_start;
+            }
+            case OPCODE_ITER_NEXT: {
+                struct lu_value iterator_val =
+                    record->registers[instr->iter_next.iterator_reg];
+                struct lu_value next_func =
+                    lu_obj_get(lu_as_object(iterator_val),
+                               lu_intern_string(vm->istate, "next"));
+
+                if (!lu_is_function(next_func)) {
+                    lu_raise_error(
+                        vm->istate,
+                        lu_string_new(vm->istate, "next() is not a function"));
+                    goto error_reporter;
+                }
+                struct lu_value next_val =
+                    lu_call(vm, lu_as_object(iterator_val),
+                            lu_as_function(next_func), nullptr, 0, false);
+
+                if (!lu_is_object(next_val)) {
+                    lu_raise_error(vm->istate,
+                                   lu_string_new(vm->istate,
+                                                 "next() returned non object"));
+                    goto error_reporter;
+                }
+
+                struct lu_value done_val =
+                    lu_obj_get(lu_as_object(next_val),
+                               lu_intern_string(vm->istate, "done"));
+                if (lu_as_int(done_val)) {
+                    record->ip = instr->iter_next.jmp_offset;
+                    goto loop_start;
+                }
+
+                record->registers[instr->iter_next.loop_var_reg] =
+                    lu_obj_get(lu_as_object(next_val),
+                               lu_intern_string(vm->istate, "value"));
+
+                if (lu_has_error(vm)) {
+                    goto error_reporter;
+                }
+
                 goto loop_start;
             }
             case OPCODE_MAKE_FUNCTION: {

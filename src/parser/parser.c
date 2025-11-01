@@ -446,10 +446,18 @@ static struct ast_node* parse_for_stmt(struct parser* parser) {
 static struct ast_node* parse_let_decl(struct parser* parser) {
     struct token* token = parser_eat(parser);
     struct token* id = parse_expected(parser, TOKEN_IDENTIFIER);
-    parse_expected(parser, TOKEN_EQUAL);
-    struct ast_node* value = parse_expression(parser, 0);
-    struct ast_node* node = make_node(parser, AST_NODE_LET_DECL,
-                                      SPAN_MERGE(token->span, value->span));
+    struct ast_node* value = nullptr;
+    struct span span;
+
+    if (!check(parser, TOKEN_EQUAL)) {
+        span = SPAN_MERGE(token->span, id->span);
+    } else {
+        parse_expected(parser, TOKEN_EQUAL);
+        value = parse_expression(parser, 0);
+        span = SPAN_MERGE(token->span, value->span);
+    }
+
+    struct ast_node* node = make_node(parser, AST_NODE_LET_DECL,span);
     node->data.let_decl = (struct ast_let_decl){
         .name_span = id->span,
         .value = value,

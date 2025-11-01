@@ -64,6 +64,8 @@ enum opcode {
     OPCODE_OBJECT_SET_PROPERTY,  // uses instruction.binary_op
     OPCODE_OBJECT_GET_PROPERTY,
 
+    OPCODE_GET_ITER,
+    OPCODE_ITER_NEXT,
 };
 
 // this is high level representation of instruction
@@ -109,6 +111,12 @@ struct instruction {
             uint32_t self_reg;
             uint32_t* args_reg;
         } call;
+
+        struct {
+            uint32_t iterator_reg;
+            uint32_t loop_var_reg;
+            uint32_t jmp_offset;
+        } iter_next;
 
         uint32_t destination_reg;
     };

@@ -17,14 +17,14 @@ fn check_winner() {
         [0,4,8], [2,4,6]
     ]
 
-    for (let i=0; i<8; i=i+1) {
-        let combo = wins[i]
+    for(let combo in wins){
         let a = combo[0]
         let b = combo[1]
         let c = combo[2]
         if (board[a] != EMPTY_CELL && board[a] == board[b] && board[b] == board[c]) {
             return board[a]
         }
+
     }
 
     return none
@@ -32,8 +32,8 @@ fn check_winner() {
 
 
 fn board_full() {
-    for (let i=0; i<9; i=i+1) {
-        if (board[i] == EMPTY_CELL) {
+    for(let cell in board){
+        if(cell==EMPTY_CELL){
             return false
         }
     }

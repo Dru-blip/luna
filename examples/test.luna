@@ -1,7 +1,3 @@
-let a={
-    sayHello:fn(){
-        return ad()
-    }
+for(let i in [1,2,3]){
+    print(i)
 }
-
-a.sayHello()

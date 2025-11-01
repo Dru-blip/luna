@@ -855,7 +855,12 @@ static void end_scope(struct generator* generator) {
 
 static inline void generate_let_decl(struct generator* generator,
                                      struct ast_node* stmt) {
-    uint32_t value = generate_expr(generator, stmt->data.let_decl.value);
+    uint32_t value;
+    if (stmt->data.let_decl.value) {
+        value = generate_expr(generator, stmt->data.let_decl.value);
+    } else {
+        value = generate_simple_load(generator, OPCODE_LOAD_NONE, stmt->span);
+    }
     struct variable* var;
 
     char* name =
@@ -1042,6 +1047,69 @@ static void generate_for_stmt(struct generator* generator,
     generator_switch_basic_block(generator, end_block);
 }
 
+static inline void generate_for_in_stmt(struct generator* generator,
+                                        struct ast_node* stmt) {
+    const struct ast_for_in_stmt* for_stmt = &stmt->data.for_in_stmt;
+    uint32_t init_block = generator_basic_block_new(generator);
+    uint32_t test_block = generator_basic_block_new(generator);
+    uint32_t body_block = generator_basic_block_new(generator);
+    uint32_t end_block = generator_basic_block_new(generator);
+
+    generator_emit_jump_instruction(generator, init_block,
+                                    for_stmt->left->span);
+
+    generator_switch_basic_block(generator, init_block);
+    struct loop loop = {.start_block_id = test_block,
+                        .end_block_id = end_block};
+    begin_scope(generator);
+
+    struct variable* var;
+    char* name = generator->program.source +
+                 for_stmt->left->data.let_decl.name_span.start;
+    uint32_t name_len = for_stmt->left->data.let_decl.name_span.end -
+                        for_stmt->left->data.let_decl.name_span.start;
+    declare_variable(generator, name, name_len, &var);
+
+    uint32_t iterable = generate_expr(generator, for_stmt->right);
+
+    uint32_t iterator = generator_allocate_register(generator);
+    struct instruction get_iter_instr = {
+        .opcode = OPCODE_GET_ITER,
+        .pair.fst = iterable,
+        .pair.snd = iterator,
+    };
+
+    emit_instruction(generator, get_iter_instr, for_stmt->right->span);
+
+    generator_emit_jump_instruction(generator, test_block,
+                                    for_stmt->right->span);
+
+    generator_switch_basic_block(generator, test_block);
+
+    struct instruction iter_next_instr = {
+        .opcode = OPCODE_ITER_NEXT,
+    };
+    iter_next_instr.iter_next.iterator_reg = iterator;
+    iter_next_instr.iter_next.jmp_offset = end_block;
+    iter_next_instr.iter_next.loop_var_reg = var->allocated_reg;
+
+    emit_instruction(generator, iter_next_instr, for_stmt->right->span);
+
+    arrput(generator->loop_stack, loop);
+    generator_emit_jump_instruction(generator, body_block,
+                                    for_stmt->body->span);
+
+    generator_switch_basic_block(generator, body_block);
+    generate_stmt(generator, for_stmt->body);
+
+    generator_emit_jump_instruction(generator, test_block,
+                                    for_stmt->body->span);
+
+    end_scope(generator);
+    arrpop(generator->loop_stack);
+    generator_switch_basic_block(generator, end_block);
+}
+
 static inline void generate_fn_decl(struct generator* generator,
                                     struct ast_node* stmt) {
     char* name = generator->program.source + stmt->data.fn_decl.name_span.start;
@@ -1154,6 +1222,9 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
         case AST_NODE_FOR_STMT: {
             return generate_for_stmt(generator, stmt);
         }
+        case AST_NODE_FOR_IN_STMT: {
+            return generate_for_in_stmt(generator, stmt);
+        }
         case AST_NODE_FN_DECL: {
             return generate_fn_decl(generator, stmt);
         }
@@ -1237,6 +1308,11 @@ static void generator_basic_blocks_linearize(struct generator* generator,
                     block_start_offsets[instr->jmp_if.true_block_id];
                 instr->jmp_if.false_block_id =
                     block_start_offsets[instr->jmp_if.false_block_id];
+                break;
+            }
+            case OPCODE_ITER_NEXT: {
+                instr->iter_next.jmp_offset =
+                    block_start_offsets[instr->iter_next.jmp_offset];
                 break;
             }
             default:

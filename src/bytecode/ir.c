@@ -54,6 +54,8 @@ static const char* opcode_names[] = {
     "NewObject",
     "ObjectSetProperty",
     "ObjectGetProperty",
+    "GetIter",
+    "IterNext",
 };
 
 static void print_instructions(struct executable* executable) {

@@ -205,6 +205,7 @@ struct lu_array_iter {
 #define lu_as_array(v) ((struct lu_array*)lu_as_object(v))
 
 #define lu_obj_get(obj, key) lu_object_get_property(obj, key)
+#define lu_obj_get_ref(obj, key) lu_object_get_property_ref(obj, key)
 #define lu_obj_set(obj, key, value) \
     lu_property_map_set(&(obj)->properties, key, value)
 #define lu_obj_remove(obj, key) lu_property_map_remove(&(obj)->properties, key)
@@ -245,6 +246,8 @@ void lu_property_map_set(struct property_map* map, struct lu_string* key,
 bool lu_property_map_has(struct property_map* map, struct lu_string* key);
 struct lu_value lu_property_map_get(struct property_map* map,
                                     struct lu_string* key);
+struct lu_value* lu_property_map_get_ref(struct property_map* map,
+                                         struct lu_string* key);
 
 // TODO: implement property remove
 void lu_property_map_remove(struct property_map* map, struct lu_string* key);
@@ -253,6 +256,8 @@ struct lu_object* lu_object_new(struct lu_istate* state);
 struct lu_object* lu_object_new_sized(struct lu_istate* state, size_t size);
 struct lu_value lu_object_get_property(struct lu_object* obj,
                                        struct lu_string* key);
+struct lu_value* lu_object_get_property_ref(struct lu_object* obj,
+                                            struct lu_string* key);
 struct lu_object_vtable* lu_object_get_default_vtable();
 struct lu_string* lu_string_new(struct lu_istate* state, char* data);
 struct lu_string* lu_small_string_new(struct lu_istate* state, char* data,

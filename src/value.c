@@ -313,6 +313,22 @@ struct lu_value lu_property_map_get(struct property_map* map,
     return lu_value_undefined();
 }
 
+struct lu_value* lu_property_map_get_ref(struct property_map* map,
+                                         struct lu_string* key) {
+    //
+    size_t index = (key->hash) & (map->capacity - 1);
+
+    struct property_map_entry* entry = map->entries[index];
+    while (entry) {
+        if (lu_string_equal(entry->key, key)) {
+            return &entry->value;
+        }
+        entry = entry->next;
+    }
+
+    return nullptr;
+}
+
 bool lu_property_map_has(struct property_map* map, struct lu_string* key) {
     size_t index = (key->hash) & (map->capacity - 1);
 
@@ -359,6 +375,20 @@ struct lu_value lu_object_get_property(struct lu_object* obj,
         curr = curr->prototype;
     }
     return lu_value_undefined();
+}
+
+struct lu_value* lu_object_get_property_ref(struct lu_object* obj,
+                                            struct lu_string* key) {
+    struct lu_object* curr = obj;
+    while (curr) {
+        struct lu_value* value =
+            lu_property_map_get_ref(&curr->properties, key);
+        if (value) {
+            return value;
+        }
+        curr = curr->prototype;
+    }
+    return nullptr;
 }
 
 inline struct lu_object_vtable* lu_object_get_default_vtable() {
