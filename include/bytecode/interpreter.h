@@ -21,6 +21,7 @@ struct lu_istate {
 };
 
 struct lu_istate* lu_istate_new();
+void lu_istate_process_init(struct lu_istate* state, int argc, char* argv[]);
 void lu_istate_destroy(struct lu_istate* state);
 struct lu_value lu_run_program(struct lu_istate* state, const char* filepath);
 

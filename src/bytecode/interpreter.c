@@ -8,8 +8,10 @@
 #include "heap.h"
 #include "objects/array.h"
 #include "objects/object_prototype.h"
+#include "objects/process.h"
 #include "parser.h"
 #include "stb_ds.h"
+#include "string_interner.h"
 #include "value.h"
 
 static char* read_file(const char* filename, size_t* source_length) {
@@ -45,6 +47,19 @@ struct lu_istate* lu_istate_new() {
     arena_init(&state->args_buffer);
     lu_init_global_object(state);
     return state;
+}
+
+void lu_istate_process_init(struct lu_istate* state, int argc, char* argv[]) {
+    struct lu_array* args = lu_array_new(state);
+
+    for (int i = 0; i < argc; i++) {
+        lu_array_push(args, lu_value_object(lu_string_new(state, argv[i])));
+    }
+
+    struct lu_object* process_obj = lu_process_object_new(state, args);
+
+    lu_obj_set(state->vm->global_object, lu_intern_string(state, "process"),
+               lu_value_object(process_obj));
 }
 
 void lu_istate_destroy(struct lu_istate* state) {

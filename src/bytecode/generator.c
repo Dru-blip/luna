@@ -836,19 +836,19 @@ static inline void begin_scope(struct generator* generator) {
 }
 
 static void end_scope(struct generator* generator) {
-    size_t number_of_elements_to_pop = 0;
+    size_t number_of_variables_to_pop = 0;
     struct variable* var;
     for (size_t i = generator->local_variable_count; i > 0; i--) {
         var = &generator->local_variables[i - 1];
         if (var->scope == SCOPE_LOCAL &&
             var->scope_depth == generator->scope_depth) {
-            number_of_elements_to_pop++;
+            number_of_variables_to_pop++;
         }
     }
 
-    while (number_of_elements_to_pop > 0) {
+    while (number_of_variables_to_pop > 0) {
         arrpop(generator->local_variables);
-        number_of_elements_to_pop--;
+        number_of_variables_to_pop--;
     }
     generator->scope_depth--;
 }

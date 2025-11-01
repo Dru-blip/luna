@@ -9,7 +9,7 @@ parser_srcs=['src/parser/tokenizer.c','src/parser/parser.c','src/parser/ast.c']
 
 runtime_srcs=['src/heap.c','src/value.c','src/string_interner.c','src/bytecode/generator.c',
             'src/bytecode/interpreter.c','src/bytecode/vm.c','src/bytecode/ir.c',
-            'src/objects/global.c','src/objects/object_prototype.c','src/objects/array.c']
+            'src/objects/global.c','src/objects/object_prototype.c','src/objects/array.c','src/objects/process.c']
 
 main_srcs=['src/main.c']
 
