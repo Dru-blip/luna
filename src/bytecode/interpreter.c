@@ -9,6 +9,7 @@
 #include "objects/array.h"
 #include "objects/object_prototype.h"
 #include "objects/process.h"
+#include "objects/string.h"
 #include "parser.h"
 #include "stb_ds.h"
 #include "string_interner.h"
@@ -37,6 +38,8 @@ struct lu_istate* lu_istate_new() {
     string_interner_init(state);
     state->object_prototype = lu_object_prototype_new(state);
     state->array_prototype = lu_array_prototype_new(state);
+    state->string_prototype = lu_string_prototype_new(state);
+
     state->global_object = lu_object_new(state);
     state->module_cache = lu_object_new(state);
     state->running_module = nullptr;

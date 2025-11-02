@@ -262,6 +262,8 @@ struct lu_object_vtable* lu_object_get_default_vtable();
 struct lu_string* lu_string_new(struct lu_istate* state, char* data);
 struct lu_string* lu_small_string_new(struct lu_istate* state, char* data,
                                       size_t length, size_t hash);
+struct lu_string* lu_string_from_block(struct lu_istate* state,
+                                       struct string_block* block);
 struct lu_string* lu_string_concat(struct lu_istate* state, struct lu_value lhs,
                                    struct lu_value rhs);
 

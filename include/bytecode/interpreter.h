@@ -18,6 +18,7 @@ struct lu_istate {
 
     struct lu_object* object_prototype;
     struct lu_object* array_prototype;
+    struct lu_object* string_prototype;
 };
 
 struct lu_istate* lu_istate_new();

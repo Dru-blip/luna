@@ -60,7 +60,23 @@ typedef struct lu_value lu_value;
             lu_raise_error((vm)->istate, lu_string_new((vm)->istate, buffer)); \
             return lu_value_none();                                            \
         }                                                                      \
-        *(struct lu_obj**)(dest) = (args)[(idx)].obj;                          \
+        *(struct lu_obj**)(dest) = (args)[(idx)].object;                       \
+    } while (0)
+
+#define LU_TRY_UNPACK_STR(vm, args, idx, dest)                                 \
+    do {                                                                       \
+        if (!lu_is_string((args)[(idx)])) {                                    \
+            const char* got_type_str_name =                                    \
+                lu_value_get_type_name((args)[(idx)]);                         \
+            const char* expected_type_str_name = "string";                     \
+            char buffer[256];                                                  \
+            snprintf(buffer, sizeof(buffer),                                   \
+                     "bad argument #%d: expected '%s', got '%s'", (idx),       \
+                     expected_type_str_name, got_type_str_name);               \
+            lu_raise_error((vm)->istate, lu_string_new((vm)->istate, buffer)); \
+            return lu_value_none();                                            \
+        }                                                                      \
+        *(struct lu_string**)(dest) = lu_as_string((args)[(idx)]);             \
     } while (0)
 
 #define LU_TRY_UNPACK_ARGS(vm, typespec, argc, args, ...)                  \
@@ -75,6 +91,14 @@ typedef struct lu_value lu_value;
                         goto arg_raise_type_error;                         \
                     }                                                      \
                     *((int64_t*)(__args[__i])) = args[__i].integer;        \
+                    break;                                                 \
+                }                                                          \
+                case 's': {                                                \
+                    if (!lu_is_string(args[__i])) {                        \
+                        goto arg_raise_type_error;                         \
+                    }                                                      \
+                    *((struct lu_string**)(__args[__i])) =                 \
+                        lu_as_string(args[__i]);                           \
                     break;                                                 \
                 }                                                          \
                 case '?': {                                                \

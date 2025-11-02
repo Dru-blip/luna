@@ -28,13 +28,15 @@ struct activation_record {
                                    // activation records
 };
 
+// unused
 enum lu_vm_status {
     VM_STATUS_RUNNING,
     VM_STATUS_HALT,
 };
+//
 
 struct lu_vm {
-    enum lu_vm_status status;
+    enum lu_vm_status status;  // unused
     struct activation_record* records;
     struct lu_object* global_object;
     size_t rp;

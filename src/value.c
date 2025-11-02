@@ -405,6 +405,7 @@ struct lu_string* lu_small_string_new(struct lu_istate* state, char* data,
     str->vtable = &lu_string_vtable;
     memcpy(str->Sms, data, length);
     str->Sms[length] = '\0';
+    str->prototype = state->string_prototype;
     // DANGER: this causes infinite recursion.
     // lu_obj_set(str, lu_intern_string(state, "length"), lu_value_int(length));
     // intern_string -> lu_small_string_new -> lu_intern_string -> this loop
@@ -424,6 +425,7 @@ struct lu_string* lu_string_new(struct lu_istate* state, char* data) {
     str->vtable = &lu_string_vtable;
     str->hash = hash;
     str->length = len;
+    str->prototype = state->string_prototype;
     if (is_small) {
         str->type = STRING_SMALL;
         // inline if small string
@@ -438,6 +440,20 @@ struct lu_string* lu_string_new(struct lu_istate* state, char* data) {
         str->block = block;
     }
     // lu_obj_set(str, lu_intern_string(state, "length"), lu_value_int(len));
+    return str;
+}
+
+struct lu_string* lu_string_from_block(struct lu_istate* state,
+                                       struct string_block* block) {
+    size_t hash = hash_str(block->data, block->length);
+    struct lu_string* str =
+        lu_object_new_sized(state, sizeof(struct lu_string));
+    str->vtable = &lu_string_vtable;
+    str->hash = hash;
+    str->length = block->length;
+    str->prototype = state->string_prototype;
+    str->type = STRING_SIMPLE;
+    str->block = block;
     return str;
 }
 
@@ -511,6 +527,7 @@ struct lu_string* lu_string_concat(struct lu_istate* state, struct lu_value lhs,
     str->vtable = &lu_string_vtable;
     str->hash = hash_str(block->data, len);
     str->type = STRING_SIMPLE;
+    str->prototype = state->string_prototype;
 
     return str;
 }

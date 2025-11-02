@@ -1,3 +1,3 @@
-let filename=process.cwd()
+let a="hello"
 
-print(filename)
+print(a.indexOf("ll"))
