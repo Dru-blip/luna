@@ -41,18 +41,16 @@ LU_NATIVE_FN(Array_insert) {
 
     if (index < 0 || index >= lu_array_length(arr)) {
         char buffer[256];
-        snprintf(
-            buffer, sizeof(buffer),
-            "bad argument #%d (index %ld) out of bounds (array length %ld)", 0,
-            index, lu_array_length(arr));
-        lu_raise_error(vm->istate, lu_string_new(vm->istate, buffer));
+        snprintf(buffer, sizeof(buffer),
+                 "bad argument #%d (index %ld) out of bounds (array length %ld)", 0, index,
+                 lu_array_length(arr));
+        lu_raise_error(vm->istate, buffer);
         return lu_value_none();
     }
 
     if (arr->size + 1 >= arr->capacity) {
         arr->capacity *= 2;
-        arr->elements =
-            realloc(arr->elements, arr->capacity * sizeof(struct lu_value));
+        arr->elements = realloc(arr->elements, arr->capacity * sizeof(struct lu_value));
     }
 
     for (uint32_t i = arr->size - 1; i >= index; --i) {
@@ -73,11 +71,10 @@ LU_NATIVE_FN(Array_remove) {
 
     if (index < 0 || index >= arr->size) {
         char buffer[256];
-        snprintf(
-            buffer, sizeof(buffer),
-            "bad argument #%d (index %ld) out of bounds (array length %ld)", 0,
-            index, lu_array_length(arr));
-        lu_raise_error(vm->istate, lu_string_new(vm->istate, buffer));
+        snprintf(buffer, sizeof(buffer),
+                 "bad argument #%d (index %ld) out of bounds (array length %ld)", 0, index,
+                 lu_array_length(arr));
+        lu_raise_error(vm->istate, buffer);
     }
 
     for (uint32_t i = index; i < arr->size - 1; ++i) {
@@ -119,18 +116,14 @@ LU_NATIVE_FN(Array_to_string) {
                 break;
             }
             case VALUE_OBJECT: {
-                struct lu_value fn =
-                    lu_obj_get(lu_as_object(elem),
-                               lu_intern_string(vm->istate, "toString"));
+                struct lu_value fn = lu_obj_get(lu_as_object(elem), vm->istate->names.toString);
                 if (lu_is_undefined(fn) || !lu_is_function(fn)) {
                     strbuf_append(&sb, "[Object]");
                     break;
                 }
                 struct lu_function* func = lu_as_function(fn);
-                struct lu_value str_val =
-                    lu_call(vm, lu_as_object(elem), func, nullptr, 0, false);
-                strbuf_appendf(&sb, "%s",
-                               lu_string_get_cstring(lu_as_string(str_val)));
+                struct lu_value str_val = lu_call(vm, lu_as_object(elem), func, nullptr, 0, false);
+                strbuf_appendf(&sb, "%s", lu_string_get_cstring(lu_as_string(str_val)));
                 break;
             }
             default: {
@@ -147,10 +140,8 @@ LU_NATIVE_FN(Array_to_string) {
 }
 
 LU_NATIVE_FN(Array_iterator_next) {
-    struct lu_value* index_val =
-        lu_obj_get_ref(self, lu_intern_string(vm->istate, "index"));
-    struct lu_array* arr =
-        lu_as_array(lu_obj_get(self, lu_intern_string(vm->istate, "data")));
+    struct lu_value* index_val = lu_obj_get_ref(self, vm->istate->names.index);
+    struct lu_array* arr = lu_as_array(lu_obj_get(self, vm->istate->names.data));
     struct lu_object* obj = lu_object_new(vm->istate);
 
     bool done = index_val->integer >= arr->size;
@@ -159,8 +150,8 @@ LU_NATIVE_FN(Array_iterator_next) {
         value = lu_array_get(arr, index_val->integer++);
     }
 
-    lu_obj_set(obj, lu_intern_string(vm->istate, "done"), lu_value_bool(done));
-    lu_obj_set(obj, lu_intern_string(vm->istate, "value"), value);
+    lu_obj_set(obj, vm->istate->names.done, lu_value_bool(done));
+    lu_obj_set(obj, vm->istate->names.value, value);
 
     LU_RETURN_OBJ(obj);
 }
@@ -168,11 +159,10 @@ LU_NATIVE_FN(Array_iterator_next) {
 LU_NATIVE_FN(Array_iterator) {
     struct lu_object* obj = lu_object_new(vm->istate);
 
-    lu_obj_set(obj, lu_intern_string(vm->istate, "data"),
-               lu_value_object(self));
-    lu_obj_set(obj, lu_intern_string(vm->istate, "index"), lu_value_int(0));
+    lu_obj_set(obj, vm->istate->names.data, lu_value_object(self));
+    lu_obj_set(obj, vm->istate->names.index, lu_value_int(0));
 
-    lu_register_native_fn(vm->istate, obj, "next", Array_iterator_next, 0);
+    LU_REGISTER_NATIVE_FN_WITH_NAME(vm->istate, obj, next, Array_iterator_next, 0);
 
     LU_RETURN_OBJ(obj);
 }

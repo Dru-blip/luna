@@ -15,12 +15,11 @@ LU_NATIVE_FN(Process_cwd) {
 
     const char* err = strerror(errno);
 
-    lu_raise_error(vm->istate, lu_string_new(vm->istate, err));
+    lu_raise_error(vm->istate, err);
     return lu_value_none();
 }
 
-struct lu_object* lu_process_object_new(struct lu_istate* state,
-                                        struct lu_array* args) {
+struct lu_object* lu_process_object_new(struct lu_istate* state, struct lu_array* args) {
     //
     struct lu_object* obj = lu_object_new(state);
 

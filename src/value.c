@@ -472,13 +472,15 @@ static struct lu_string* lu_value_to_string(struct lu_istate* state,
             return lu_integer_to_string(state, lu_as_int(value));
         }
         case VALUE_BOOL: {
-            return lu_intern_string(state, value.integer ? "true" : "false");
+            return value.integer ? state->names.True : state->names.False;
         }
         case VALUE_NONE: {
-            return lu_intern_string(state, "none");
+            return state->names.none;
         }
         default: {
-            return lu_intern_string(state, "(object)");
+            // TODO: maybe call toString method or is it even necessary here.
+            // should figure that out.
+            return state->names.Object_Object;
         }
     }
 }
@@ -623,7 +625,7 @@ static void extract_source_line_info(struct lu_istate* state, struct span* loc,
     *line_start_offset = line_start;
 }
 
-void lu_raise_error(struct lu_istate* state, struct lu_string* message) {
+void lu_raise_error(struct lu_istate* state, char* message) {
     struct lu_object* error = lu_object_new(state);
 
     struct span* loc = &lu_vm_current_ip_span(state->vm);
@@ -631,8 +633,8 @@ void lu_raise_error(struct lu_istate* state, struct lu_string* message) {
     struct strbuf sb;
     strbuf_init_static(&sb, buffer, sizeof(buffer));
 
-    lu_obj_set(error, lu_intern_string(state, "message"),
-               lu_value_object(message));
+    lu_obj_set(error, state->names.message,
+               lu_value_object(lu_string_new(state, message)));
 
     size_t line_start_offset, line_length;
     extract_source_line_info(state, loc, &line_start_offset, &line_length);
@@ -666,7 +668,7 @@ void lu_raise_error(struct lu_istate* state, struct lu_string* message) {
                        span->col, reset);
     }
 
-    lu_obj_set(error, lu_intern_string(state, "traceback"),
+    lu_obj_set(error, state->names.traceback,
                lu_value_object(lu_string_new(state, buffer)));
 
     state->error_location = *loc;

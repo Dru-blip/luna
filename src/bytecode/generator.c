@@ -473,8 +473,7 @@ static inline void generate_simple_assign(struct generator* generator,
 
     struct variable* var;
     if (!find_variable(generator, name, name_len, &var)) {
-        lu_raise_error(generator->state,
-                       lu_string_new(generator->state, "undeclared variable"));
+        lu_raise_error(generator->state, "undeclared variable");
         return;
     }
 
@@ -547,9 +546,7 @@ static inline uint32_t generate_assign_expr(struct generator* generator,
             break;
         }
         default:
-            lu_raise_error(
-                generator->state,
-                lu_string_new(generator->state, "invalid assignment target"));
+            lu_raise_error(generator->state, "invalid assignment target");
             break;
     }
 
@@ -665,10 +662,8 @@ static inline uint32_t generate_call_expr(struct generator* generator,
             break;
         }
         default: {
-            lu_raise_error(
-                generator->state,
-                lu_string_new(generator->state,
-                              "attempt to call a non function value"));
+            lu_raise_error(generator->state,
+                           "attempt to call a non function value");
             break;
         }
     }

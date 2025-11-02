@@ -12,7 +12,7 @@
     snprintf(buffer, sizeof(buffer),                                         \
              "invalid operand types for operation (%s) : '%s' and '%s'", op, \
              lhs_type_name, rhs_type_name);                                  \
-    lu_raise_error(vm->istate, lu_string_new(vm->istate, buffer));           \
+    lu_raise_error(vm->istate, buffer);                                      \
     return lu_value_none();
 
 static inline struct lu_value lu_vm_op_add(struct lu_vm* vm, struct lu_value a,
@@ -51,9 +51,7 @@ static inline struct lu_value lu_vm_op_div(struct lu_vm* vm, struct lu_value a,
                                            struct lu_value b) {
     if (IS_NUMERIC(a) && IS_NUMERIC(b)) {
         if (b.integer == 0) {
-            struct span span = lu_vm_current_ip_span(vm);
-            lu_raise_error(vm->istate,
-                           lu_string_new(vm->istate, "Division by zero"));
+            lu_raise_error(vm->istate, "Division by zero");
             return lu_value_none();
         }
         return lu_value_int(a.integer * b.integer);

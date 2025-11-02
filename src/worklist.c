@@ -19,7 +19,8 @@ void worklist_enqueue(struct worklist* worklist, struct lu_object* object) {
 
 struct lu_object* worklist_dequeue(struct worklist* worklist) {
     struct worklist_item* item = worklist->head;
-    if (!item) return nullptr;
+    if (!item)
+        return nullptr;
     void* object = item->object;
     worklist->head = item->next;
     if (!worklist->head) {

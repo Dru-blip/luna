@@ -6,6 +6,7 @@
 #include "bytecode/ir.h"
 #include "bytecode/vm.h"
 #include "heap.h"
+#include "luna.h"
 #include "objects/array.h"
 #include "objects/object_prototype.h"
 #include "objects/process.h"
@@ -15,7 +16,7 @@
 #include "string_interner.h"
 #include "value.h"
 
-static char* read_file(const char* filename, size_t* source_length) {
+ALWAYS_INLINE static char* read_file(const char* filename, size_t* source_length) {
     FILE* f = fopen(filename, "r");
     if (!f) {
         printf("Error: could not open file %s\n", filename);
@@ -30,6 +31,63 @@ static char* read_file(const char* filename, size_t* source_length) {
     fclose(f);
     *source_length = len;
     return buffer;
+}
+
+ALWAYS_INLINE static void lu_register_common_names(struct lu_istate* state) {
+#define REGISTER_NAME(name) state->names.name = lu_intern_string(state, #name)
+#define REGISTER_NAME_AS(name, str) state->names.name = lu_intern_string(state, str)
+
+    REGISTER_NAME(Object);
+    REGISTER_NAME_AS(Object_Object, "[Object object]");
+
+    REGISTER_NAME(Array);
+    REGISTER_NAME_AS(True, "true");
+    REGISTER_NAME_AS(False, "false");
+    REGISTER_NAME(none);
+
+    REGISTER_NAME(toString);
+
+    REGISTER_NAME(message);
+    REGISTER_NAME(traceback);
+
+    REGISTER_NAME(data);
+    REGISTER_NAME(index);
+
+    REGISTER_NAME(done);
+    REGISTER_NAME(value);
+    REGISTER_NAME(next);
+
+    REGISTER_NAME(push);
+    REGISTER_NAME(pop);
+    REGISTER_NAME(insert);
+    REGISTER_NAME(remove);
+    REGISTER_NAME(clear);
+    REGISTER_NAME(iterator);
+
+    REGISTER_NAME(console);
+    REGISTER_NAME(print);
+    REGISTER_NAME(log);
+    REGISTER_NAME(process);
+
+    REGISTER_NAME(import);
+    REGISTER_NAME(len);
+    REGISTER_NAME(readInt);
+
+    REGISTER_NAME(min);
+    REGISTER_NAME(max);
+    REGISTER_NAME(pow);
+    REGISTER_NAME(abs);
+    REGISTER_NAME(Math);
+
+    REGISTER_NAME(hasProperty);
+    REGISTER_NAME(proto);
+    REGISTER_NAME(prototype);
+
+    REGISTER_NAME(charAt);
+    REGISTER_NAME(substring);
+    REGISTER_NAME(indexOf);
+#undef REGISTER_NAME_AS
+#undef REGISTER_NAME
 }
 
 struct lu_istate* lu_istate_new() {
@@ -47,6 +105,7 @@ struct lu_istate* lu_istate_new() {
     state->vm = lu_vm_new(state);
     state->error = nullptr;
 
+    lu_register_common_names(state);
     arena_init(&state->args_buffer);
     lu_init_global_object(state);
     return state;
@@ -61,8 +120,7 @@ void lu_istate_process_init(struct lu_istate* state, int argc, char* argv[]) {
 
     struct lu_object* process_obj = lu_process_object_new(state, args);
 
-    lu_obj_set(state->vm->global_object, lu_intern_string(state, "process"),
-               lu_value_object(process_obj));
+    lu_obj_set(state->vm->global_object, state->names.process, lu_value_object(process_obj));
 }
 
 void lu_istate_destroy(struct lu_istate* state) {
@@ -102,8 +160,7 @@ struct lu_value lu_run_program(struct lu_istate* state, const char* filepath) {
     const char* source = read_file(filepath, &source_length);
     struct ast_program program = parse_program(filepath, source);
     program.source_length = source_length;
-    struct lu_module* module =
-        lu_module_new(state, lu_string_new(state, filepath), &program);
+    struct lu_module* module = lu_module_new(state, lu_string_new(state, filepath), &program);
 
     struct lu_module* prev_module = state->running_module;
     state->running_module = module;
@@ -118,10 +175,9 @@ struct lu_value lu_run_program(struct lu_istate* state, const char* filepath) {
             state->vm->status = VM_STATUS_HALT;
             return lu_value_undefined();
         }
-        struct lu_string* str = lu_as_string(
-            lu_obj_get(state->error, lu_intern_string(state, "message")));
-        struct lu_string* traceback = lu_as_string(
-            lu_obj_get(state->error, lu_intern_string(state, "traceback")));
+        struct lu_string* str = lu_as_string(lu_obj_get(state->error, state->names.message));
+        struct lu_string* traceback =
+            lu_as_string(lu_obj_get(state->error, state->names.traceback));
         printf("Error: %s\n", lu_string_get_cstring(str));
         if (traceback) {
             printf("%s\n", traceback->block->data);
@@ -139,9 +195,12 @@ struct lu_value lu_run_program(struct lu_istate* state, const char* filepath) {
     // return lu_value_none();
 }
 
-struct lu_value lu_call(struct lu_vm* vm, struct lu_object* self,
-                        struct lu_function* function, struct lu_value* args,
-                        uint8_t argc, bool as_callback) {
+struct lu_value lu_call(struct lu_vm* vm,
+                        struct lu_object* self,
+                        struct lu_function* function,
+                        struct lu_value* args,
+                        uint8_t argc,
+                        bool as_callback) {
     if (function->type == FUNCTION_NATIVE) {
         return function->func(vm, self, args, argc);
     }

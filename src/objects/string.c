@@ -20,8 +20,7 @@ LU_NATIVE_FN(String_char_at) {
     struct lu_string* str = self;
 
     if (index < 0 || index >= str->length) {
-        lu_raise_error(vm->istate,
-                       lu_string_new(vm->istate, "Index out of bounds"));
+        lu_raise_error(vm->istate, "Index out of bounds");
         LU_RETURN_NONE();
     }
 
@@ -40,8 +39,7 @@ LU_NATIVE_FN(String_char_at) {
 LU_NATIVE_FN(String_substring) {
     int64_t start, end;
     LU_TRY_UNPACK_ARGS(vm, "ii", argc, args, &start, &end)
-    struct string_block* block =
-        calloc(1, sizeof(struct string_block) + end - start + 1);
+    struct string_block* block = calloc(1, sizeof(struct string_block) + end - start + 1);
     block->next = block->prev = nullptr;
     block->prev = vm->istate->string_pool.last_block;
     vm->istate->string_pool.last_block = block;

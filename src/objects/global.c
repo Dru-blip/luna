@@ -45,9 +45,7 @@ LU_NATIVE_FN(print_func) {
 }
 
 LU_NATIVE_FN(raise_func) {
-    lu_raise_error(
-        vm->istate,
-        lu_string_new(vm->istate, "raised error from native function"));
+    lu_raise_error(vm->istate, "raised error from native function");
     LU_RETURN_NONE();
 }
 
@@ -81,8 +79,7 @@ LU_NATIVE_FN(import_module) {
     // TODO: handle package format (foo.bar)
     struct lu_value file_path_value = LU_ARG_GET(args, 0);
     // TODO: add checks for file path
-    struct lu_value module =
-        lu_obj_get(vm->istate->module_cache, lu_as_string(file_path_value));
+    struct lu_value module = lu_obj_get(vm->istate->module_cache, lu_as_string(file_path_value));
     if (!lu_is_undefined(module)) {
         return lu_cast(struct lu_module, module.object)->exported;
     }
@@ -110,15 +107,14 @@ LU_NATIVE_FN(import_module) {
     }
 
     char file_path[PATH_MAX];
-    snprintf(file_path, PATH_MAX, "%s.%s",
-             lu_string_get_cstring(lu_as_string(file_path_value)), "luna");
+    snprintf(file_path, PATH_MAX, "%s.%s", lu_string_get_cstring(lu_as_string(file_path_value)),
+             "luna");
 
     char* path_buffer = nullptr;
     while ((file_info = readdir(dir)) != nullptr) {
         if (strcmp(file_info->d_name, file_path) == 0) {
             path_buffer = malloc(PATH_MAX + 256);
-            snprintf(path_buffer, PATH_MAX + 256, "%s/%s", path,
-                     file_info->d_name);
+            snprintf(path_buffer, PATH_MAX + 256, "%s/%s", path, file_info->d_name);
             break;
         }
     }
@@ -126,7 +122,7 @@ LU_NATIVE_FN(import_module) {
     if (path_buffer == nullptr) {
         closedir(dir);
         strbuf_appendf(&sb, "failed to read file: '%s'", file_path);
-        lu_raise_error(vm->istate, lu_string_new(vm->istate, err_buffer));
+        lu_raise_error(vm->istate, err_buffer);
         return lu_value_undefined();
     }
 
@@ -139,11 +135,11 @@ LU_NATIVE_FN(import_module) {
 
 // console methods
 LU_NATIVE_FN(console_read_int) {
-    if (argc <= 0) goto read_impl;
+    if (argc <= 0)
+        goto read_impl;
     struct lu_value help = LU_ARG_GET(args, 0);
     if (!lu_is_string(help)) {
-        lu_raise_error(vm->istate,
-                       lu_string_new(vm->istate, "Expected a string argument"));
+        lu_raise_error(vm->istate, "Expected a string argument");
         LU_RETURN_NONE();
     }
     printf("%s", lu_string_get_cstring(lu_as_string(help)));
@@ -174,7 +170,6 @@ LU_NATIVE_FN(Math_min) {
 LU_NATIVE_FN(Math_max) {
     int64_t a, b;
     LU_TRY_UNPACK_ARGS(vm, "ii", argc, args, &a, &b);
-
     return lu_value_int(a > b ? a : b);
 }
 
@@ -195,21 +190,20 @@ LU_NATIVE_FN(Math_abs) {
 // --------------------
 
 void lu_init_global_object(struct lu_istate* state) {
-    lu_register_native_fn(state, state->vm->global_object, "print", print_func,
-                          UINT8_MAX);
-    lu_register_native_fn(state, state->vm->global_object, "raise", raise_func,
-                          0);
-    lu_register_native_fn(state, state->vm->global_object, "import",
-                          import_module, 1);
+    lu_register_native_fn(state, state->vm->global_object, "print", print_func, UINT8_MAX);
+    lu_register_native_fn(state, state->vm->global_object, "raise", raise_func, 0);
+    lu_register_native_fn(state, state->vm->global_object, "import", import_module, 1);
     lu_register_native_fn(state, state->vm->global_object, "len", len, 1);
 
     lu_register_native_fn(state, state->vm->global_object, "Array", Array, 0);
 
+    // console object
     struct lu_object* console_obj = lu_object_new(state);
     lu_register_native_fn(state, console_obj, "readInt", console_read_int, 1);
     lu_obj_set(state->vm->global_object, lu_intern_string(state, "console"),
                lu_value_object(console_obj));
 
+    // math object
     struct lu_object* math_obj = lu_object_new(state);
     lu_register_native_fn(state, math_obj, "min", Math_min, 2);
     lu_register_native_fn(state, math_obj, "max", Math_max, 2);

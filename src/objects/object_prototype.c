@@ -7,15 +7,15 @@
 #include "value.h"
 
 LU_NATIVE_FN(Object_to_string) {
-    return lu_value_object(lu_intern_string(vm->istate, "Object"));
+    return lu_value_object(vm->istate->names.Object);
 }
 
 LU_NATIVE_FN(Object_has_property) {
-    if (argc == 0) LU_RETURN_NONE();
+    if (argc == 0)
+        LU_RETURN_NONE();
     struct lu_value key_val = args[0];
     if (!lu_is_string(key_val)) {
-        lu_raise_error(vm->istate,
-                       lu_string_new(vm->istate, "Key must be a string"));
+        lu_raise_error(vm->istate, "Key must be a string");
     }
     struct lu_object* curr = self;
     while (curr) {

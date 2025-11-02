@@ -145,9 +145,7 @@ loop_start:
                     goto loop_start;
                 }
 
-                lu_raise_error(
-                    vm->istate,
-                    lu_string_new(vm->istate, "undeclared variable"));
+                lu_raise_error(vm->istate, "undeclared variable");
                 goto error_reporter;
             }
             case OPCODE_UNARY_PLUS: {
@@ -170,7 +168,7 @@ loop_start:
                 snprintf(buffer, sizeof(buffer),
                          "invalid operand type for unary (-) : '%s'",
                          argument_type_name);
-                lu_raise_error(vm->istate, lu_string_new(vm->istate, buffer));
+                lu_raise_error(vm->istate, buffer);
 
                 goto error_reporter;
             }
@@ -199,11 +197,8 @@ loop_start:
                 struct lu_value obj_val =
                     record->registers[instr->binary_op.result_reg];
                 if (!lu_is_object(obj_val)) {
-                    lu_raise_error(
-                        vm->istate,
-                        lu_string_new(
-                            vm->istate,
-                            "invalid member access on non object value"));
+                    lu_raise_error(vm->istate,
+                                   "invalid member access on non object value");
                     goto error_reporter;
                 }
                 struct lu_string* key =
@@ -221,11 +216,8 @@ loop_start:
                     record->executable
                         ->identifier_table[instr->binary_op.right_reg];
                 if (!lu_is_object(obj_val)) {
-                    lu_raise_error(
-                        vm->istate,
-                        lu_string_new(
-                            vm->istate,
-                            "invalid member access on non object value"));
+                    lu_raise_error(vm->istate,
+                                   "invalid member access on non object value");
                     goto error_reporter;
                 }
                 struct lu_value value = lu_obj_get(lu_as_object(obj_val), key);
@@ -235,8 +227,7 @@ loop_start:
                     strbuf_init_static(&sb, buffer, sizeof(buffer));
                     strbuf_appendf(&sb, "object has no property '%s'",
                                    lu_string_get_cstring(key));
-                    lu_raise_error(vm->istate,
-                                   lu_string_new(vm->istate, buffer));
+                    lu_raise_error(vm->istate, buffer);
                     goto error_reporter;
                 }
                 record->registers[instr->binary_op.result_reg] = value;
@@ -262,8 +253,7 @@ loop_start:
                                 buffer, sizeof(buffer),
                                 "index %ld out of bounds (array length %ld)",
                                 index, lu_array_length(lu_as_array(obj_val)));
-                            lu_raise_error(vm->istate,
-                                           lu_string_new(vm->istate, buffer));
+                            lu_raise_error(vm->istate, buffer);
                             goto error_reporter;
                         }
                         record->registers[instr->binary_op.result_reg] = value;
@@ -293,8 +283,7 @@ loop_start:
                                 buffer, sizeof(buffer),
                                 "index %ld out of bounds (array length %ld)",
                                 index, lu_array_length(lu_as_array(obj_val)));
-                            lu_raise_error(vm->istate,
-                                           lu_string_new(vm->istate, buffer));
+                            lu_raise_error(vm->istate, buffer);
                             goto error_reporter;
                         }
                         goto loop_start;
@@ -344,21 +333,16 @@ loop_start:
             case OPCODE_GET_ITER: {
                 struct lu_value iterable = record->registers[instr->pair.fst];
                 if (!lu_is_object(iterable)) {
-                    lu_raise_error(
-                        vm->istate,
-                        lu_string_new(vm->istate,
-                                      "cannot iterate over non-object"));
+                    lu_raise_error(vm->istate,
+                                   "cannot iterate over non-object");
                     goto error_reporter;
                 }
 
-                struct lu_value iterator_val =
-                    lu_obj_get(lu_as_object(iterable),
-                               lu_intern_string(vm->istate, "iterator"));
+                struct lu_value iterator_val = lu_obj_get(
+                    lu_as_object(iterable), vm->istate->names.iterator);
                 if (lu_is_undefined(iterator_val) ||
                     !lu_is_function(iterator_val)) {
-                    lu_raise_error(
-                        vm->istate,
-                        lu_string_new(vm->istate, "object is not iterable"));
+                    lu_raise_error(vm->istate, "object is not iterable");
                     goto error_reporter;
                 }
 
@@ -374,14 +358,11 @@ loop_start:
             case OPCODE_ITER_NEXT: {
                 struct lu_value iterator_val =
                     record->registers[instr->iter_next.iterator_reg];
-                struct lu_value next_func =
-                    lu_obj_get(lu_as_object(iterator_val),
-                               lu_intern_string(vm->istate, "next"));
+                struct lu_value next_func = lu_obj_get(
+                    lu_as_object(iterator_val), vm->istate->names.next);
 
                 if (!lu_is_function(next_func)) {
-                    lu_raise_error(
-                        vm->istate,
-                        lu_string_new(vm->istate, "next() is not a function"));
+                    lu_raise_error(vm->istate, "next() is not a function");
                     goto error_reporter;
                 }
                 struct lu_value next_val =
@@ -389,23 +370,19 @@ loop_start:
                             lu_as_function(next_func), nullptr, 0, false);
 
                 if (!lu_is_object(next_val)) {
-                    lu_raise_error(vm->istate,
-                                   lu_string_new(vm->istate,
-                                                 "next() returned non object"));
+                    lu_raise_error(vm->istate, "next() returned non object");
                     goto error_reporter;
                 }
 
                 struct lu_value done_val =
-                    lu_obj_get(lu_as_object(next_val),
-                               lu_intern_string(vm->istate, "done"));
+                    lu_obj_get(lu_as_object(next_val), vm->istate->names.done);
                 if (lu_as_int(done_val)) {
                     record->ip = instr->iter_next.jmp_offset;
                     goto loop_start;
                 }
 
                 record->registers[instr->iter_next.loop_var_reg] =
-                    lu_obj_get(lu_as_object(next_val),
-                               lu_intern_string(vm->istate, "value"));
+                    lu_obj_get(lu_as_object(next_val), vm->istate->names.value);
 
                 if (lu_has_error(vm)) {
                     goto error_reporter;
@@ -438,8 +415,7 @@ loop_start:
                              "attempt to call a non function value"
                              " (%s)",
                              calle_type_name);
-                    lu_raise_error(vm->istate,
-                                   lu_string_new(vm->istate, buffer));
+                    lu_raise_error(vm->istate, buffer);
                     goto error_reporter;
                 }
                 struct activation_record* parent_record = record;
@@ -503,16 +479,16 @@ loop_start:
     return lu_value_none();
 
 invalid_array_index:
-    lu_raise_error(vm->istate, lu_string_new(vm->istate, "invalid index"));
+    lu_raise_error(vm->istate, "invalid index");
 #include "ansi_color_codes.h"
 error_reporter:
     if (vm->istate->running_module != vm->istate->main_module) {
         return lu_value_none();
     }
-    struct lu_string* str = lu_as_string(
-        lu_obj_get(vm->istate->error, lu_intern_string(vm->istate, "message")));
-    struct lu_string* traceback = lu_as_string(lu_obj_get(
-        vm->istate->error, lu_intern_string(vm->istate, "traceback")));
+    struct lu_string* str =
+        lu_as_string(lu_obj_get(vm->istate->error, vm->istate->names.message));
+    struct lu_string* traceback = lu_as_string(
+        lu_obj_get(vm->istate->error, vm->istate->names.traceback));
     printf(BRED "Error" WHT ": %s\n" reset, lu_string_get_cstring(str));
     printf("%s\n", traceback->block->data);
     return lu_value_none();
