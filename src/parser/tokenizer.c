@@ -1,4 +1,4 @@
-#include "parser/tokenizer.h"
+#include "tokenizer.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -7,26 +7,26 @@
 
 #include "stb_ds.h"
 
-static token_kind_t lookup_keyword(const char* ident) {
+static enum token_kind lookup_keyword(const char* ident) {
     for (size_t i = 0; i < sizeof(keywords) / sizeof(keywords[0]); ++i) {
         if (strcmp(keywords[i].key, ident) == 0) {
             return keywords[i].value;
         }
     }
-    return token_kind_identifier;
+    return TOKEN_IDENTIFIER;
 }
 
-static char current(tokenizer_t* t) {
+static char current(struct tokenizer* t) {
     return (t->pos < t->len) ? t->src[t->pos] : '\0';
 }
 
-static void advance(tokenizer_t* t) {
+static void advance(struct tokenizer* t) {
     t->col++;
     t->pos++;
 }
 
-static void skip_whitespace(tokenizer_t* t) {
-    while (true) {
+static void skip_whitespace(struct tokenizer* t) {
+    while (1) {
         char c = current(t);
         if (c == ' ' || c == '\t' || c == '\r') {
             advance(t);
@@ -41,11 +41,9 @@ static void skip_whitespace(tokenizer_t* t) {
                 if (next == '/') {
                     t->pos += 2;
                     t->col += 2;
-                    while (true) {
+                    while (1) {
                         c = current(t);
-                        if (c == '\n' || c == '\0') {
-                            break;
-                        }
+                        if (c == '\n' || c == '\0') break;
                         advance(t);
                     }
                     continue;
@@ -53,11 +51,12 @@ static void skip_whitespace(tokenizer_t* t) {
                 if (next == '*') {
                     t->pos += 2;
                     t->col += 2;
-                    while (true) {
+                    while (1) {
                         c = current(t);
                         if (c == '\0') {
-                            printf("Unterminated block comment at %d:%d",
-                                   t->line, t->col);
+                            fprintf(stderr,
+                                    "Unterminated block comment at %d:%d\n",
+                                    t->line, t->col);
                             exit(1);
                         }
                         if (c == '\n') {
@@ -77,7 +76,6 @@ static void skip_whitespace(tokenizer_t* t) {
                     }
                     continue;
                 }
-                break;
             }
             break;
         } else {
@@ -86,183 +84,170 @@ static void skip_whitespace(tokenizer_t* t) {
     }
 }
 
-static token_t next_token(tokenizer_t* t) {
+static struct token next_token(struct tokenizer* t) {
     skip_whitespace(t);
 
-    span_t start = {t->line, t->col, (uint32_t)t->pos, t->pos + 1};
-    token_data_t data = {};
+    struct span start = {t->line, t->col, (uint32_t)t->pos, t->pos + 1};
+    union token_data data = {};
     char c = current(t);
-    token_kind_t kind;
+    enum token_kind kind;
 
     switch (c) {
         case '\0':
             advance(t);
-            kind = token_kind_eof;
+            kind = TOKEN_EOF;
             break;
         case '(':
             advance(t);
-            kind = token_kind_lparen;
+            kind = TOKEN_LPAREN;
             break;
         case ')':
             advance(t);
-            kind = token_kind_rparen;
+            kind = TOKEN_RPAREN;
             break;
         case '{':
             advance(t);
-            kind = token_kind_lbrace;
+            kind = TOKEN_LBRACE;
             break;
         case '}':
             advance(t);
-            kind = token_kind_rbrace;
+            kind = TOKEN_RBRACE;
             break;
         case '[':
             advance(t);
-            kind = token_kind_lbracket;
+            kind = TOKEN_LBRACKET;
             break;
         case ']':
             advance(t);
-            kind = token_kind_rbracket;
+            kind = TOKEN_RBRACKET;
             break;
         case ';':
             advance(t);
-            kind = token_kind_semicolon;
+            kind = TOKEN_SEMICOLON;
             break;
-        case '+': {
+        case '+':
+            advance(t);
+            kind = (current(t) == '=') ? (advance(t), TOKEN_PLUS_EQUAL)
+                                       : TOKEN_PLUS;
+            break;
+        case '-':
+            advance(t);
+            kind = (current(t) == '=') ? (advance(t), TOKEN_MINUS_EQUAL)
+                                       : TOKEN_MINUS;
+            break;
+        case '*':
+            advance(t);
+            kind = (current(t) == '=') ? (advance(t), TOKEN_ASTERISK_EQUAL)
+                                       : TOKEN_ASTERISK;
+            break;
+        case '/':
+            advance(t);
+            kind = (current(t) == '=') ? (advance(t), TOKEN_SLASH_EQUAL)
+                                       : TOKEN_SLASH;
+            break;
+        case '%':
+            advance(t);
+            kind = (current(t) == '=') ? (advance(t), TOKEN_MODULUS_EQUAL)
+                                       : TOKEN_MODULUS;
+            break;
+        case '=':
+            advance(t);
+            kind = (current(t) == '=') ? (advance(t), TOKEN_EQUAL_EQUAL)
+                                       : TOKEN_EQUAL;
+            break;
+        case '!':
+            advance(t);
+            kind = (current(t) == '=') ? (advance(t), TOKEN_BANG_EQUAL)
+                                       : TOKEN_BANG;
+            break;
+        case '<':
             advance(t);
             if (current(t) == '=') {
                 advance(t);
-                kind = token_kind_plus_equal;
-                break;
-            }
-            kind = token_kind_plus;
-            break;
-        }
-        case '-': {
-            advance(t);
-            if (current(t) == '=') {
-                advance(t);
-                kind = token_kind_minus_equal;
-                break;
-            }
-            kind = token_kind_minus;
-            break;
-        }
-        case '*': {
-            advance(t);
-            if (current(t) == '=') {
-                advance(t);
-                kind = token_kind_asterisk_equal;
-                break;
-            }
-            kind = token_kind_asterisk;
-            break;
-        }
-        case '/': {
-            advance(t);
-            if (current(t) == '=') {
-                advance(t);
-                kind = token_kind_slash_equal;
-                break;
-            }
-            kind = token_kind_slash;
-            break;
-        }
-        case '%': {
-            advance(t);
-            if (current(t) == '=') {
-                advance(t);
-                kind = token_kind_modulus_equal;
-                break;
-            }
-            kind = token_kind_modulus;
-            break;
-        }
-        case '=': {
-            advance(t);
-            if (current(t) == '=') {
-                advance(t);
-                kind = token_kind_equal_equal;
-                break;
-            }
-            kind = token_kind_equal;
-            break;
-        }
-        case '!': {
-            advance(t);
-            if (current(t) == '=') {
-                advance(t);
-                kind = token_kind_bang_equal;
-                break;
-            }
-            kind = token_kind_bang;
-            break;
-        }
-        case '<': {
-            advance(t);
-            if (current(t) == '=') {
-                advance(t);
-                kind = token_kind_less_equal;
-                break;
+                kind = TOKEN_LESS_EQUAL;
             } else if (current(t) == '<') {
                 advance(t);
-                kind = token_kind_less_less;
-                break;
-            }
-            kind = token_kind_less;
+                kind = TOKEN_LESS_LESS;
+            } else
+                kind = TOKEN_LESS;
             break;
-        }
-        case '>': {
+        case '>':
             advance(t);
             if (current(t) == '=') {
                 advance(t);
-                kind = token_kind_greater_equal;
-                break;
+                kind = TOKEN_GREATER_EQUAL;
             } else if (current(t) == '>') {
                 advance(t);
-                kind = token_kind_greater_greater;
-                break;
+                kind = TOKEN_GREATER_GREATER;
+            } else
+                kind = TOKEN_GREATER;
+            break;
+        case '&':
+            advance(t);
+            kind = (current(t) == '&') ? (advance(t), TOKEN_AMPERSAND_AMPERSAND)
+                                       : TOKEN_AMPERSAND;
+            break;
+        case '|':
+            advance(t);
+            kind = (current(t) == '|') ? (advance(t), TOKEN_PIPE_PIPE)
+                                       : TOKEN_PIPE;
+            break;
+        case ',':
+            advance(t);
+            kind = TOKEN_COMMA;
+            break;
+        case '.':
+            advance(t);
+            kind = TOKEN_DOT;
+            break;
+        case ':':
+            advance(t);
+            kind = TOKEN_COLON;
+            break;
+        case '"': {
+            advance(t);
+            const char* start = t->src + t->pos;
+
+            while (true) {
+                char c = current(t);
+                if (c == '"') {
+                    break;
+                } else if (c == '\\') {
+                    advance(t);
+                    if (current(t) == '\0') {
+                        fprintf(
+                            stderr,
+                            "Unterminated escape sequence at line %d, col %d\n",
+                            t->line, t->col);
+                        exit(1);
+                    }
+                    advance(t);
+                } else if (c == '\0') {
+                    fprintf(stderr,
+                            "Unterminated string literal starting at line %d, "
+                            "col %d\n",
+                            t->line, t->col);
+                    exit(1);
+                } else {
+                    advance(t);
+                }
             }
-            kind = token_kind_greater;
-            break;
-        }
-        case '&': {
+
+            kind = TOKEN_STRING;
+            data.str_val = start;
+
             advance(t);
-            if (current(t) == '&') {
-                advance(t);
-                kind = token_kind_ampersand_ampersand;
-                break;
-            }
-            kind = token_kind_ampersand;
-            break;
-        }
-        case '|': {
-            advance(t);
-            if (current(t) == '|') {
-                advance(t);
-                kind = token_kind_pipe_pipe;
-                break;
-            }
-            kind = token_kind_pipe;
-            break;
-        }
-        case ',': {
-            advance(t);
-            kind = token_kind_comma;
-            break;
-        }
-        case '.': {
-            advance(t);
-            kind = token_kind_dot;
             break;
         }
         default:
             if (isdigit(c)) {
+                size_t start_pos = t->pos;
                 while (isdigit(current(t))) advance(t);
-                char* endptr;
-                char* nptr = strdup(t->src + start.start);
-                data.int_val = strtol(nptr, &endptr, 10);
-                kind = token_kind_integer;
-                free(nptr);
+                size_t len = t->pos - start_pos;
+                char* num_str = strndup(t->src + start_pos, len);
+                data.int_val = strtoll(num_str, nullptr, 10);
+                free(num_str);
+                kind = TOKEN_INTEGER;
             } else if (isalpha(c) || c == '_') {
                 size_t start_pos = t->pos;
                 while (isalnum(current(t)) || current(t) == '_') advance(t);
@@ -278,15 +263,11 @@ static token_t next_token(tokenizer_t* t) {
     }
 
     start.end = t->pos;
-    return (token_t){
-        .kind = kind,
-        .span = start,
-        .data = data,
-    };
+    return (struct token){.kind = kind, .span = start, .data = data};
 }
 
-token_t* tokenize(const char* source) {
-    tokenizer_t tokenizer = {
+struct token* tokenize(const char* source) {
+    struct tokenizer tokenizer = {
         .src = source,
         .len = strlen(source),
         .pos = 0,
@@ -295,12 +276,12 @@ token_t* tokenize(const char* source) {
         .line_start = 0,
     };
 
-    token_t* tokens = NULL;
+    struct token* tokens = nullptr;
 
     while (tokenizer.pos <= tokenizer.len) {
-        const token_t tok = next_token(&tokenizer);
+        struct token tok = next_token(&tokenizer);
         arrput(tokens, tok);
-        if (tok.kind == token_kind_eof) break;
+        if (tok.kind == TOKEN_EOF) break;
     }
 
     return tokens;

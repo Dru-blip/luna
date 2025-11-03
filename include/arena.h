@@ -7,52 +7,52 @@
 #define KB 1024
 #define ARENA_BLOCK_DEFAULT_CAPACITY (4 * KB)
 
-typedef struct arena_block arena_block_t;
-
-typedef struct arena_block {
-    arena_block_t* next;
+struct arena_block {
+    struct arena_block* next;
     size_t capacity;
     size_t used;
     uint8_t data[];
-} arena_block_t;
+};
 
-typedef struct arena {
-    arena_block_t* head;
-} arena_t;
+struct arena {
+    struct arena_block* head;
+};
 
-arena_block_t* arena_new_block(size_t capacity);
-void arena_init(arena_t* arena);
-void* arena_alloc(arena_t* arena, size_t size);
-void arena_reset(arena_t* arena);
-void arena_destroy(arena_t* arena);
+struct arena_block* arena_new_block(size_t capacity);
+void arena_init(struct arena* arena);
+void* arena_alloc(struct arena* arena, size_t size);
+void arena_reset(struct arena* arena);
+void arena_destroy(struct arena* arena);
 
 #ifdef ARENA_IMPLEMENTATION
-static inline void* arena_block_allocate(arena_block_t* block, size_t size) {
+
+static inline void* arena_block_allocate(struct arena_block* block,
+                                         size_t size) {
     void* obj = block->data + block->used;
     block->used += size;
     return obj;
 }
 
-arena_block_t* arena_new_block(size_t capacity) {
-    arena_block_t* blk =
-        (arena_block_t*)malloc(sizeof(arena_block_t) + capacity);
+struct arena_block* arena_new_block(size_t capacity) {
+    struct arena_block* blk =
+        (struct arena_block*)malloc(sizeof(struct arena_block) + capacity);
     blk->capacity = capacity;
     blk->used = 0;
     blk->next = nullptr;
     return blk;
 }
 
-void arena_init(arena_t* arena) { arena->head = nullptr; }
+void arena_init(struct arena* arena) { arena->head = nullptr; }
 
-void* arena_alloc(arena_t* arena, size_t size) {
-    arena_block_t* blk = arena->head;
+void* arena_alloc(struct arena* arena, size_t size) {
+    struct arena_block* blk = arena->head;
     while (blk) {
         if (blk->used + size < blk->capacity) {
-            void* obj = arena_block_allocate(blk, size);
-            if (obj) return obj;
+            return arena_block_allocate(blk, size);
         }
         blk = blk->next;
     }
+
     size_t blk_capacity = ARENA_BLOCK_DEFAULT_CAPACITY > size
                               ? ARENA_BLOCK_DEFAULT_CAPACITY
                               : size;
@@ -63,17 +63,20 @@ void* arena_alloc(arena_t* arena, size_t size) {
     return arena_block_allocate(blk, size);
 }
 
-void arena_reset(arena_t* arena) {
-    for (arena_block_t* blk = arena->head; blk; blk = blk->next) {
+void arena_reset(struct arena* arena) {
+    for (struct arena_block* blk = arena->head; blk; blk = blk->next) {
         blk->used = 0;
     }
 }
-void arena_destroy(arena_t* arena) {
-    arena_block_t* blk = arena->head;
+
+void arena_destroy(struct arena* arena) {
+    struct arena_block* blk = arena->head;
     while (blk) {
-        arena_block_t* next = blk->next;
+        struct arena_block* next = blk->next;
         free(blk);
         blk = next;
     }
+    arena->head = nullptr;
 }
+
 #endif

@@ -1,48 +1,61 @@
 #pragma once
 
-typedef enum binary_op {
-    binary_op_add,
-    binary_op_sub,
-    binary_op_mul,
-    binary_op_div,
-    binary_op_mod,
+enum binary_op {
+    OP_ADD,
+    OP_SUB,
+    OP_MUL,
+    OP_DIV,
+    OP_MOD,
 
-    binary_op_gt,
-    binary_op_gte,
-    binary_op_lt,
-    binary_op_lte,
+    OP_GT,
+    OP_GTE,
+    OP_LT,
+    OP_LTE,
 
-    binary_op_eq,
-    binary_op_neq,
+    OP_EQ,
+    OP_NEQ,
 
-    binary_op_shl,
-    binary_op_shr,
+    OP_SHL,
+    OP_SHR,
 
-    binary_op_land,
-    binary_op_lor,
-} binary_op_t;
+    OP_LAND,
+    OP_LOR,
+};
 
-typedef enum unary_op {
-    unary_op_plus,
-    unary_op_minus,
-    unary_op_lnot,
-} unary_op_t;
+enum unary_op {
+    OP_UPLUS,
+    OP_NEGATE,
+    OP_LNOT,
+};
 
-typedef enum assign_op {
-    assign_op_simple,
-    assign_op_add,
-    assign_op_sub,
-    assign_op_mul,
-    assign_op_div,
-    assign_op_mod,
-} assign_op_t;
+enum assign_op {
+    OP_ASSIGN_SIMPLE,
+    OP_ASSIGN_ADD,
+    OP_ASSIGN_SUB,
+    OP_ASSIGN_MUL,
+    OP_ASSIGN_DIV,
+    OP_ASSIGN_MOD,
+};
 
-typedef enum postfix_op {
-    postfix_call,
-    postfix_member,
-} postfix_op_t;
+enum postfix_op {
+    OP_CALL,
+    OP_MEMBER,
+    OP_COMPUTED_MEMBER,
+};
 
 static const char* binary_op_labels[] = {
+    "add",  "sub", "mul", "div", "mod",
+
+    "gt",   "gte", "lt",  "lte",
+
+    "eq",   "neq",
+
+    "shl",  "shr",
+
+    "land", "lor",
+};
+
+static const char* binary_op_symbols[] = {
     "+",  "-",  "*", "/",  "%",
 
     ">",  ">=", "<", "<=",
@@ -52,4 +65,10 @@ static const char* binary_op_labels[] = {
     "<<", ">>",
 
     "&&", "||",
+};
+
+static const char* unary_op_labels[] = {
+    "plus",
+    "negate",
+    "lnot",
 };

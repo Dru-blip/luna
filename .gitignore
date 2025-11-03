@@ -4,3 +4,5 @@ builddir
 .clangd
 .zed
 .vscode
+buildDir
+.idea
