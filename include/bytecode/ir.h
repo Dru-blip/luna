@@ -73,7 +73,7 @@ enum opcode {
 enum operand_type {
     OPERAND_REG,
     OPERAND_CONST,
-    OPERAND_BLOCK_ID,
+    OPERAND_LABEL,
 };
 
 // unused for now
@@ -83,7 +83,7 @@ struct operand {
     union {
         uint32_t reg;
         uint16_t constant_index;
-        size_t block_id;
+        size_t block_offset;  // used for operand type label
     };
 };
 
@@ -148,6 +148,8 @@ struct basic_block {
     struct span* instructions_spans;
     size_t start_offset;  // used when linearizing blocks
     bool visited;
+    size_t ancestors[4];
+    size_t successors[4];
 };
 
 struct executable {
