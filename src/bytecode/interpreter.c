@@ -185,9 +185,11 @@ struct lu_value lu_run_program(struct lu_istate* state, const char* filepath) {
         return lu_value_undefined();
     }
     print_executable(executable);
+
     lu_obj_set(state->module_cache, module->name, lu_value_object(module));
     struct lu_value result = lu_value_none();
     result = lu_run_executable(state, executable);
+    module->exported = result;
     // print_value(result);
     state->running_module = prev_module;
 

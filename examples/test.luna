@@ -1,1 +1,7 @@
-import("hello")
+let a={count:0}
+
+for(let i=0;i<100000;i=i+1){
+    a.count=a.count+1
+}
+
+print(a.count)
