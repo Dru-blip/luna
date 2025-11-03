@@ -5,4 +5,5 @@ fn fib(n){
     return fib(n-1)+fib(n-2)
 }
 
-return fib(35)
+let a=fib(35)
+print("fib 35 : ",a)

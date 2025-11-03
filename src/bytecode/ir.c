@@ -56,6 +56,7 @@ static const char* opcode_names[] = {
     "ObjectGetProperty",
     "GetIter",
     "IterNext",
+    "Hlt",
 };
 
 static void print_instructions(struct executable* executable) {
@@ -90,13 +91,11 @@ static void print_instructions(struct executable* executable) {
                 break;
             }
             case OPCODE_STORE_GLOBAL_BY_INDEX: {
-                printf("global[%u] r%u", instr->mov.dest_reg,
-                       instr->mov.src_reg);
+                printf("global[%u] r%u", instr->mov.dest_reg, instr->mov.src_reg);
                 break;
             }
             case OPCODE_LOAD_GLOBAL_BY_INDEX: {
-                printf("r%u, global[%u]", instr->mov.dest_reg,
-                       instr->mov.src_reg);
+                printf("r%u, global[%u]", instr->mov.dest_reg, instr->mov.src_reg);
                 break;
             }
             case OPCODE_STORE_GLOBAL_BY_NAME: {
@@ -115,8 +114,8 @@ static void print_instructions(struct executable* executable) {
             case OPCODE_MUL:
             case OPCODE_DIV:
             case OPCODE_MOD: {
-                printf("r%u <- r%u , r%u", instr->binary_op.result_reg,
-                       instr->binary_op.left_reg, instr->binary_op.right_reg);
+                printf("r%u <- r%u , r%u", instr->binary_op.result_reg, instr->binary_op.left_reg,
+                       instr->binary_op.right_reg);
                 break;
             }
             case OPCODE_TEST_GREATER_THAN:
@@ -125,8 +124,8 @@ static void print_instructions(struct executable* executable) {
             case OPCODE_TEST_LESS_THAN_EQUAL:
             case OPCODE_TEST_EQUAL:
             case OPCODE_TEST_NOT_EQUAL: {
-                printf("r%u <- r%u cmp r%u", instr->binary_op.result_reg,
-                       instr->binary_op.left_reg, instr->binary_op.right_reg);
+                printf("r%u <- r%u cmp r%u", instr->binary_op.result_reg, instr->binary_op.left_reg,
+                       instr->binary_op.right_reg);
                 break;
             }
             case OPCODE_SHIFT_LEFT:
@@ -138,8 +137,7 @@ static void print_instructions(struct executable* executable) {
             case OPCODE_UNARY_MINUS:
             case OPCODE_UNARY_PLUS:
             case OPCODE_UNARY_NOT: {
-                printf("r%u <- op r%u", instr->destination_reg,
-                       instr->destination_reg);
+                printf("r%u <- op r%u", instr->destination_reg, instr->destination_reg);
                 break;
             }
             case OPCODE_JUMP: {
@@ -148,8 +146,7 @@ static void print_instructions(struct executable* executable) {
             }
             case OPCODE_JMP_IF: {
                 printf("r%u goto %u else goto %u", instr->jmp_if.condition_reg,
-                       instr->jmp_if.true_block_id,
-                       instr->jmp_if.false_block_id);
+                       instr->jmp_if.true_block_id, instr->jmp_if.false_block_id);
                 break;
             }
             case OPCODE_RET: {
@@ -162,8 +159,7 @@ static void print_instructions(struct executable* executable) {
                 break;
             }
             case OPCODE_CALL: {
-                printf("r%u <- r%u()", instr->call.ret_reg,
-                       instr->call.callee_reg);
+                printf("r%u <- r%u()", instr->call.ret_reg, instr->call.callee_reg);
                 break;
             }
             case OPCODE_OBJECT_GET_PROPERTY: {

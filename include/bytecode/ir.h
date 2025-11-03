@@ -66,6 +66,8 @@ enum opcode {
 
     OPCODE_GET_ITER,
     OPCODE_ITER_NEXT,
+
+    OPCODE_HLT,
 };
 
 // this is high level representation of instruction
@@ -188,8 +190,7 @@ struct generator {
 
 void generator_init(struct generator* generator, struct ast_program program);
 size_t generator_basic_block_new(struct generator* generator);
-struct executable* generator_generate(struct lu_istate* state,
-                                      struct ast_program program);
+struct executable* generator_generate(struct lu_istate* state, struct ast_program program);
 struct executable* generator_make_executable(struct generator* generator);
 
 void print_executable(struct executable* executable);
