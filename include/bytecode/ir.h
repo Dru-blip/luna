@@ -70,57 +70,74 @@ enum opcode {
     OPCODE_HLT,
 };
 
+enum operand_type {
+    OPERAND_REG,
+    OPERAND_CONST,
+    OPERAND_BLOCK_ID,
+};
+
+// unused for now
+// will later integrate into pipeline for optimizations.
+struct operand {
+    enum operand_type type;
+    union {
+        uint32_t reg;
+        uint16_t constant_index;
+        size_t block_id;
+    };
+};
+
 // this is high level representation of instruction
 // later this will be represented in byte stream for better storage.
 struct instruction {
     enum opcode opcode;
     union {
         struct {
-            uint16_t constant_index;
-            uint32_t destination_reg;
+            struct operand constant;
+            struct operand destination;
         } load_const;
 
         struct {
-            uint32_t left_reg;
-            uint32_t right_reg;
-            uint32_t result_reg;
+            struct operand left;
+            struct operand right;
+            struct operand result;
         } binary_op;
 
         struct {
-            uint32_t condition_reg;
-            uint32_t true_block_id;
-            uint32_t false_block_id;
+            struct operand condition;
+            struct operand true_block_id;
+            struct operand false_block_id;
         } jmp_if;
 
         struct {
-            uint32_t target_offset;
+            struct operand target;
         } jmp;
 
         struct {
-            uint32_t dest_reg;
-            uint32_t src_reg;
+            struct operand source;
+            struct operand destination;
         } mov;
 
         struct {
-            uint32_t fst;
-            uint32_t snd;
+            struct operand fst;
+            struct operand snd;
         } pair;
 
         struct {
-            uint32_t callee_reg;
+            struct operand callee;
             uint32_t argc;
-            uint32_t ret_reg;
-            uint32_t self_reg;
-            uint32_t* args_reg;
+            struct operand ret;
+            struct operand self;
+            struct operand* args_reg;
         } call;
 
         struct {
-            uint32_t iterator_reg;
-            uint32_t loop_var_reg;
-            uint32_t jmp_offset;
+            struct operand iterator;
+            struct operand loop_var;
+            struct operand jmp_offset;
         } iter_next;
 
-        uint32_t destination_reg;
+        struct operand destination;
     };
 };
 
