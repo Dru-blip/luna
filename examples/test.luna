@@ -1,1 +1,1 @@
-import("hello")
+for(let i=0;i<100000000;i=i+1){}

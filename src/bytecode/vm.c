@@ -284,8 +284,33 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
                 registers[instr->binary_op.result_reg] = value;
                 DISPATCH_NEXT();
             }
+
+            char buffer[256];
+            snprintf(buffer, sizeof(buffer), "array index must be an integer ,got %s",
+                     lu_value_get_type_name(computed_index));
+            lu_raise_error(vm->istate, buffer);
+            goto error_reporter;
         }
-        // TODO: Implement loading from other types of objects
+
+        if (!lu_is_string(computed_index)) {
+            char buffer[256];
+            snprintf(buffer, sizeof(buffer), "object accessor must be a string , got %s",
+                     lu_value_get_type_name(computed_index));
+            lu_raise_error(vm->istate, buffer);
+            return lu_value_none();
+        }
+
+        struct lu_value result = lu_obj_get(lu_as_object(obj_val), lu_as_string(computed_index));
+        if (lu_is_undefined(result)) {
+            char buffer[256];
+            struct strbuf sb;
+            strbuf_init_static(&sb, buffer, sizeof(buffer));
+            strbuf_appendf(&sb, "object has no property '%s'",
+                           lu_string_get_cstring(lu_as_string(computed_index)));
+            lu_raise_error(vm->istate, buffer);
+            return lu_value_none();
+        }
+        registers[instr->binary_op.result_reg] = result;
         DISPATCH_NEXT();
     }
     CASE(OPCODE_STORE_SUBSCR) : {
@@ -307,8 +332,22 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
                 }
                 DISPATCH_NEXT();
             }
+            char buffer[256];
+            snprintf(buffer, sizeof(buffer), "array index must be an integer ,got %s",
+                     lu_value_get_type_name(computed_index));
+            lu_raise_error(vm->istate, buffer);
+            goto error_reporter;
         }
-        // TODO: Implement  for objects
+        if (!lu_is_string(computed_index)) {
+            char buffer[256];
+            snprintf(buffer, sizeof(buffer), "object accessor must be a string , got %s",
+                     lu_value_get_type_name(computed_index));
+            lu_raise_error(vm->istate, buffer);
+            return lu_value_none();
+        }
+
+        lu_obj_set(lu_as_object(obj_val), lu_as_string(computed_index),
+                   registers[instr->binary_op.result_reg]);
         DISPATCH_NEXT();
     }
 
