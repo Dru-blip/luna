@@ -69,8 +69,11 @@ size_t generator_basic_block_new(struct generator* generator) {
     return block.id;
 }
 
-static inline uint32_t generator_allocate_register(struct generator* generator) {
-    return generator->register_counter++;
+static inline struct operand generator_allocate_register(struct generator* generator) {
+    struct operand operand;
+    operand.type = OPERAND_REG;
+    operand.index = generator->register_counter++;
+    return operand;
 }
 
 static void declare_variable(struct generator* generator,
@@ -104,8 +107,9 @@ static void declare_variable(struct generator* generator,
         .scope = scope_depth == 0 ? SCOPE_GLOBAL : SCOPE_LOCAL,
         .scope_depth = scope_depth,
     };
-    uint32_t slot = new_variable.scope == SCOPE_GLOBAL ? generator->global_variable_count++
-                                                       : generator_allocate_register(generator);
+    struct operand slot = new_variable.scope == SCOPE_GLOBAL
+                              ? (struct operand){OPERAND_REG, generator->global_variable_count++}
+                              : generator_allocate_register(generator);
     new_variable.allocated_reg = slot;
     if (new_variable.scope == SCOPE_GLOBAL) {
         arrput(generator->global_variables, new_variable);
@@ -141,9 +145,9 @@ static bool find_variable(struct generator* generator,
     return false;
 }
 
-static uint32_t declare_global(struct generator* generator,
-                               const char* name,
-                               uint32_t name_length) {
+static struct operand declare_global(struct generator* generator,
+                                     const char* name,
+                                     uint32_t name_length) {
     //
     struct variable* var;
     for (uint32_t i = generator->global_variable_count; i > 0; i--) {
@@ -158,7 +162,11 @@ static uint32_t declare_global(struct generator* generator,
         .name_length = name_length,
         .scope = SCOPE_GLOBAL,
         .scope_depth = generator->scope_depth,
-        .allocated_reg = generator->global_variable_count++,
+        .allocated_reg =
+            (struct operand){
+                .type = OPERAND_REG,
+                .index = generator->global_variable_count++,
+            },
     };
 
     arrput(generator->global_variables, new_variable);
@@ -210,17 +218,16 @@ static inline size_t generator_add_executable_contant(struct generator* generato
     return generator->constant_counter++;
 }
 
-static uint32_t generator_emit_load_constant(struct generator* generator, size_t const_index) {
+static struct operand generator_emit_load_constant(struct generator* generator,
+                                                   size_t const_index) {
     struct instruction instr = {
-        .load_const =
-            {
-                const_index,
-                generator_allocate_register(generator),
-            },
         .opcode = OPCODE_LOAD_CONST,
+        .operand_count = 2,
     };
-    arrput(generator->blocks[generator->current_block_id].instructions, instr);
-    return instr.load_const.destination_reg;
+
+    instr.operands[0] = (struct operand){.type = OPERAND_CONST, .index = const_index};
+    // arrput(generator->blocks[generator->current_block_id].instructions, instr);
+    return instr.operands[0];
 }
 
 static void generator_emit_instruction(struct generator* generator, enum opcode opcode) {
@@ -259,29 +266,30 @@ static char* extract_name_and_len(struct generator* generator,
     return name;
 }
 
-static uint32_t generator_emit_binop_instruction(struct generator* generator,
-                                                 enum binary_op binop,
-                                                 uint32_t lhs_register_index,
-                                                 uint32_t rhs_register_index) {
-    const uint32_t dst_reg = generator_allocate_register(generator);
+static struct operand generator_emit_binop_instruction(struct generator* generator,
+                                                       enum binary_op binop,
+                                                       struct operand lhs,
+                                                       struct operand rhs) {
+    const struct operand dst = generator_allocate_register(generator);
 
     struct instruction instr = {};
-    instr.binary_op.left_reg = lhs_register_index;
-    instr.binary_op.right_reg = rhs_register_index;
-    instr.binary_op.result_reg = dst_reg;
+    instr.operands[0] = lhs;
+    instr.operands[1] = rhs;
+    instr.operands[2] = dst;
     instr.opcode = binop_to_opcode[binop];
     arrput(generator->blocks[generator->current_block_id].instructions, instr);
-    return dst_reg;
+    return dst;
 }
 
 static void generator_emit_mov_instruction(struct generator* generator,
-                                           uint32_t dst_register_index,
-                                           uint32_t src_register_index) {
+                                           struct operand dst,
+                                           struct operand src) {
     struct instruction instr = {
         .opcode = OPCODE_MOV,
+        .operand_count = 2,
     };
-    instr.mov.src_reg = src_register_index;
-    instr.mov.dest_reg = dst_register_index;
+    instr.operands[0] = src;
+    instr.operands[1] = dst;
     arrput(generator->blocks[generator->current_block_id].instructions, instr);
 }
 
@@ -291,13 +299,13 @@ static void generator_emit_jump_instruction(struct generator* generator,
     struct instruction instr = {
         .opcode = OPCODE_JUMP,
     };
-    instr.jmp.target_offset = target_block_id;
+    instr.operands[0] = (struct operand){.type = OPERAND_BLOCK_ID, .index = target_block_id};
     arrput(GET_CURRENT_BLOCK.instructions, instr);
     arrput(GET_CURRENT_BLOCK.instructions_spans, span);
 }
 
 //
-static uint32_t generate_expr(struct generator* generator, struct ast_node* expr);
+static struct operand generate_expr(struct generator* generator, struct ast_node* expr);
 static void generate_stmts(struct generator* generator, struct ast_node** stmts);
 static void generate_stmt(struct generator* generator, struct ast_node* stmt);
 //
@@ -308,60 +316,64 @@ static inline void emit_instruction(struct generator* generator,
     arrput(GET_CURRENT_BLOCK.instructions, instr);
 }
 
-static inline uint32_t generate_simple_load(struct generator* generator,
-                                            enum opcode op,
-                                            struct span span) {
-    const uint32_t dst_reg = generator_allocate_register(generator);
-    struct instruction instr = {.opcode = op, .destination_reg = dst_reg};
+static inline struct operand generate_simple_load(struct generator* generator,
+                                                  enum opcode op,
+                                                  struct span span) {
+    const struct operand dst_reg = generator_allocate_register(generator);
+    struct instruction instr = {.opcode = op};
+    instr.operands[0] = dst_reg;
     emit_instruction(generator, instr, span);
     return dst_reg;
 }
 
-static inline uint32_t generate_constant_load(struct generator* generator,
-                                              size_t const_index,
-                                              struct span span) {
-    arrput(GET_CURRENT_BLOCK.instructions_spans, span);
+static inline struct operand generate_constant_load(struct generator* generator,
+                                                    size_t const_index,
+                                                    struct span span) {
+    // arrput(GET_CURRENT_BLOCK.instructions_spans, span);
     return generator_emit_load_constant(generator, const_index);
 }
 
-static inline uint32_t generate_int_expr(struct generator* generator, struct ast_node* expr) {
+static inline struct operand generate_int_expr(struct generator* generator, struct ast_node* expr) {
     size_t const_index = generator_add_int_contant(generator, expr->data.int_val);
     return generate_constant_load(generator, const_index, expr->span);
 }
 
-static inline uint32_t generate_bool_expr(struct generator* generator, struct ast_node* expr) {
-    enum opcode op = expr->data.int_val ? OPCODE_LOAD_TRUE : OPCODE_LOAD_FALSE;
-    return generate_simple_load(generator, op, expr->span);
+static inline struct operand generate_bool_expr(struct generator* generator,
+                                                struct ast_node* expr) {
+    // enum opcode op = expr->data.int_val ? OPCODE_LOAD_TRUE : OPCODE_LOAD_FALSE;
+    return (struct operand){.type = OPERAND_CONST_BOOL, .index = expr->data.int_val};
 }
 
-static inline uint32_t generate_str_expr(struct generator* generator, struct ast_node* expr) {
+static inline struct operand generate_str_expr(struct generator* generator, struct ast_node* expr) {
     size_t const_index = generator_add_str_contant(generator, expr->data.id, &expr->span);
     return generate_constant_load(generator, const_index, expr->span);
 }
 
-static inline uint32_t generate_array_expr(struct generator* generator, struct ast_node* expr) {
-    uint32_t dst_reg = generator_allocate_register(generator);
+static inline struct operand generate_array_expr(struct generator* generator,
+                                                 struct ast_node* expr) {
+    struct operand dst_reg = generator_allocate_register(generator);
 
-    struct instruction new_array_instr = {.opcode = OPCODE_NEW_ARRAY, .destination_reg = dst_reg};
+    struct instruction new_array_instr = {.opcode = OPCODE_NEW_ARRAY};
+    new_array_instr.operands[0] = dst_reg;
     emit_instruction(generator, new_array_instr, expr->span);
 
     for (uint32_t i = 0; i < arrlen(expr->data.list); i++) {
         struct ast_node* element = expr->data.list[i];
         struct instruction append_instr = {.opcode = OPCODE_ARRAY_APPEND,
-                                           .pair.fst = dst_reg,
-                                           .pair.snd = generate_expr(generator, element)};
+                                           .operands[0] = dst_reg,
+                                           .operands[1] = generate_expr(generator, element)};
         emit_instruction(generator, append_instr, element->span);
     }
 
     return dst_reg;
 }
 
-static inline uint32_t generate_identifier_expr(struct generator* generator,
-                                                struct ast_node* expr) {
+static inline struct operand generate_identifier_expr(struct generator* generator,
+                                                      struct ast_node* expr) {
     uint32_t name_len;
     char* name = extract_name_and_len(generator, expr, &name_len);
 
-    uint32_t dst_reg = generator_allocate_register(generator);
+    struct operand dst_reg = generator_allocate_register(generator);
 
     struct variable* var;
     if (!find_variable(generator, name, name_len, &var)) {
@@ -374,9 +386,11 @@ static inline uint32_t generate_identifier_expr(struct generator* generator,
         uint32_t name_index = generator_add_identifier(generator, name_string);
 
         struct instruction instr = {
-            .opcode = OPCODE_LOAD_GLOBAL_BY_NAME, .pair.fst = name_index, .pair.snd = dst_reg};
+            .opcode = OPCODE_LOAD_GLOBAL_BY_NAME,
+            .operands[0] = (struct operand){.type = OPERAND_CONST, .index = name_index},
+            .operands[1] = dst_reg};
         emit_instruction(generator, instr, expr->span);
-        return instr.pair.snd;
+        return instr.operands[1];
     }
 
     // Local and parameter variables are accessed directly
@@ -386,44 +400,48 @@ static inline uint32_t generate_identifier_expr(struct generator* generator,
 
     // Global variables require a load instruction
     struct instruction instr = {.opcode = OPCODE_LOAD_GLOBAL_BY_INDEX,
-                                .mov.dest_reg = dst_reg,
-                                .mov.src_reg = var->allocated_reg};
+                                .operands[0] = var->allocated_reg,
+                                .operands[1] = dst_reg};
     emit_instruction(generator, instr, expr->span);
     return dst_reg;
 }
 
-static inline uint32_t generate_unop_expr(struct generator* generator, struct ast_node* expr) {
-    uint32_t dst_reg = generate_expr(generator, expr->data.unop.argument);
+static inline struct operand generate_unop_expr(struct generator* generator,
+                                                struct ast_node* expr) {
+    struct operand dst_reg = generate_expr(generator, expr->data.unop.argument);
     struct instruction instr = {.opcode = unop_to_opcode[expr->data.unop.op],
-                                .destination_reg = dst_reg};
+                                .operands[0] = dst_reg};
     emit_instruction(generator, instr, expr->span);
     return dst_reg;
 }
 
-static inline uint32_t generate_logical_binop(struct generator* generator, struct ast_node* expr) {
-    uint32_t lhs = generate_expr(generator, expr->data.binop.lhs);
-    uint32_t dst = generator_allocate_register(generator);
+static inline struct operand generate_logical_binop(struct generator* generator,
+                                                    struct ast_node* expr) {
+    struct operand lhs = generate_expr(generator, expr->data.binop.lhs);
+    struct operand dst = generator_allocate_register(generator);
     const size_t rhs_block = generator_basic_block_new(generator);
     const size_t end_block = generator_basic_block_new(generator);
 
     generator_emit_mov_instruction(generator, dst, lhs);
     arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
 
-    struct instruction branch_instr = {.opcode = OPCODE_JMP_IF,
-                                       .jmp_if.condition_reg = lhs,
-                                       .jmp_if.true_block_id = rhs_block,
-                                       .jmp_if.false_block_id = end_block};
+    struct instruction branch_instr = {.opcode = OPCODE_JMP_IF};
+    branch_instr.operands[0] = lhs;
+    branch_instr.operands[1] = (struct operand){.type = OPERAND_BLOCK_ID, .index = rhs_block};
+    branch_instr.operands[2] = (struct operand){.type = OPERAND_BLOCK_ID, .index = end_block};
 
     if (expr->data.binop.op == OP_LOR) {
-        branch_instr.jmp_if.true_block_id = end_block;
-        branch_instr.jmp_if.false_block_id = rhs_block;
+        branch_instr.operands[1] = (struct operand){.type = OPERAND_BLOCK_ID, .index = end_block};
+        branch_instr.operands[2] = (struct operand){.type = OPERAND_BLOCK_ID, .index = rhs_block};
     }
 
     emit_instruction(generator, branch_instr, expr->span);
 
     generator_switch_basic_block(generator, rhs_block);
-    uint32_t rhs = generate_expr(generator, expr->data.binop.rhs);
-    generator_emit_mov_instruction(generator, dst, rhs);
+    // figure out Why rhs is unused
+    struct operand rhs = generate_expr(generator, expr->data.binop.rhs);
+    generator_emit_mov_instruction(generator, dst,
+                                   (struct operand){.type = OPERAND_BLOCK_ID, .index = rhs_block});
     arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
     generator_emit_jump_instruction(generator, end_block, expr->span);
     arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
@@ -432,10 +450,10 @@ static inline uint32_t generate_logical_binop(struct generator* generator, struc
     return dst;
 }
 
-static inline uint32_t generate_binop(struct generator* generator, struct ast_node* expr) {
+static inline struct operand generate_binop(struct generator* generator, struct ast_node* expr) {
     if (expr->data.binop.op < OP_LAND) {
-        uint32_t lhs = generate_expr(generator, expr->data.binop.lhs);
-        uint32_t rhs = generate_expr(generator, expr->data.binop.rhs);
+        struct operand lhs = generate_expr(generator, expr->data.binop.lhs);
+        struct operand rhs = generate_expr(generator, expr->data.binop.rhs);
         arrput(GET_CURRENT_BLOCK.instructions_spans, expr->span);
         return generator_emit_binop_instruction(generator, expr->data.binop.op, lhs, rhs);
     }
@@ -444,7 +462,7 @@ static inline uint32_t generate_binop(struct generator* generator, struct ast_no
 
 static inline void generate_simple_assign(struct generator* generator,
                                           struct ast_node* lhs,
-                                          uint32_t val_reg,
+                                          struct operand val_reg,
                                           struct span span) {
     uint32_t name_len;
     char* name = extract_name_and_len(generator, lhs, &name_len);
@@ -456,28 +474,29 @@ static inline void generate_simple_assign(struct generator* generator,
     }
 
     struct instruction instr = {
-        .opcode = (var->scope == SCOPE_GLOBAL) ? OPCODE_STORE_GLOBAL_BY_INDEX : OPCODE_MOV,
-        .mov.dest_reg = var->allocated_reg,
-        .mov.src_reg = val_reg};
+        .opcode = (var->scope == SCOPE_GLOBAL) ? OPCODE_STORE_GLOBAL_BY_INDEX : OPCODE_MOV};
+    instr.operands[0] = val_reg;
+    instr.operands[1] = var->allocated_reg;
+
     emit_instruction(generator, instr, span);
 }
 
 static inline void generate_subscript_assign(struct generator* generator,
                                              struct ast_node* lhs,
-                                             uint32_t val_reg,
+                                             struct operand val_reg,
                                              struct span span) {
-    struct instruction instr = {.opcode = OPCODE_STORE_SUBSCR,
-                                .binary_op.left_reg = generate_expr(generator, lhs->data.pair.fst),
-                                .binary_op.right_reg = generate_expr(generator, lhs->data.pair.snd),
-                                .binary_op.result_reg = val_reg};
+    struct instruction instr = {.opcode = OPCODE_STORE_SUBSCR};
+    instr.operands[0] = generate_expr(generator, lhs->data.pair.fst);
+    instr.operands[1] = generate_expr(generator, lhs->data.pair.snd);
+    instr.operands[2] = val_reg;
     emit_instruction(generator, instr, span);
 }
 
 static inline void generate_object_property_assign(struct generator* generator,
                                                    struct ast_node* lhs,
-                                                   uint32_t val_reg,
+                                                   struct operand val_reg,
                                                    struct span span) {
-    uint32_t obj = generate_expr(generator, lhs->data.member_expr.object);
+    struct operand obj = generate_expr(generator, lhs->data.member_expr.object);
     char* name = generator->program.source + lhs->data.member_expr.property_name.start;
     uint32_t name_len =
         lhs->data.member_expr.property_name.end - lhs->data.member_expr.property_name.start;
@@ -492,15 +511,18 @@ static inline void generate_object_property_assign(struct generator* generator,
 
     struct instruction instr = {
         .opcode = OPCODE_OBJECT_SET_PROPERTY,
-        .binary_op.left_reg = name_index,
-        .binary_op.right_reg = val_reg,
-        .binary_op.result_reg = obj,
     };
+
+    instr.operands[0] = (struct operand){OPERAND_CONST, name_index};
+    instr.operands[1] = val_reg;
+    instr.operands[2] = obj;
+
     emit_instruction(generator, instr, span);
 }
 
-static inline uint32_t generate_assign_expr(struct generator* generator, struct ast_node* expr) {
-    uint32_t val_reg = generate_expr(generator, expr->data.binop.rhs);
+static inline struct operand generate_assign_expr(struct generator* generator,
+                                                  struct ast_node* expr) {
+    struct operand val_reg = generate_expr(generator, expr->data.binop.rhs);
 
     switch (expr->data.binop.lhs->kind) {
         case AST_NODE_IDENTIFIER: {
@@ -524,7 +546,8 @@ static inline uint32_t generate_assign_expr(struct generator* generator, struct 
 }
 
 // Load function by name for call expression
-static inline uint32_t load_callee_by_name(struct generator* generator, struct ast_node* callee) {
+static inline struct operand load_callee_by_name(struct generator* generator,
+                                                 struct ast_node* callee) {
     // Duplicate block of code from generate_identifier expr
     // ---------------------------------------------------
     uint32_t name_len;
@@ -532,7 +555,7 @@ static inline uint32_t load_callee_by_name(struct generator* generator, struct a
 
     struct variable* var;
 
-    uint32_t dst_reg = generator_allocate_register(generator);
+    struct operand dst_reg = generator_allocate_register(generator);
     if (!find_variable(generator, name, name_len, &var)) {
         char* name_copy = malloc(name_len + 1);
         memcpy(name_copy, name, name_len);
@@ -542,37 +565,45 @@ static inline uint32_t load_callee_by_name(struct generator* generator, struct a
         uint32_t name_index = generator_add_identifier(generator, name_string);
 
         struct instruction instr = {
-            .opcode = OPCODE_LOAD_GLOBAL_BY_NAME, .pair.fst = name_index, .pair.snd = dst_reg};
+            .opcode = OPCODE_LOAD_GLOBAL_BY_NAME,
+            .operands[0] = (struct operand){.type = OPERAND_CONST, .index = name_index},
+            .operands[1] = dst_reg,
+        };
+
         emit_instruction(generator, instr, callee->span);
         free(name_copy);
-        return instr.pair.snd;
+        return instr.operands[1];
     }
 
     if (var->scope == SCOPE_LOCAL || var->scope == SCOPE_PARAM) {
         return var->allocated_reg;
     }
 
-    struct instruction instr = {.opcode = OPCODE_LOAD_GLOBAL_BY_INDEX,
-                                .mov.dest_reg = dst_reg,
-                                .mov.src_reg = var->allocated_reg};
+    struct instruction instr = {
+        .opcode = OPCODE_LOAD_GLOBAL_BY_INDEX,
+        .operands[0] = var->allocated_reg,
+        .operands[1] = dst_reg,
+    };
     emit_instruction(generator, instr, callee->span);
     return dst_reg;
     // ---------------------------------------------------
 }
 
-static inline uint32_t generate_subscript_expr(struct generator* generator, struct ast_node* expr) {
-    struct instruction instr = {
-        .opcode = OPCODE_LOAD_SUBSCR,
-        .binary_op.result_reg = generator_allocate_register(generator),
-        .binary_op.left_reg = generate_expr(generator, expr->data.pair.fst),
-        .binary_op.right_reg = generate_expr(generator, expr->data.pair.snd)};
+static inline struct operand generate_subscript_expr(struct generator* generator,
+                                                     struct ast_node* expr) {
+    struct instruction instr = {.opcode = OPCODE_LOAD_SUBSCR};
+
+    instr.operands[0] = generate_expr(generator, expr->data.pair.fst);
+    instr.operands[1] = generate_expr(generator, expr->data.pair.snd);
+    instr.operands[2] = generator_allocate_register(generator);
+
     emit_instruction(generator, instr, expr->span);
-    return instr.binary_op.result_reg;
+    return instr.operands[2];
 }
 
-static uint32_t generate_member_expr(struct generator* generator, struct ast_node* expr) {
-    uint32_t obj = generate_expr(generator, expr->data.member_expr.object);
-    uint32_t dst_reg = generator_allocate_register(generator);
+static struct operand generate_member_expr(struct generator* generator, struct ast_node* expr) {
+    struct operand obj = generate_expr(generator, expr->data.member_expr.object);
+    struct operand dst_reg = generator_allocate_register(generator);
     char* name = generator->program.source + expr->data.member_expr.property_name.start;
     uint32_t name_len =
         expr->data.member_expr.property_name.end - expr->data.member_expr.property_name.start;
@@ -585,59 +616,61 @@ static uint32_t generate_member_expr(struct generator* generator, struct ast_nod
     free(name_copy);
     uint32_t name_index = generator_add_identifier(generator, name_string);
 
-    struct instruction get_prop_instr = {
-        .opcode = OPCODE_OBJECT_GET_PROPERTY,
-        .binary_op.left_reg = obj,
-        .binary_op.right_reg = name_index,
-        .binary_op.result_reg = dst_reg,
-    };
+    struct instruction get_prop_instr = {.opcode = OPCODE_OBJECT_GET_PROPERTY};
+
+    get_prop_instr.operands[0] = obj;
+    get_prop_instr.operands[1] = (struct operand){.type = OPERAND_CONST, .index = name_index};
+    get_prop_instr.operands[2] = dst_reg;
+
     emit_instruction(generator, get_prop_instr, expr->span);
     return dst_reg;
 }
 
-static inline uint32_t generate_call_expr(struct generator* generator, struct ast_node* expr) {
-    struct instruction call_instr;
-    call_instr.opcode = OPCODE_CALL;
-    call_instr.call.argc = expr->data.call.argc;
-    call_instr.call.args_reg = nullptr;
+// static inline struct operand generate_call_expr(struct generator* generator,
+//                                                 struct ast_node* expr) {
+//     struct instruction call_instr;
+//     call_instr.opcode = OPCODE_CALL;
+//     call_instr.call.argc = expr->data.call.argc;
+//     call_instr.call.args_reg = nullptr;
 
-    switch (expr->data.call.callee->kind) {
-        case AST_NODE_IDENTIFIER: {
-            call_instr.call.callee_reg = load_callee_by_name(generator, expr->data.call.callee);
-            call_instr.call.self_reg = call_instr.call.callee_reg;
-            break;
-        }
-        case AST_NODE_COMPUTED_MEMBER_EXPR: {
-            call_instr.call.self_reg =
-                generate_expr(generator, expr->data.call.callee->data.pair.fst);
-            call_instr.call.callee_reg = generate_subscript_expr(generator, expr->data.call.callee);
-            break;
-        }
-        case AST_NODE_MEMBER_EXPR: {
-            uint32_t object_reg =
-                generate_expr(generator, expr->data.call.callee->data.member_expr.object);
-            call_instr.call.callee_reg = generate_member_expr(generator, expr->data.call.callee);
-            call_instr.call.self_reg = object_reg;
-            break;
-        }
-        default: {
-            lu_raise_error(generator->state, "attempt to call a non function value");
-            break;
-        }
-    }
+//     switch (expr->data.call.callee->kind) {
+//         case AST_NODE_IDENTIFIER: {
+//             call_instr.call.callee_reg = load_callee_by_name(generator, expr->data.call.callee);
+//             call_instr.call.self_reg = call_instr.call.callee_reg;
+//             break;
+//         }
+//         case AST_NODE_COMPUTED_MEMBER_EXPR: {
+//             call_instr.call.self_reg =
+//                 generate_expr(generator, expr->data.call.callee->data.pair.fst);
+//             call_instr.call.callee_reg = generate_subscript_expr(generator,
+//             expr->data.call.callee); break;
+//         }
+//         case AST_NODE_MEMBER_EXPR: {
+//             uint32_t object_reg =
+//                 generate_expr(generator, expr->data.call.callee->data.member_expr.object);
+//             call_instr.call.callee_reg = generate_member_expr(generator, expr->data.call.callee);
+//             call_instr.call.self_reg = object_reg;
+//             break;
+//         }
+//         default: {
+//             lu_raise_error(generator->state, "attempt to call a non function value");
+//             break;
+//         }
+//     }
 
-    for (uint8_t i = 0; i < expr->data.call.argc; ++i) {
-        uint32_t arg_reg = generate_expr(generator, expr->data.call.args[i]);
-        arrput(call_instr.call.args_reg, arg_reg);
-    }
+//     for (uint8_t i = 0; i < expr->data.call.argc; ++i) {
+//         uint32_t arg_reg = generate_expr(generator, expr->data.call.args[i]);
+//         arrput(call_instr.call.args_reg, arg_reg);
+//     }
 
-    call_instr.call.ret_reg = generator_allocate_register(generator);
+//     call_instr.call.ret_reg = generator_allocate_register(generator);
 
-    emit_instruction(generator, call_instr, expr->span);
-    return call_instr.call.ret_reg;
-}
+//     emit_instruction(generator, call_instr, expr->span);
+//     return call_instr.call.ret_reg;
+// }
 
-static inline uint32_t generate_function_expr(struct generator* generator, struct ast_node* expr) {
+static inline struct operand generate_function_expr(struct generator* generator,
+                                                    struct ast_node* expr) {
     // Duplicate block of code from generate_fn_decl
     //---------------------------------------------
 
@@ -677,20 +710,21 @@ static inline uint32_t generate_function_expr(struct generator* generator, struc
 
     struct instruction make_fn_instr;
     make_fn_instr.opcode = OPCODE_MAKE_FUNCTION;
-    make_fn_instr.binary_op.result_reg = generator_allocate_register(generator);
-    make_fn_instr.binary_op.left_reg = executable_index;
-    make_fn_instr.binary_op.right_reg = name_index;
+
+    make_fn_instr.operands[0] = (struct operand){.type = OPERAND_CONST, .index = executable_index};
+    make_fn_instr.operands[1] = (struct operand){.type = OPERAND_CONST, .index = name_index};
+    make_fn_instr.operands[2] = generator_allocate_register(generator);
 
     emit_instruction(generator, make_fn_instr, expr->span);
     //-----------------------------------------------
-    return make_fn_instr.binary_op.result_reg;
+    return make_fn_instr.operands[2];
 }
 
-static uint32_t generate_object_expr(struct generator* generator, struct ast_node* expr) {
+static struct operand generate_object_expr(struct generator* generator, struct ast_node* expr) {
     //
-    uint32_t dst_reg = generator_allocate_register(generator);
+    struct operand dst_reg = generator_allocate_register(generator);
 
-    struct instruction new_object_instr = {.opcode = OPCODE_NEW_OBJECT, .destination_reg = dst_reg};
+    struct instruction new_object_instr = {.opcode = OPCODE_NEW_OBJECT, .operands[0] = dst_reg};
     emit_instruction(generator, new_object_instr, expr->span);
 
     const size_t len = arrlen(expr->data.list);
@@ -708,23 +742,23 @@ static uint32_t generate_object_expr(struct generator* generator, struct ast_nod
         struct lu_string* name_string = lu_intern_string(generator->state, name_copy);
         free(name_copy);
         uint32_t name_index = generator_add_identifier(generator, name_string);
-        uint32_t prop_value = generate_expr(generator, prop->data.property.value);
+        struct operand prop_value = generate_expr(generator, prop->data.property.value);
         struct instruction set_prop_instr = {
             .opcode = OPCODE_OBJECT_SET_PROPERTY,
-            .binary_op.left_reg = name_index,
-            .binary_op.right_reg = prop_value,
-            .binary_op.result_reg = dst_reg,
         };
+        set_prop_instr.operands[0] = (struct operand){OPERAND_CONST, name_index};
+        set_prop_instr.operands[1] = prop_value;
+        set_prop_instr.operands[2] = dst_reg;
         emit_instruction(generator, set_prop_instr, prop->span);
     }
 
     return dst_reg;
 }
 
-static uint32_t generate_expr(struct generator* generator, struct ast_node* expr) {
+static struct operand generate_expr(struct generator* generator, struct ast_node* expr) {
     switch (expr->kind) {
         case AST_NODE_SELF_EXPR: {
-            return 0;
+            return (struct operand){.type = OPERAND_REG, .index = 0};
         }
         case AST_NODE_INT: {
             return generate_int_expr(generator, expr);
@@ -753,9 +787,9 @@ static uint32_t generate_expr(struct generator* generator, struct ast_node* expr
         case AST_NODE_ASSIGN: {
             return generate_assign_expr(generator, expr);
         }
-        case AST_NODE_CALL: {
-            return generate_call_expr(generator, expr);
-        }
+        // case AST_NODE_CALL: {
+        //     return generate_call_expr(generator, expr);
+        // }
         case AST_NODE_MEMBER_EXPR: {
             return generate_member_expr(generator, expr);
         }
@@ -769,7 +803,7 @@ static uint32_t generate_expr(struct generator* generator, struct ast_node* expr
             return generate_object_expr(generator, expr);
         }
         default: {
-            return 0;
+            return (struct operand){.type = OPERAND_REG, .index = 0};
         }
     }
 }
@@ -796,7 +830,7 @@ static void end_scope(struct generator* generator) {
 }
 
 static inline void generate_let_decl(struct generator* generator, struct ast_node* stmt) {
-    uint32_t value;
+    struct operand value;
     if (stmt->data.let_decl.value) {
         value = generate_expr(generator, stmt->data.let_decl.value);
     } else {
@@ -811,15 +845,15 @@ static inline void generate_let_decl(struct generator* generator, struct ast_nod
     struct instruction store_instr = {
         .opcode = var->scope == SCOPE_GLOBAL ? OPCODE_STORE_GLOBAL_BY_INDEX : OPCODE_MOV,
     };
-    store_instr.mov.dest_reg = var->allocated_reg;
-    store_instr.mov.src_reg = value;
+    store_instr.operands[0] = value;
+    store_instr.operands[1] = var->allocated_reg;
 
     emit_instruction(generator, store_instr, stmt->span);
 }
 
 static inline void generate_return_stmt(struct generator* generator, struct ast_node* stmt) {
-    uint32_t value = generate_expr(generator, stmt->data.node);
-    struct instruction instr = {.opcode = OPCODE_RET, .destination_reg = value};
+    struct operand value = generate_expr(generator, stmt->data.node);
+    struct instruction instr = {.opcode = OPCODE_RET, .operands[0] = value};
     emit_instruction(generator, instr, stmt->span);
 }
 
@@ -844,14 +878,15 @@ static inline void generate_if_stmt(struct generator* generator, struct ast_node
         uint32_t true_block = generator_basic_block_new(generator);
         uint32_t false_block = generator_basic_block_new(generator);
 
-        uint32_t condition = generate_expr(generator, current->data.if_stmt.test);
+        struct operand condition = generate_expr(generator, current->data.if_stmt.test);
 
         struct instruction branch_instr = {
             .opcode = OPCODE_JMP_IF,
         };
-        branch_instr.jmp_if.condition_reg = condition;
-        branch_instr.jmp_if.true_block_id = true_block;
-        branch_instr.jmp_if.false_block_id = false_block;
+
+        branch_instr.operands[0] = condition;
+        branch_instr.operands[1] = (struct operand){.type = OPERAND_BLOCK_ID, .index = true_block};
+        branch_instr.operands[2] = (struct operand){.type = OPERAND_BLOCK_ID, .index = false_block};
 
         emit_instruction(generator, branch_instr, current->span);
 
@@ -900,14 +935,15 @@ static inline void generate_while_stmt(struct generator* generator, struct ast_n
     generator_emit_jump_instruction(generator, test_block, stmt->data.pair.fst->span);
 
     generator_switch_basic_block(generator, test_block);
-    uint32_t test = generate_expr(generator, stmt->data.pair.fst);
+    struct operand test = generate_expr(generator, stmt->data.pair.fst);
 
     struct instruction branch_instr = {
         .opcode = OPCODE_JMP_IF,
     };
-    branch_instr.jmp_if.condition_reg = test;
-    branch_instr.jmp_if.true_block_id = body_block;
-    branch_instr.jmp_if.false_block_id = end_block;
+
+    branch_instr.operands[0] = test;
+    branch_instr.operands[1] = (struct operand){.type = OPERAND_BLOCK_ID, .index = body_block};
+    branch_instr.operands[2] = (struct operand){.type = OPERAND_BLOCK_ID, .index = end_block};
 
     emit_instruction(generator, branch_instr, stmt->span);
 
@@ -940,14 +976,15 @@ static void generate_for_stmt(struct generator* generator, struct ast_node* stmt
     generator_emit_jump_instruction(generator, test_block, for_stmt->test->span);
 
     generator_switch_basic_block(generator, test_block);
-    uint32_t test = generate_expr(generator, for_stmt->test);
+    struct operand test = generate_expr(generator, for_stmt->test);
 
     struct instruction branch_instr = {
         .opcode = OPCODE_JMP_IF,
     };
-    branch_instr.jmp_if.condition_reg = test;
-    branch_instr.jmp_if.true_block_id = body_block;
-    branch_instr.jmp_if.false_block_id = end_block;
+
+    branch_instr.operands[0] = test;
+    branch_instr.operands[1] = (struct operand){.type = OPERAND_BLOCK_ID, .index = body_block};
+    branch_instr.operands[2] = (struct operand){.type = OPERAND_BLOCK_ID, .index = end_block};
 
     emit_instruction(generator, branch_instr, for_stmt->test->span);
 
@@ -985,14 +1022,15 @@ static inline void generate_for_in_stmt(struct generator* generator, struct ast_
         for_stmt->left->data.let_decl.name_span.end - for_stmt->left->data.let_decl.name_span.start;
     declare_variable(generator, name, name_len, &var);
 
-    uint32_t iterable = generate_expr(generator, for_stmt->right);
+    struct operand iterable = generate_expr(generator, for_stmt->right);
 
-    uint32_t iterator = generator_allocate_register(generator);
+    struct operand iterator = generator_allocate_register(generator);
     struct instruction get_iter_instr = {
         .opcode = OPCODE_GET_ITER,
-        .pair.fst = iterable,
-        .pair.snd = iterator,
     };
+
+    get_iter_instr.operands[0] = iterable;
+    get_iter_instr.operands[1] = iterator;
 
     emit_instruction(generator, get_iter_instr, for_stmt->right->span);
 
@@ -1003,9 +1041,10 @@ static inline void generate_for_in_stmt(struct generator* generator, struct ast_
     struct instruction iter_next_instr = {
         .opcode = OPCODE_ITER_NEXT,
     };
-    iter_next_instr.iter_next.iterator_reg = iterator;
-    iter_next_instr.iter_next.jmp_offset = end_block;
-    iter_next_instr.iter_next.loop_var_reg = var->allocated_reg;
+
+    iter_next_instr.operands[0] = iterator;
+    iter_next_instr.operands[1] = (struct operand){.type = OPERAND_BLOCK_ID, .index = end_block};
+    iter_next_instr.operands[2] = var->allocated_reg;
 
     emit_instruction(generator, iter_next_instr, for_stmt->right->span);
 
@@ -1059,9 +1098,9 @@ static inline void generate_fn_decl(struct generator* generator, struct ast_node
     generator_switch_basic_block(generator, fn_entry_block);
     generate_stmt(generator, stmt->data.fn_decl.body);
 
-    uint32_t none_reg = generator_allocate_register(generator);
-    struct instruction none_instr = {.opcode = OPCODE_LOAD_NONE, .destination_reg = none_reg};
-    struct instruction instr = {.opcode = OPCODE_RET, .destination_reg = none_reg};
+    struct operand none_reg = generator_allocate_register(generator);
+    struct instruction none_instr = {.opcode = OPCODE_LOAD_NONE, .operands[0] = none_reg};
+    struct instruction instr = {.opcode = OPCODE_RET, .operands[0] = none_reg};
     emit_instruction(generator, none_instr, stmt->span);
 
     emit_instruction(generator, instr, stmt->span);
@@ -1076,17 +1115,19 @@ static inline void generate_fn_decl(struct generator* generator, struct ast_node
 
     struct instruction make_fn_instr;
     make_fn_instr.opcode = OPCODE_MAKE_FUNCTION;
-    make_fn_instr.binary_op.result_reg = generator_allocate_register(generator);
-    make_fn_instr.binary_op.left_reg = executable_index;
-    make_fn_instr.binary_op.right_reg = name_index;
+
+    make_fn_instr.operands[0] = (struct operand){OPERAND_CONST, .index = executable_index};
+    make_fn_instr.operands[1] = (struct operand){OPERAND_CONST, .index = name_index};
+    make_fn_instr.operands[2] = generator_allocate_register(generator);
 
     emit_instruction(generator, make_fn_instr, stmt->span);
 
     struct instruction store_func_instr;
     store_func_instr.opcode =
         var->scope == SCOPE_GLOBAL ? OPCODE_STORE_GLOBAL_BY_INDEX : OPCODE_MOV;
-    store_func_instr.mov.src_reg = make_fn_instr.binary_op.result_reg;
-    store_func_instr.mov.dest_reg = var->allocated_reg;
+
+    store_func_instr.operands[0] = make_fn_instr.operands[2];
+    store_func_instr.operands[1] = var->allocated_reg;
     emit_instruction(generator, store_func_instr, stmt->span);
 
     free(name_copy);
@@ -1199,26 +1240,26 @@ static void generator_basic_blocks_linearize(struct generator* generator,
     // instead of doing a full loop on the instructions
     // its better to store the jump instructions inside a seperate array (like a
     // patch buffer) and patch those to avoid unnecessary iterations.
-    for (size_t i = 0; i < total_instructions; i++) {
-        struct instruction* instr = &flat[i];
-        switch (instr->opcode) {
-            case OPCODE_JUMP: {
-                instr->jmp.target_offset = block_start_offsets[instr->jmp.target_offset];
-                break;
-            }
-            case OPCODE_JMP_IF: {
-                instr->jmp_if.true_block_id = block_start_offsets[instr->jmp_if.true_block_id];
-                instr->jmp_if.false_block_id = block_start_offsets[instr->jmp_if.false_block_id];
-                break;
-            }
-            case OPCODE_ITER_NEXT: {
-                instr->iter_next.jmp_offset = block_start_offsets[instr->iter_next.jmp_offset];
-                break;
-            }
-            default:
-                break;
-        }
-    }
+    // for (size_t i = 0; i < total_instructions; i++) {
+    //     struct instruction* instr = &flat[i];
+    //     switch (instr->opcode) {
+    //         case OPCODE_JUMP: {
+    //             instr->jmp.target_offset = block_start_offsets[instr->jmp.target_offset];
+    //             break;
+    //         }
+    //         case OPCODE_JMP_IF: {
+    //             instr->jmp_if.true_block_id = block_start_offsets[instr->jmp_if.true_block_id];
+    //             instr->jmp_if.false_block_id = block_start_offsets[instr->jmp_if.false_block_id];
+    //             break;
+    //         }
+    //         case OPCODE_ITER_NEXT: {
+    //             instr->iter_next.jmp_offset = block_start_offsets[instr->iter_next.jmp_offset];
+    //             break;
+    //         }
+    //         default:
+    //             break;
+    //     }
+    // }
 
     free(block_start_offsets);
 

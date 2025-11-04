@@ -70,75 +70,27 @@ enum opcode {
     OPCODE_HLT,
 };
 
-enum operand_type {
+enum operand_type : uint8_t {
     OPERAND_REG,
     OPERAND_CONST,
-    OPERAND_LABEL,
+    OPERAND_CONST_BOOL,
+    OPERAND_BLOCK_ID,
 };
 
 // unused for now
 // will later integrate into pipeline for optimizations.
 struct operand {
     enum operand_type type;
-    union {
-        uint32_t reg;
-        uint16_t constant_index;
-        size_t block_offset;  // used for operand type label
-    };
+    uint32_t index;
 };
 
 // this is high level representation of instruction
 // later this will be represented in byte stream for better storage.
 struct instruction {
     enum opcode opcode;
-    union {
-        struct {
-            struct operand constant;
-            struct operand destination;
-        } load_const;
-
-        struct {
-            struct operand left;
-            struct operand right;
-            struct operand result;
-        } binary_op;
-
-        struct {
-            struct operand condition;
-            struct operand true_block_id;
-            struct operand false_block_id;
-        } jmp_if;
-
-        struct {
-            struct operand target;
-        } jmp;
-
-        struct {
-            struct operand source;
-            struct operand destination;
-        } mov;
-
-        struct {
-            struct operand fst;
-            struct operand snd;
-        } pair;
-
-        struct {
-            struct operand callee;
-            uint32_t argc;
-            struct operand ret;
-            struct operand self;
-            struct operand* args_reg;
-        } call;
-
-        struct {
-            struct operand iterator;
-            struct operand loop_var;
-            struct operand jmp_offset;
-        } iter_next;
-
-        struct operand destination;
-    };
+    uint32_t operand_count;
+    struct operand operands[3];
+    struct operand* args;
 };
 
 struct basic_block {
@@ -178,7 +130,7 @@ struct variable {
     char* name;
     size_t name_length;
     size_t scope_depth;
-    uint32_t allocated_reg;
+    struct operand allocated_reg;
 };
 
 struct loop {

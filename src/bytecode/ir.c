@@ -66,114 +66,116 @@ static void print_instructions(struct executable* executable) {
     printf("  Constants (%zu)\n", executable->constants_size);
 
     printf("\nInstructions:\n");
-    for (size_t i = 0; i < executable->instructions_size; i++) {
-        struct instruction* instr = &executable->instructions[i];
-        printf("\t %04zu: %s ", i, opcode_names[instr->opcode]);
+    // for (size_t i = 0; i < executable->instructions_size; i++) {
+    //     struct instruction* instr = &executable->instructions[i];
+    //     printf("\t %04zu: %s ", i, opcode_names[instr->opcode]);
 
-        // REWRITE:  the instruction printing should be in  a more readable
-        // format
-        switch (instr->opcode) {
-            case OPCODE_LOAD_CONST: {
-                printf("r%u [const %u]", instr->load_const.destination_reg,
-                       instr->load_const.constant_index);
-                break;
-            }
-            case OPCODE_LOAD_NONE: {
-                printf("r%u", instr->destination_reg);
-                break;
-            }
-            case OPCODE_LOAD_TRUE: {
-                printf("r%u", instr->destination_reg);
-                break;
-            }
-            case OPCODE_LOAD_FALSE: {
-                printf("r%u", instr->destination_reg);
-                break;
-            }
-            case OPCODE_STORE_GLOBAL_BY_INDEX: {
-                printf("global[%u] r%u", instr->mov.dest_reg, instr->mov.src_reg);
-                break;
-            }
-            case OPCODE_LOAD_GLOBAL_BY_INDEX: {
-                printf("r%u, global[%u]", instr->mov.dest_reg, instr->mov.src_reg);
-                break;
-            }
-            case OPCODE_STORE_GLOBAL_BY_NAME: {
-                break;
-            }
-            case OPCODE_LOAD_GLOBAL_BY_NAME: {
-                printf("r%u, names[%u]", instr->pair.snd, instr->pair.fst);
-                break;
-            }
-            case OPCODE_MOV: {
-                printf("r%u <- r%u", instr->mov.dest_reg, instr->mov.src_reg);
-                break;
-            }
-            case OPCODE_ADD:
-            case OPCODE_SUB:
-            case OPCODE_MUL:
-            case OPCODE_DIV:
-            case OPCODE_MOD: {
-                printf("r%u <- r%u , r%u", instr->binary_op.result_reg, instr->binary_op.left_reg,
-                       instr->binary_op.right_reg);
-                break;
-            }
-            case OPCODE_TEST_GREATER_THAN:
-            case OPCODE_TEST_GREATER_THAN_EQUAL:
-            case OPCODE_TEST_LESS_THAN:
-            case OPCODE_TEST_LESS_THAN_EQUAL:
-            case OPCODE_TEST_EQUAL:
-            case OPCODE_TEST_NOT_EQUAL: {
-                printf("r%u <- r%u cmp r%u", instr->binary_op.result_reg, instr->binary_op.left_reg,
-                       instr->binary_op.right_reg);
-                break;
-            }
-            case OPCODE_SHIFT_LEFT:
-            case OPCODE_SHIFT_RIGHT: {
-                printf("r%u <- r%u shift r%u", instr->binary_op.result_reg,
-                       instr->binary_op.left_reg, instr->binary_op.right_reg);
-                break;
-            }
-            case OPCODE_UNARY_MINUS:
-            case OPCODE_UNARY_PLUS:
-            case OPCODE_UNARY_NOT: {
-                printf("r%u <- op r%u", instr->destination_reg, instr->destination_reg);
-                break;
-            }
-            case OPCODE_JUMP: {
-                printf("%u", instr->jmp.target_offset);
-                break;
-            }
-            case OPCODE_JMP_IF: {
-                printf("r%u goto %u else goto %u", instr->jmp_if.condition_reg,
-                       instr->jmp_if.true_block_id, instr->jmp_if.false_block_id);
-                break;
-            }
-            case OPCODE_RET: {
-                printf("r%u", instr->destination_reg);
-                break;
-            }
-            case OPCODE_MAKE_FUNCTION: {
-                printf("r%u e[%u] names[%u]", instr->binary_op.result_reg,
-                       instr->binary_op.left_reg, instr->binary_op.right_reg);
-                break;
-            }
-            case OPCODE_CALL: {
-                printf("r%u <- r%u()", instr->call.ret_reg, instr->call.callee_reg);
-                break;
-            }
-            case OPCODE_OBJECT_GET_PROPERTY: {
-                printf("r%u <- r%u[names[%u]]", instr->binary_op.result_reg,
-                       instr->binary_op.left_reg, instr->binary_op.right_reg);
-                break;
-            }
-            default: {
-                break;
-            }
-        }
+    //     // REWRITE:  the instruction printing should be in  a more readable
+    //     // format
+    //     switch (instr->opcode) {
+    //         case OPCODE_LOAD_CONST: {
+    //             printf("r%u [const %u]", instr->load_const.destination_reg,
+    //                    instr->load_const.constant_index);
+    //             break;
+    //         }
+    //         case OPCODE_LOAD_NONE: {
+    //             printf("r%u", instr->destination_reg);
+    //             break;
+    //         }
+    //         case OPCODE_LOAD_TRUE: {
+    //             printf("r%u", instr->destination_reg);
+    //             break;
+    //         }
+    //         case OPCODE_LOAD_FALSE: {
+    //             printf("r%u", instr->destination_reg);
+    //             break;
+    //         }
+    //         case OPCODE_STORE_GLOBAL_BY_INDEX: {
+    //             printf("global[%u] r%u", instr->mov.dest_reg, instr->mov.src_reg);
+    //             break;
+    //         }
+    //         case OPCODE_LOAD_GLOBAL_BY_INDEX: {
+    //             printf("r%u, global[%u]", instr->mov.dest_reg, instr->mov.src_reg);
+    //             break;
+    //         }
+    //         case OPCODE_STORE_GLOBAL_BY_NAME: {
+    //             break;
+    //         }
+    //         case OPCODE_LOAD_GLOBAL_BY_NAME: {
+    //             printf("r%u, names[%u]", instr->pair.snd, instr->pair.fst);
+    //             break;
+    //         }
+    //         case OPCODE_MOV: {
+    //             printf("r%u <- r%u", instr->mov.dest_reg, instr->mov.src_reg);
+    //             break;
+    //         }
+    //         case OPCODE_ADD:
+    //         case OPCODE_SUB:
+    //         case OPCODE_MUL:
+    //         case OPCODE_DIV:
+    //         case OPCODE_MOD: {
+    //             printf("r%u <- r%u , r%u", instr->binary_op.result_reg,
+    //             instr->binary_op.left_reg,
+    //                    instr->binary_op.right_reg);
+    //             break;
+    //         }
+    //         case OPCODE_TEST_GREATER_THAN:
+    //         case OPCODE_TEST_GREATER_THAN_EQUAL:
+    //         case OPCODE_TEST_LESS_THAN:
+    //         case OPCODE_TEST_LESS_THAN_EQUAL:
+    //         case OPCODE_TEST_EQUAL:
+    //         case OPCODE_TEST_NOT_EQUAL: {
+    //             printf("r%u <- r%u cmp r%u", instr->binary_op.result_reg,
+    //             instr->binary_op.left_reg,
+    //                    instr->binary_op.right_reg);
+    //             break;
+    //         }
+    //         case OPCODE_SHIFT_LEFT:
+    //         case OPCODE_SHIFT_RIGHT: {
+    //             printf("r%u <- r%u shift r%u", instr->binary_op.result_reg,
+    //                    instr->binary_op.left_reg, instr->binary_op.right_reg);
+    //             break;
+    //         }
+    //         case OPCODE_UNARY_MINUS:
+    //         case OPCODE_UNARY_PLUS:
+    //         case OPCODE_UNARY_NOT: {
+    //             printf("r%u <- op r%u", instr->destination_reg, instr->destination_reg);
+    //             break;
+    //         }
+    //         case OPCODE_JUMP: {
+    //             printf("%u", instr->jmp.target_offset);
+    //             break;
+    //         }
+    //         case OPCODE_JMP_IF: {
+    //             printf("r%u goto %u else goto %u", instr->jmp_if.condition_reg,
+    //                    instr->jmp_if.true_block_id, instr->jmp_if.false_block_id);
+    //             break;
+    //         }
+    //         case OPCODE_RET: {
+    //             printf("r%u", instr->destination_reg);
+    //             break;
+    //         }
+    //         case OPCODE_MAKE_FUNCTION: {
+    //             printf("r%u e[%u] names[%u]", instr->binary_op.result_reg,
+    //                    instr->binary_op.left_reg, instr->binary_op.right_reg);
+    //             break;
+    //         }
+    //         case OPCODE_CALL: {
+    //             printf("r%u <- r%u()", instr->call.ret_reg, instr->call.callee_reg);
+    //             break;
+    //         }
+    //         case OPCODE_OBJECT_GET_PROPERTY: {
+    //             printf("r%u <- r%u[names[%u]]", instr->binary_op.result_reg,
+    //                    instr->binary_op.left_reg, instr->binary_op.right_reg);
+    //             break;
+    //         }
+    //         default: {
+    //             break;
+    //         }
+    //     }
 
-        printf("\n");
-    }
+    //     printf("\n");
+    // }
     printf("}\n");
 }
 
