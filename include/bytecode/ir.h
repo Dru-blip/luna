@@ -70,6 +70,20 @@ enum opcode {
     OPCODE_HLT,
 };
 
+// unused
+enum operand_kind {
+    OPERAND_REG,
+    OPERAND_CONST,
+};
+
+// unused for now
+// will later integrate into pipeline for optimizations.
+struct operand {
+    enum operand_kind kind;
+    uint32_t index;
+};
+//
+
 // this is high level representation of instruction
 // later this will be represented in byte stream for better storage.
 struct instruction {
@@ -130,7 +144,7 @@ struct basic_block {
     struct instruction* instructions;
     struct span* instructions_spans;
     size_t start_offset;  // used when linearizing blocks
-    bool visited;
+    bool visited;         // unused
 };
 
 struct executable {
