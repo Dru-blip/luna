@@ -408,9 +408,11 @@ static inline struct operand generate_identifier_expr(struct generator* generato
 
 static inline struct operand generate_unop_expr(struct generator* generator,
                                                 struct ast_node* expr) {
-    struct operand dst_reg = generate_expr(generator, expr->data.unop.argument);
+    struct operand src_reg = generate_expr(generator, expr->data.unop.argument);
+    struct operand dst_reg = generator_allocate_register(generator);
     struct instruction instr = {.opcode = unop_to_opcode[expr->data.unop.op],
-                                .operands[0] = dst_reg};
+                                .operands[0] = src_reg,
+                                .operands[1] = dst_reg};
     emit_instruction(generator, instr, expr->span);
     return dst_reg;
 }
@@ -626,48 +628,48 @@ static struct operand generate_member_expr(struct generator* generator, struct a
     return dst_reg;
 }
 
-// static inline struct operand generate_call_expr(struct generator* generator,
-//                                                 struct ast_node* expr) {
-//     struct instruction call_instr;
-//     call_instr.opcode = OPCODE_CALL;
-//     call_instr.call.argc = expr->data.call.argc;
-//     call_instr.call.args_reg = nullptr;
+static inline struct operand generate_call_expr(struct generator* generator,
+                                                struct ast_node* expr) {
+    struct instruction call_instr;
+    call_instr.opcode = OPCODE_CALL;
+    call_instr.operand_count = expr->data.call.argc;
+    call_instr.args = nullptr;
 
-//     switch (expr->data.call.callee->kind) {
-//         case AST_NODE_IDENTIFIER: {
-//             call_instr.call.callee_reg = load_callee_by_name(generator, expr->data.call.callee);
-//             call_instr.call.self_reg = call_instr.call.callee_reg;
-//             break;
-//         }
-//         case AST_NODE_COMPUTED_MEMBER_EXPR: {
-//             call_instr.call.self_reg =
-//                 generate_expr(generator, expr->data.call.callee->data.pair.fst);
-//             call_instr.call.callee_reg = generate_subscript_expr(generator,
-//             expr->data.call.callee); break;
-//         }
-//         case AST_NODE_MEMBER_EXPR: {
-//             uint32_t object_reg =
-//                 generate_expr(generator, expr->data.call.callee->data.member_expr.object);
-//             call_instr.call.callee_reg = generate_member_expr(generator, expr->data.call.callee);
-//             call_instr.call.self_reg = object_reg;
-//             break;
-//         }
-//         default: {
-//             lu_raise_error(generator->state, "attempt to call a non function value");
-//             break;
-//         }
-//     }
+    switch (expr->data.call.callee->kind) {
+        case AST_NODE_IDENTIFIER: {
+            call_instr.operands[0] = load_callee_by_name(generator, expr->data.call.callee);
+            call_instr.operands[1] = call_instr.operands[0];
+            break;
+        }
+        case AST_NODE_COMPUTED_MEMBER_EXPR: {
+            call_instr.operands[1] =
+                generate_expr(generator, expr->data.call.callee->data.pair.fst);
+            call_instr.operands[0] = generate_subscript_expr(generator, expr->data.call.callee);
+            break;
+        }
+        case AST_NODE_MEMBER_EXPR: {
+            struct operand object_reg =
+                generate_expr(generator, expr->data.call.callee->data.member_expr.object);
+            call_instr.operands[0] = generate_member_expr(generator, expr->data.call.callee);
+            call_instr.operands[1] = object_reg;
+            break;
+        }
+        default: {
+            lu_raise_error(generator->state, "attempt to call a non function value");
+            break;
+        }
+    }
 
-//     for (uint8_t i = 0; i < expr->data.call.argc; ++i) {
-//         uint32_t arg_reg = generate_expr(generator, expr->data.call.args[i]);
-//         arrput(call_instr.call.args_reg, arg_reg);
-//     }
+    for (uint8_t i = 0; i < expr->data.call.argc; ++i) {
+        struct operand arg_reg = generate_expr(generator, expr->data.call.args[i]);
+        arrput(call_instr.args, arg_reg);
+    }
 
-//     call_instr.call.ret_reg = generator_allocate_register(generator);
+    call_instr.operands[2] = generator_allocate_register(generator);
 
-//     emit_instruction(generator, call_instr, expr->span);
-//     return call_instr.call.ret_reg;
-// }
+    emit_instruction(generator, call_instr, expr->span);
+    return call_instr.operands[2];
+}
 
 static inline struct operand generate_function_expr(struct generator* generator,
                                                     struct ast_node* expr) {
@@ -787,9 +789,9 @@ static struct operand generate_expr(struct generator* generator, struct ast_node
         case AST_NODE_ASSIGN: {
             return generate_assign_expr(generator, expr);
         }
-        // case AST_NODE_CALL: {
-        //     return generate_call_expr(generator, expr);
-        // }
+        case AST_NODE_CALL: {
+            return generate_call_expr(generator, expr);
+        }
         case AST_NODE_MEMBER_EXPR: {
             return generate_member_expr(generator, expr);
         }
@@ -1207,6 +1209,9 @@ struct executable* generator_generate(struct lu_istate* state, struct ast_progra
 
 static void generator_basic_blocks_linearize(struct generator* generator,
                                              struct executable* executable) {
+    // TODO: Should implement instruction serialization into byte stream
+    //
+
     // calculate block start offsets
     size_t* block_start_offsets = malloc(sizeof(size_t) * generator->block_counter);
     size_t offset = 0;
@@ -1240,26 +1245,26 @@ static void generator_basic_blocks_linearize(struct generator* generator,
     // instead of doing a full loop on the instructions
     // its better to store the jump instructions inside a seperate array (like a
     // patch buffer) and patch those to avoid unnecessary iterations.
-    // for (size_t i = 0; i < total_instructions; i++) {
-    //     struct instruction* instr = &flat[i];
-    //     switch (instr->opcode) {
-    //         case OPCODE_JUMP: {
-    //             instr->jmp.target_offset = block_start_offsets[instr->jmp.target_offset];
-    //             break;
-    //         }
-    //         case OPCODE_JMP_IF: {
-    //             instr->jmp_if.true_block_id = block_start_offsets[instr->jmp_if.true_block_id];
-    //             instr->jmp_if.false_block_id = block_start_offsets[instr->jmp_if.false_block_id];
-    //             break;
-    //         }
-    //         case OPCODE_ITER_NEXT: {
-    //             instr->iter_next.jmp_offset = block_start_offsets[instr->iter_next.jmp_offset];
-    //             break;
-    //         }
-    //         default:
-    //             break;
-    //     }
-    // }
+    for (size_t i = 0; i < total_instructions; i++) {
+        struct instruction* instr = &flat[i];
+        switch (instr->opcode) {
+            case OPCODE_JUMP: {
+                instr->operands[0].index = block_start_offsets[instr->operands[0].index];
+                break;
+            }
+            case OPCODE_JMP_IF: {
+                instr->operands[1].index = block_start_offsets[instr->operands[1].index];
+                instr->operands[2].index = block_start_offsets[instr->operands[2].index];
+                break;
+            }
+            case OPCODE_ITER_NEXT: {
+                instr->operands[1].index = block_start_offsets[instr->operands[1].index];
+                break;
+            }
+            default:
+                break;
+        }
+    }
 
     free(block_start_offsets);
 

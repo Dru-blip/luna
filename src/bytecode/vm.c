@@ -15,6 +15,22 @@
 #define lu_has_error(vm) (vm)->istate->error != nullptr
 #define IS_NUMERIC(a) (lu_is_int(a) || lu_is_bool(a))
 
+static inline struct lu_value get_operand(struct operand op,
+                                          struct lu_value* slots,
+                                          struct lu_value* constants) {
+    if (op.type == OPERAND_REG) {
+        return slots[op.index];
+    }
+
+    if (op.type == OPERAND_CONST) {
+        return constants[op.index];
+    }
+
+    if (op.type == OPERAND_CONST_BOOL) {
+        return lu_value_bool(op.index ? true : false);
+    }
+}
+
 struct lu_vm* lu_vm_new(struct lu_istate* istate) {
     struct lu_vm* vm = malloc(sizeof(struct lu_vm));
     vm->records = nullptr;
@@ -150,23 +166,23 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
     DISPATCH_NEXT();
 
     CASE(OPCODE_LOAD_CONST) : {
-        registers[instr->load_const.destination_reg] =
-            executable->constants[instr->load_const.constant_index];
+        registers[instr->operands[1].index] = executable->constants[instr->operands[0].index];
         DISPATCH_NEXT();
     }
-#define HANDLE_LOAD_LITERAL(opcode, instr, val)  \
-    CASE(opcode) : {                             \
-        registers[instr->destination_reg] = val; \
-        DISPATCH_NEXT();                         \
+#define HANDLE_LOAD_LITERAL(opcode, instr, val)    \
+    CASE(opcode) : {                               \
+        registers[instr->operands[0].index] = val; \
+        DISPATCH_NEXT();                           \
     }
     HANDLE_LOAD_LITERAL(OPCODE_LOAD_NONE, instr, lu_value_none());
     HANDLE_LOAD_LITERAL(OPCODE_LOAD_TRUE, instr, lu_value_bool(true));
     HANDLE_LOAD_LITERAL(OPCODE_LOAD_FALSE, instr, lu_value_bool(false));
 
-#define HANDLE_MOV(opcode, instr, dst, src)                 \
-    CASE(opcode) : {                                        \
-        dst[instr->mov.dest_reg] = src[instr->mov.src_reg]; \
-        DISPATCH_NEXT();                                    \
+#define HANDLE_MOV(opcode, instr, dst, src)                                      \
+    CASE(opcode) : {                                                             \
+        dst[instr->operands[1].index] =                                          \
+            get_operand(instr->operands[0], src, record->executable->constants); \
+        DISPATCH_NEXT();                                                         \
     }
 
     HANDLE_MOV(OPCODE_MOV, instr, registers, registers)
@@ -174,21 +190,22 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
     HANDLE_MOV(OPCODE_STORE_GLOBAL_BY_INDEX, instr, global_fast_slots, registers)
 
     CASE(OPCODE_STORE_GLOBAL_BY_NAME) : {
-        struct lu_string* name = executable->identifier_table[instr->pair.snd];
-        lu_obj_set(named_globals, name, registers[instr->pair.fst]);
+        struct lu_string* name = executable->identifier_table[instr->operands[1].index];
+        lu_obj_set(named_globals, name,
+                   get_operand(instr->operands[0], record->registers, record->globals->fast_slots));
         DISPATCH_NEXT();
     }
     CASE(OPCODE_LOAD_GLOBAL_BY_NAME) : {
-        struct lu_string* name = executable->identifier_table[instr->pair.fst];
+        struct lu_string* name = executable->identifier_table[instr->operands[0].index];
         struct lu_value value = lu_obj_get(named_globals, name);
         if (!lu_is_undefined(value)) {
-            registers[instr->pair.snd] = value;
+            registers[instr->operands[1].index] = value;
             DISPATCH_NEXT();
         }
 
         value = lu_obj_get(vm->global_object, name);
         if (!lu_is_undefined(value)) {
-            registers[instr->pair.snd] = value;
+            registers[instr->operands[1].index] = value;
             DISPATCH_NEXT();
         }
 
@@ -201,9 +218,10 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
         DISPATCH_NEXT();
     }
     CASE(OPCODE_UNARY_MINUS) : {
-        struct lu_value argument = registers[instr->destination_reg];
+        struct lu_value argument =
+            get_operand(instr->operands[0], registers, executable->constants);
         if (IS_NUMERIC(argument)) {
-            registers[instr->destination_reg] = lu_value_int(-lu_as_int(argument));
+            registers[instr->operands[1].index] = lu_value_int(-lu_as_int(argument));
             DISPATCH_NEXT();
         }
 
@@ -216,37 +234,37 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
         goto error_reporter;
     }
     CASE(OPCODE_UNARY_NOT) : {
-        registers[instr->destination_reg] =
-            lu_value_bool(lu_is_falsy(registers[instr->destination_reg]));
+        registers[instr->operands[1].index] = lu_value_bool(
+            lu_is_falsy(get_operand(instr->operands[0], registers, executable->constants)));
         DISPATCH_NEXT();
     }
     CASE(OPCODE_NEW_ARRAY) : {
-        registers[instr->destination_reg] = lu_value_object(lu_array_new(vm->istate));
+        registers[instr->operands[0].index] = lu_value_object(lu_array_new(vm->istate));
         DISPATCH_NEXT();
     }
     CASE(OPCODE_ARRAY_APPEND) : {
-        struct lu_array* array = lu_as_array(registers[instr->pair.fst]);
-        lu_array_push(array, registers[instr->pair.snd]);
+        struct lu_array* array = lu_as_array(registers[instr->operands[0].index]);
+        lu_array_push(array, registers[instr->operands[1].index]);
         DISPATCH_NEXT();
     }
     CASE(OPCODE_NEW_OBJECT) : {
-        registers[instr->destination_reg] = lu_value_object(lu_object_new(vm->istate));
+        registers[instr->operands[0].index] = lu_value_object(lu_object_new(vm->istate));
         DISPATCH_NEXT();
     }
     CASE(OPCODE_OBJECT_SET_PROPERTY) : {
-        struct lu_value obj_val = registers[instr->binary_op.result_reg];
+        struct lu_value obj_val = registers[instr->operands[2].index];
         if (!lu_is_object(obj_val)) {
             lu_raise_error(vm->istate, "invalid member access on non object value");
             goto error_reporter;
         }
-        struct lu_string* key = executable->identifier_table[instr->binary_op.left_reg];
-        struct lu_value value = registers[instr->binary_op.right_reg];
+        struct lu_string* key = executable->identifier_table[instr->operands[0].index];
+        struct lu_value value = registers[instr->operands[1].index];
         lu_obj_set(lu_as_object(obj_val), key, value);
         DISPATCH_NEXT();
     }
     CASE(OPCODE_OBJECT_GET_PROPERTY) : {
-        struct lu_value obj_val = registers[instr->binary_op.left_reg];
-        struct lu_string* key = executable->identifier_table[instr->binary_op.right_reg];
+        struct lu_value obj_val = registers[instr->operands[0].index];
+        struct lu_string* key = executable->identifier_table[instr->operands[1].index];
         if (!lu_is_object(obj_val)) {
             lu_raise_error(vm->istate, "invalid member access on non object value");
             goto error_reporter;
@@ -260,13 +278,15 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
             lu_raise_error(vm->istate, buffer);
             goto error_reporter;
         }
-        registers[instr->binary_op.result_reg] = value;
+        registers[instr->operands[2].index] = value;
 
         DISPATCH_NEXT();
     }
     CASE(OPCODE_LOAD_SUBSCR) : {
-        struct lu_value obj_val = registers[instr->binary_op.left_reg];
-        struct lu_value computed_index = registers[instr->binary_op.right_reg];
+        struct lu_value obj_val =
+            get_operand(instructions->operands[1], registers, executable->constants);
+        struct lu_value computed_index =
+            get_operand(instructions->operands[0], registers, executable->constants);
         if (lu_is_array(obj_val)) {
             if (lu_is_int(computed_index)) {
                 int64_t index = lu_as_int(computed_index);
@@ -281,7 +301,7 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
                     lu_raise_error(vm->istate, buffer);
                     goto error_reporter;
                 }
-                registers[instr->binary_op.result_reg] = value;
+                registers[instr->operands[2].index] = value;
                 DISPATCH_NEXT();
             }
 
@@ -310,20 +330,20 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
             lu_raise_error(vm->istate, buffer);
             return lu_value_none();
         }
-        registers[instr->binary_op.result_reg] = result;
+        registers[instr->operands[2].index] = result;
         DISPATCH_NEXT();
     }
     CASE(OPCODE_STORE_SUBSCR) : {
-        struct lu_value obj_val = registers[instr->binary_op.left_reg];
-        struct lu_value computed_index = registers[instr->binary_op.right_reg];
+        struct lu_value obj_val = registers[instr->operands[0].index];
+        struct lu_value computed_index = registers[instr->operands[1].index];
         if (lu_is_array(obj_val)) {
             if (lu_is_int(computed_index)) {
                 int64_t index = lu_as_int(computed_index);
                 if (index < 0) {
                     goto invalid_array_index;
                 }
-                if (lu_array_set(lu_as_array(obj_val), index,
-                                 registers[instr->binary_op.result_reg]) > 0) {
+                if (lu_array_set(lu_as_array(obj_val), index, registers[instr->operands[2].index]) >
+                    0) {
                     char buffer[256];
                     snprintf(buffer, sizeof(buffer), "index %ld out of bounds (array length %ld)",
                              index, lu_array_length(lu_as_array(obj_val)));
@@ -349,18 +369,19 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
         }
 
         lu_obj_set(lu_as_object(obj_val), lu_as_string(computed_index),
-                   registers[instr->binary_op.result_reg]);
+                   registers[instr->operands[2].index]);
         DISPATCH_NEXT();
     }
 
-#define HANDLE_BINARY_INSTRUCTION(opcode, func)                                                    \
-    CASE(opcode) : {                                                                               \
-        registers[instr->binary_op.result_reg] =                                                   \
-            func(vm, registers[instr->binary_op.left_reg], registers[instr->binary_op.right_reg]); \
-        if (lu_has_error(vm)) {                                                                    \
-            goto error_reporter;                                                                   \
-        }                                                                                          \
-        DISPATCH_NEXT();                                                                           \
+#define HANDLE_BINARY_INSTRUCTION(opcode, func)                                         \
+    CASE(opcode) : {                                                                    \
+        registers[instr->operands[2].index] =                                           \
+            func(vm, get_operand(instr->operands[0], registers, executable->constants), \
+                 get_operand(instr->operands[1], registers, executable->constants));    \
+        if (lu_has_error(vm)) {                                                         \
+            goto error_reporter;                                                        \
+        }                                                                               \
+        DISPATCH_NEXT();                                                                \
     }
     HANDLE_BINARY_INSTRUCTION(OPCODE_ADD, lu_vm_op_add);
     HANDLE_BINARY_INSTRUCTION(OPCODE_SUB, lu_vm_op_sub);
@@ -375,19 +396,20 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
     HANDLE_BINARY_INSTRUCTION(OPCODE_TEST_NOT_EQUAL, lu_vm_op_neq);
 
     CASE(OPCODE_JUMP) : {
-        record->ip = instr->jmp.target_offset;
+        record->ip = instr->operands[0].index;
         DISPATCH_NEXT();
     }
     CASE(OPCODE_JMP_IF) : {
-        if (lu_is_truthy(registers[instr->jmp_if.condition_reg])) {
-            record->ip = instr->jmp_if.true_block_id;
+        if (lu_is_truthy(get_operand(instr->operands[0], registers, executable->constants))) {
+            record->ip = instr->operands[1].index;
         } else {
-            record->ip = instr->jmp_if.false_block_id;
+            record->ip = instr->operands[2].index;
         }
         DISPATCH_NEXT();
     }
     CASE(OPCODE_GET_ITER) : {
-        struct lu_value iterable = registers[instr->pair.fst];
+        struct lu_value iterable =
+            get_operand(instr->operands[0], registers, executable->constants);
         if (!lu_is_object(iterable)) {
             lu_raise_error(vm->istate, "cannot iterate over non-object");
             goto error_reporter;
@@ -400,7 +422,7 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
             goto error_reporter;
         }
 
-        registers[instr->pair.snd] =
+        registers[instr->operands[1].index] =
             lu_call(vm, lu_as_object(iterable), lu_as_function(iterator_val), nullptr, 0, false);
         if (lu_has_error(vm)) {
             goto error_reporter;
@@ -409,7 +431,7 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
         DISPATCH_NEXT();
     }
     CASE(OPCODE_ITER_NEXT) : {
-        struct lu_value iterator_val = registers[instr->iter_next.iterator_reg];
+        struct lu_value iterator_val = registers[instr->operands[0].index];
         struct lu_value next_func = lu_obj_get(lu_as_object(iterator_val), vm->istate->names.next);
 
         if (!lu_is_function(next_func)) {
@@ -426,11 +448,11 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
 
         struct lu_value done_val = lu_obj_get(lu_as_object(next_val), vm->istate->names.done);
         if (lu_as_int(done_val)) {
-            record->ip = instr->iter_next.jmp_offset;
+            record->ip = instr->operands[1].index;
             DISPATCH_NEXT();
         }
 
-        registers[instr->iter_next.loop_var_reg] =
+        registers[instr->operands[2].index] =
             lu_obj_get(lu_as_object(next_val), vm->istate->names.value);
 
         if (lu_has_error(vm)) {
@@ -440,15 +462,15 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
         DISPATCH_NEXT();
     }
     CASE(OPCODE_MAKE_FUNCTION) : {
-        struct executable* fn_executable = executable->constants[instr->binary_op.left_reg].object;
-        struct lu_string* func_name = executable->identifier_table[instr->binary_op.right_reg];
+        struct executable* fn_executable = executable->constants[instr->operands[0].index].object;
+        struct lu_string* func_name = executable->identifier_table[instr->operands[1].index];
         struct lu_function* func =
             lu_function_new(vm->istate, func_name, vm->istate->running_module, fn_executable);
-        registers[instr->binary_op.result_reg] = lu_value_object(func);
+        registers[instr->operands[2].index] = lu_value_object(func);
         DISPATCH_NEXT();
     }
     CASE(OPCODE_CALL) : {
-        struct lu_value callee_val = registers[instr->call.callee_reg];
+        struct lu_value callee_val = registers[instr->operands[0].index];
         if (!lu_is_function(callee_val)) {
             const char* calle_type_name = lu_value_get_type_name(callee_val);
             char buffer[256];
@@ -464,17 +486,17 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
 
         struct lu_function* func = lu_as_function(callee_val);
         if (func->type == FUNCTION_NATIVE) {
-            struct lu_value self = parent_record->registers[instr->call.self_reg];
+            struct lu_value self = parent_record->registers[instr->operands[1].index];
 
             // should refactor, issue: allocating and freeing args may
             // slow down the execution , should move to a preallocated
             // buffer.
             struct lu_value args[8] = {};
-            for (uint32_t i = 0; i < instr->call.argc; i++) {
-                args[i] = registers[instr->call.args_reg[i]];
+            for (uint32_t i = 0; i < instr->operand_count; i++) {
+                args[i] = get_operand(instr->args[i], registers, executable->constants);
             }
-            registers[instr->call.ret_reg] =
-                func->func(vm, lu_as_object(self), args, instr->call.argc);
+            registers[instr->operands[2].index] =
+                func->func(vm, lu_as_object(self), args, instr->operand_count);
             if (lu_has_error(vm)) {
                 goto error_reporter;
             }
@@ -484,11 +506,11 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
         lu_vm_push_new_record_with_globals(vm, func->executable, record->globals);
         record = &vm->records[vm->rp - 1];
         LOAD_RECORD(record);
-        record->caller_ret_reg = instr->call.ret_reg;
+        record->caller_ret_reg = instr->operands[2].index;
 
-        registers[0] = parent_record->registers[instr->call.self_reg];
-        for (uint32_t i = 0; i < instr->call.argc; i++) {
-            registers[i + 1] = parent_record->registers[instr->call.args_reg[i]];
+        registers[0] = parent_record->registers[instr->operands[1].index];
+        for (uint32_t i = 0; i < instr->operand_count; i++) {
+            registers[i + 1] = get_operand(instr->args[i], registers, executable->constants);
         }
         DISPATCH_NEXT();
     }
@@ -497,12 +519,14 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
         vm->rp--;
 
         if (vm->rp < 1 || vm->istate->running_module != vm->istate->main_module || as_callback) {
-            return child_record.registers[instr->destination_reg];
+            // FIXME: This will break when returning a constant value
+            return child_record.registers[instr->operands[0].index];
         }
 
         record = &vm->records[vm->rp - 1];
         LOAD_RECORD(record);
-        registers[child_record.caller_ret_reg] = child_record.registers[instr->destination_reg];
+        // FIXME: This will break when returning a constant value
+        registers[child_record.caller_ret_reg] = child_record.registers[instr->operands[0].index];
         DISPATCH_NEXT();
     }
     CASE(OPCODE_HLT) : {
