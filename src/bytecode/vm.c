@@ -464,6 +464,11 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
         if (func->type == FUNCTION_NATIVE) {
             struct lu_value self = parent_record->registers[instr->call.self_reg];
 
+            if (!func->is_variadic) {
+                if (instr->call.argc != func->param_count) {
+                    goto arg_count_mismatch;
+                }
+            }
             // should refactor, issue: allocating and freeing args may
             // slow down the execution , should move to a preallocated
             // buffer.
@@ -477,6 +482,15 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
                 goto error_reporter;
             }
             DISPATCH_NEXT();
+        }
+
+        if (instr->call.argc != func->param_count) {
+        arg_count_mismatch:
+            char buffer[256];
+            snprintf(buffer, sizeof(buffer), "function '%s' expects %ld argument(s), got %d",
+                     lu_string_get_cstring(func->name), func->param_count, instr->call.argc);
+            lu_raise_error(vm->istate, buffer);
+            goto error_reporter;
         }
 
         lu_vm_push_new_record_with_globals(vm, func->executable, record->globals);

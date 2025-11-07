@@ -170,7 +170,7 @@ LU_NATIVE_FN(Array_iterator) {
 struct lu_object* lu_array_prototype_new(struct lu_istate* state) {
     struct lu_object* obj = lu_object_new(state);
 
-    lu_register_native_fn(state, obj, "push", Array_push, UINT8_MAX);
+    lu_register_native_fn_variadic(state, obj, "push", Array_push, UINT8_MAX);
     lu_register_native_fn(state, obj, "pop", Array_pop, 0);
     lu_register_native_fn(state, obj, "insert", Array_insert, 2);
     lu_register_native_fn(state, obj, "remove", Array_remove, 1);

@@ -172,7 +172,7 @@ struct lu_value lu_run_program(struct lu_istate* state, const char* filepath) {
     struct executable* executable = generator_generate(state, program);
     if (state->error) {
         if (state->running_module != state->main_module) {
-            state->vm->status = VM_STATUS_HALT;
+            // state->vm->status = VM_STATUS_HALT;
             return lu_value_undefined();
         }
         struct lu_string* str = lu_as_string(lu_obj_get(state->error, state->names.message));

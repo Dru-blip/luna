@@ -157,6 +157,7 @@ struct executable {
     struct lu_string** identifier_table;
     size_t identifier_table_size;
     uint32_t max_register_count;
+    uint8_t param_count;
     struct span* instructions_span;
     const char* file_path;
     size_t global_variable_count;

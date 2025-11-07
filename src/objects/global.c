@@ -77,6 +77,7 @@ LU_NATIVE_FN(len) {
 // import module
 LU_NATIVE_FN(import_module) {
     // TODO: handle package format (foo.bar)
+    // TODO: check if path is string
     struct lu_value file_path_value = LU_ARG_GET(args, 0);
     // TODO: add checks for file path
     struct lu_value module = lu_obj_get(vm->istate->module_cache, lu_as_string(file_path_value));
@@ -190,7 +191,7 @@ LU_NATIVE_FN(Math_abs) {
 // --------------------
 
 void lu_init_global_object(struct lu_istate* state) {
-    lu_register_native_fn(state, state->vm->global_object, "print", print_func, UINT8_MAX);
+    lu_register_native_fn_variadic(state, state->vm->global_object, "print", print_func, UINT8_MAX);
     lu_register_native_fn(state, state->vm->global_object, "raise", raise_func, 0);
     lu_register_native_fn(state, state->vm->global_object, "import", import_module, 1);
     lu_register_native_fn(state, state->vm->global_object, "len", len, 1);

@@ -13,7 +13,6 @@ LU_NATIVE_FN(String_to_string) {
 }
 
 LU_NATIVE_FN(String_char_at) {
-    //
     int64_t index;
     LU_TRY_UNPACK_INT(vm, args, 0, &index);
 

@@ -668,6 +668,7 @@ static inline uint32_t generate_function_expr(struct generator* generator, struc
     generate_stmt(generator, expr->data.fn_decl.body);
 
     struct executable* fn_executable = generator_make_executable(generator);
+    fn_executable->param_count = num_params;
     fn_executable->name = name_string;
     generator = generator->prev;
     generator->global_variable_count = fn_generator->global_variable_count;
@@ -1067,6 +1068,7 @@ static inline void generate_fn_decl(struct generator* generator, struct ast_node
     emit_instruction(generator, instr, stmt->span);
 
     struct executable* fn_executable = generator_make_executable(generator);
+    fn_executable->param_count = num_params;
     fn_executable->name = name_string;
     generator = generator->prev;
     generator->global_variable_count = fn_generator->global_variable_count;
