@@ -1,1 +1,1 @@
-let a=import("hello")
+let a=import('hello')

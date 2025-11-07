@@ -8,9 +8,8 @@ currently it produces very unoptimized bytecode instructions.
 
 - source code gets parsed into ast (classic stuff) like every other language does.
 - ast gets passed to the generator which builds a simple cfg (control flow graph) of basic blocks containing a sequence of instructions.
-- (why cfg) - it will enable us to optimize the code better later down the line.
 - generator linearizes these basic blocks into a single array of instructions.
-- generator packs the constants,identifiers and other data into an executable object.
+- generator packs the constants,identifiers,instructions and other data into an executable object.
 - which then loaded into the virtual machine and execute it.
 
 luna example for fibonacci:
