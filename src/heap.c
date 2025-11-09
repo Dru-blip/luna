@@ -155,7 +155,9 @@ static void collect_roots(struct heap* heap, struct lu_objectset* roots) {
     for (uint32_t i = heap->istate->vm->rp; i > 0; --i) {
         struct activation_record* record = &heap->istate->vm->records[i - 1];
         lu_objectset_add(roots, record->executable);
-        lu_objectset_add(roots, record->function);
+        if (record->function) {
+            lu_objectset_add(roots, record->function);
+        }
         lu_objectset_add(roots, record->globals->named_slots);
         size_t len = arrlen(record->globals->fast_slots);
         for (uint32_t j = 0; j < len; ++j) {
@@ -171,14 +173,20 @@ static void collect_roots(struct heap* heap, struct lu_objectset* roots) {
         }
     }
 
+    for (struct generator* gen = heap->istate->ir_generator; gen; gen = gen->prev) {
+        for (size_t i = 0; i < gen->constant_counter; i++) {
+            if (lu_is_object(gen->constants[i])) {
+                lu_objectset_add(roots, gen->constants[i].object);
+            }
+        }
+    }
+
     // adding interned strings to roots if any missed
     struct string_map_iter it;
     string_map_iter_init(&it, &heap->istate->string_pool.strings);
 
-    // printf("adding interned strings to gc roots\n");
     struct string_map_entry* entry;
     while ((entry = string_map_iter_next(&it))) {
-        // printf("cl: adding string %p\n", entry->value);
         lu_objectset_add(roots, lu_cast(struct lu_object, entry->value));
     }
 
