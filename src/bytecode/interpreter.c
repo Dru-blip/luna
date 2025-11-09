@@ -100,6 +100,7 @@ struct lu_istate* lu_istate_new() {
 
     state->global_object = lu_object_new(state);
     state->module_cache = lu_object_new(state);
+    state->native_module_cache = lu_object_new(state);
     state->running_module = nullptr;
     state->main_module = nullptr;
     state->vm = lu_vm_new(state);

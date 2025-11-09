@@ -12,6 +12,8 @@ typedef struct lu_value lu_value;
 #define LU_EXPORT __attribute__((visibility("default")))
 #define ALWAYS_INLINE __attribute__((always_inline))
 
+typedef void (*module_init_func)(struct lu_istate*, struct lu_module*);
+
 #define LU_NATIVE_FN(NAME)                                                   \
     LU_EXPORT struct lu_value NAME(struct lu_vm* vm, struct lu_object* self, \
                                    struct lu_value* args, uint8_t argc)
@@ -44,7 +46,7 @@ typedef struct lu_value lu_value;
 
 #define LU_TRY_UNPACK_OBJ(vm, args, idx, dest)                                                   \
     do {                                                                                         \
-        if (!lu_is_obj((args)[(idx)])) {                                                         \
+        if (!lu_is_object((args)[(idx)])) {                                                      \
             const char* got_type_str_name = lu_value_get_type_name((args)[(idx)]);               \
             const char* expected_type_str_name = "object";                                       \
             char buffer[256];                                                                    \
@@ -53,7 +55,7 @@ typedef struct lu_value lu_value;
             lu_raise_error((vm)->istate, buffer);                                                \
             return lu_value_none();                                                              \
         }                                                                                        \
-        *(struct lu_obj**)(dest) = (args)[(idx)].object;                                         \
+        *(struct lu_object**)(dest) = (args)[(idx)].object;                                      \
     } while (0)
 
 #define LU_TRY_UNPACK_STR(vm, args, idx, dest)                                                   \

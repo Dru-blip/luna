@@ -1,5 +1,6 @@
 #include "value.h"
 
+#include <dlfcn.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -119,9 +120,14 @@ static void lu_module_visit(struct lu_object* self, struct lu_objectset* set) {
 
 static void lu_module_finalize(struct lu_object* self) {
     struct lu_module* module = lu_cast(struct lu_module, self);
-    free(module->program.source);
-    arrfree(module->program.tokens);
-    arena_destroy(&module->program.allocator);
+    if (module->type == MODULE_NATIVE) {
+        dlclose(module->module_handle);
+    } else {
+        free(module->program.source);
+        arrfree(module->program.tokens);
+        arena_destroy(&module->program.allocator);
+    }
+
     lu_object_finalize(self);
 }
 
@@ -590,7 +596,21 @@ struct lu_module* lu_module_new(struct lu_istate* state,
     mod->name = name;
     mod->type = MODULE_USER;
     mod->vtable = &lu_module_vtable;
-    mod->exported = lu_value_undefined();
+    mod->exported = lu_value_none();
+
+    return mod;
+}
+
+struct lu_module* lu_native_module_new(struct lu_istate* state,
+                                       struct lu_string* name,
+                                       void* module_handle) {
+    //
+    struct lu_module* mod = lu_object_new_sized(state, sizeof(struct lu_module));
+    mod->module_handle = module_handle;
+    mod->name = name;
+    mod->type = MODULE_NATIVE;
+    mod->vtable = &lu_module_vtable;
+    mod->exported = lu_value_none();
 
     return mod;
 }

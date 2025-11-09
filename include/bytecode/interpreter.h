@@ -57,6 +57,7 @@ struct lu_istate {
     struct heap* heap;
     struct lu_object* global_object;
     struct lu_object* module_cache;
+    struct lu_object* native_module_cache;
     struct arena args_buffer;
     struct string_interner string_pool;
     struct lu_object* error;

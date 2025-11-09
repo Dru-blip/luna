@@ -84,9 +84,9 @@ enum object_tag {
 };
 
 struct lu_object_vtable {
-    bool is_function;
-    bool is_string;
-    bool is_array;
+    bool is_function;  // should be deprecated
+    bool is_string;    // should be deprecated
+    bool is_array;     // should be deprecated
     enum object_tag tag;
     const char* dbg_name;
     void (*finalize)(struct lu_object*);
@@ -164,8 +164,6 @@ struct lu_module {
 
     struct lu_value exported;
 };
-
-typedef void (*module_init_func)(struct lu_istate*, struct lu_module*);
 
 struct lu_array {
     LUNA_OBJECT_HEADER;
@@ -283,6 +281,10 @@ struct lu_function* lu_native_function_new(struct lu_istate* state,
 struct lu_module* lu_module_new(struct lu_istate* state,
                                 struct lu_string* name,
                                 struct ast_program* program);
+
+struct lu_module* lu_native_module_new(struct lu_istate* state,
+                                       struct lu_string* name,
+                                       void* module_handle);
 
 struct lu_array* lu_array_new(struct lu_istate* state);
 void lu_array_push(struct lu_array* array, struct lu_value value);
