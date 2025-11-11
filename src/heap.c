@@ -140,7 +140,7 @@ static void collect_roots(struct heap* heap, struct lu_objectset* roots) {
 #ifdef DEBUG
     printf("Collecting roots...\n");
 #endif
-    lu_objectset_add(roots, heap->istate->global_object);
+    // lu_objectset_add(roots, heap->istate->global_object);
     lu_objectset_add(roots, heap->istate->vm->global_object);
     lu_objectset_add(roots, heap->istate->module_cache);
     lu_objectset_add(roots, heap->istate->running_module);

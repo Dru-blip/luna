@@ -266,13 +266,22 @@ static struct token next_token(struct tokenizer* t) {
         default:
             if (isdigit(c)) {
                 size_t start_pos = t->pos;
+                kind = TOKEN_INTEGER;
                 while (isdigit(current(t)))
                     advance(t);
+                if (current(t) == '.') {
+                    advance(t);
+                    while (isdigit(current(t)))
+                        advance(t);
+                    kind = TOKEN_FLOAT;
+                }
                 size_t len = t->pos - start_pos;
                 char* num_str = strndup(t->src + start_pos, len);
-                data.int_val = strtoll(num_str, nullptr, 10);
+                if (kind == TOKEN_INTEGER)
+                    data.int_val = strtoll(num_str, nullptr, 10);
+                else
+                    data.float_val = strtod(num_str, nullptr);
                 free(num_str);
-                kind = TOKEN_INTEGER;
             } else if (isalpha(c) || c == '_') {
                 size_t start_pos = t->pos;
                 while (isalnum(current(t)) || current(t) == '_')

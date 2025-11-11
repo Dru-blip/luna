@@ -1,7 +1,5 @@
 let rl=load("raylib")
 
-
-
 rl.initWindow(800, 600, "Raylib Example")
 
 loop{

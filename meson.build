@@ -18,7 +18,7 @@ luna_runtime=shared_library('lunarun',
     parser_srcs+ds_srcs+runtime_srcs,
     include_directories:includedir,
     link_args:['-lm'],
-    install:true
+    install:true,
 )
 
 install_headers(

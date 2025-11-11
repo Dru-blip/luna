@@ -11,8 +11,7 @@ struct span {
 };
 
 #define SPAN_MERGE(a, b) \
-    ((struct span){      \
-        .line = (a).line, .col = (a).col, .start = (a).start, .end = (b).end})
+    ((struct span){.line = (a).line, .col = (a).col, .start = (a).start, .end = (b).end})
 
 enum token_kind {
     TOKEN_PLUS,
@@ -47,6 +46,7 @@ enum token_kind {
     TOKEN_PIPE_PIPE,
 
     TOKEN_INTEGER,
+    TOKEN_FLOAT,
     TOKEN_IDENTIFIER,
     TOKEN_STRING,
 
@@ -118,7 +118,8 @@ static const char* token_labels[] = {
     "|",   // TOKEN_PIPE
     "||",  // TOKEN_PIPE_PIPE
 
-    "integer",     // TOKEN_INTEGER
+    "integer",  // TOKEN_INTEGER
+    "float",
     "identifier",  // TOKEN_IDENTIFIER
     "string",      // TOKEN_STRING
 
@@ -153,6 +154,7 @@ static const char* token_labels[] = {
 union token_data {
     int64_t int_val;
     char* str_val;
+    double float_val;
 };
 
 struct token {
