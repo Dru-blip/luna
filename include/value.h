@@ -8,6 +8,9 @@
 #include "ast.h"
 #include "string_interner.h"
 
+struct lu_vm;
+
+
 enum lu_value_type {
     VALUE_BOOL,
     VALUE_NONE,
@@ -83,6 +86,7 @@ enum object_tag {
     OBJECT_TAG_EXECUTABLE,
 };
 
+
 struct lu_object_vtable {
     bool is_function;  // should be deprecated
     bool is_string;    // should be deprecated
@@ -91,6 +95,7 @@ struct lu_object_vtable {
     const char* dbg_name;
     void (*finalize)(struct lu_object*);
     void (*visit)(struct lu_object*, struct lu_objectset*);
+    struct lu_value (*subscr)(struct lu_vm* , struct lu_object*, struct lu_value key);
 };
 
 enum lu_string_type {
@@ -257,6 +262,7 @@ struct lu_object* lu_object_new(struct lu_istate* state);
 struct lu_object* lu_object_new_sized(struct lu_istate* state, size_t size);
 struct lu_value lu_object_get_property(struct lu_object* obj, struct lu_string* key);
 struct lu_value* lu_object_get_property_ref(struct lu_object* obj, struct lu_string* key);
+struct lu_value lu_object_subscr(struct lu_vm* vm, struct lu_object* obj, struct lu_value key);
 struct lu_object_vtable* lu_object_get_default_vtable();
 struct lu_string* lu_string_new(struct lu_istate* state, char* data);
 struct lu_string* lu_small_string_new(struct lu_istate* state,
@@ -267,6 +273,7 @@ struct lu_string* lu_string_from_block(struct lu_istate* state, struct string_bl
 struct lu_string* lu_string_concat(struct lu_istate* state,
                                    struct lu_value lhs,
                                    struct lu_value rhs);
+struct lu_value lu_string_subscr(struct lu_vm* vm, struct lu_object* obj, struct lu_value key);
 
 struct lu_function* lu_function_new(struct lu_istate* state,
                                     struct lu_string* name,
@@ -290,6 +297,7 @@ struct lu_array* lu_array_new(struct lu_istate* state);
 void lu_array_push(struct lu_array* array, struct lu_value value);
 struct lu_value lu_array_get(struct lu_array* array, size_t index);
 int lu_array_set(struct lu_array* array, size_t index, struct lu_value value);
+struct lu_value lu_array_subscr(struct lu_vm* vm, struct lu_object* obj, struct lu_value key);
 
 void lu_raise_error(struct lu_istate* state, char* message);
 

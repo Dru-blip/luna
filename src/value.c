@@ -138,6 +138,7 @@ static struct lu_object_vtable lu_object_default_vtable = {
     .is_array = false,
     .finalize = lu_object_finalize,
     .visit = lu_object_visit,
+    .subscr = lu_object_subscr,
     .dbg_name = "Object",
 };
 
@@ -147,6 +148,7 @@ static struct lu_object_vtable lu_string_vtable = {
     .is_array = false,
     .finalize = lu_string_finalize,
     .visit = lu_object_visit,
+    .subscr = lu_string_subscr,
     .dbg_name = "String",
 };
 
@@ -156,6 +158,7 @@ static struct lu_object_vtable lu_function_vtable = {
     .is_array = false,
     .finalize = lu_object_finalize,
     .visit = lu_function_visit,
+    .subscr = lu_object_subscr,
     .dbg_name = "Function",
 };
 
@@ -165,6 +168,7 @@ static struct lu_object_vtable lu_array_vtable = {
     .is_array = true,
     .finalize = lu_array_finalize,
     .visit = lu_array_visit,
+    .subscr = lu_array_subscr,
     .dbg_name = "Array",
 };
 
@@ -174,6 +178,7 @@ static struct lu_object_vtable lu_module_vtable = {
     .is_array = false,
     .finalize = lu_module_finalize,
     .visit = lu_module_visit,
+    .subscr = lu_object_subscr,
     .dbg_name = "Module",
 };
 
@@ -388,6 +393,15 @@ struct lu_value* lu_object_get_property_ref(struct lu_object* obj, struct lu_str
     return nullptr;
 }
 
+struct lu_value lu_object_subscr(struct lu_vm* vm, struct lu_object* obj, struct lu_value key) {
+    if (lu_is_string(key)) {
+        return lu_obj_get(obj, lu_as_string(key));
+    }
+
+    lu_raise_error(vm->istate, "Invalid key type");
+    return lu_value_undefined();
+}
+
 inline struct lu_object_vtable* lu_object_get_default_vtable() {
     return &lu_object_default_vtable;
 }
@@ -525,6 +539,26 @@ struct lu_string* lu_string_concat(struct lu_istate* state,
     return str;
 }
 
+struct lu_value lu_string_subscr(struct lu_vm* vm, struct lu_object* obj, struct lu_value key) {
+    if (lu_is_int(key)) {
+        int64_t index = lu_as_int(key);
+        struct lu_string* str = lu_cast(struct lu_string, obj);
+        if (index < 0 || index >= str->length) {
+            // TODO: add more context to the message.
+            lu_raise_error(vm->istate, "Index out of bounds");
+            return lu_value_undefined();
+        }
+        char c[2] = {'\0', '\0'};
+        if (str->type == STRING_SMALL || str->type == STRING_SMALL_INTERNED) {
+            c[0] = str->Sms[index];
+        } else {
+            c[0] = str->block->data[index];
+        }
+        return lu_value_object(lu_string_new(vm->istate, c));
+    }
+    return lu_object_subscr(vm, obj, key);
+}
+
 struct lu_function* lu_function_new(struct lu_istate* state,
                                     struct lu_string* name,
                                     struct lu_module* module,
@@ -586,6 +620,21 @@ int lu_array_set(struct lu_array* array, size_t index, struct lu_value value) {
 
     array->elements[index] = value;
     return 0;
+}
+
+struct lu_value lu_array_subscr(struct lu_vm* vm, struct lu_object* obj, struct lu_value key) {
+    if (lu_is_int(key)) {
+        int64_t index = lu_as_int(key);
+        struct lu_array* array = lu_cast(struct lu_array, obj);
+        if (index < 0 || index >= array->size) {
+            // TODO: add more context to the message.
+            lu_raise_error(vm->istate, "Index out of bounds");
+            return lu_value_undefined();
+        }
+
+        return lu_array_get(array, index);
+    }
+    return lu_object_subscr(vm, obj, key);
 }
 
 struct lu_module* lu_module_new(struct lu_istate* state,

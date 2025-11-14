@@ -28,8 +28,7 @@ LU_NATIVE_FN(Array_pop) {
     if (arr->size == 0) {
         return lu_value_none();
     }
-
-    return arr->elements[arr->size--];
+    return arr->elements[--arr->size];
 }
 
 LU_NATIVE_FN(Array_insert) {
