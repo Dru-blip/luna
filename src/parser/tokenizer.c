@@ -83,6 +83,89 @@ static void skip_whitespace(struct tokenizer* t) {
     }
 }
 
+static struct token scan_string(struct tokenizer* t, char quote) {
+    advance(t);
+
+    size_t cap = 64;
+    size_t len = 0;
+    char* buf = malloc(cap);
+
+    while (true) {
+        char c = current(t);
+
+        if (c == '\0') {
+            fprintf(stderr, "Unterminated string literal at %d:%d\n", t->line, t->col);
+            exit(1);
+        }
+
+        if (c == quote)
+            break;
+        if (c == '\\') {
+            advance(t);
+            char e = current(t);
+            if (e == '\0') {
+                fprintf(stderr, "Unterminated escape sequence\n");
+                exit(1);
+            }
+
+            char decoded;
+            switch (e) {
+                case 'n':
+                    decoded = '\n';
+                    break;
+                case 't':
+                    decoded = '\t';
+                    break;
+                case 'r':
+                    decoded = '\r';
+                    break;
+                case '\\':
+                    decoded = '\\';
+                    break;
+                case '\'':
+                    decoded = '\'';
+                    break;
+                case '"':
+                    decoded = '"';
+                    break;
+                case '0':
+                    decoded = '\0';
+                    break;
+                default:
+                    decoded = e;
+                    break;
+            }
+
+            if (len + 1 >= cap) {
+                cap *= 2;
+                buf = realloc(buf, cap);
+            }
+
+            buf[len++] = decoded;
+
+            advance(t);
+            continue;
+        }
+
+        if (len + 1 >= cap) {
+            cap *= 2;
+            buf = realloc(buf, cap);
+        }
+
+        buf[len++] = c;
+        advance(t);
+    }
+
+    advance(t);
+
+    buf[len] = '\0';
+
+    struct token tok;
+    tok.kind = TOKEN_STRING;
+    tok.data.str_val = buf;
+    return tok;
+}
+
 static struct token next_token(struct tokenizer* t) {
     skip_whitespace(t);
 
@@ -196,72 +279,16 @@ static struct token next_token(struct tokenizer* t) {
             break;
 
         case '\'': {
-            // Duplicate block of code from double quote
-            advance(t);
-            const char* start = t->src + t->pos;
-
-            while (true) {
-                char c = current(t);
-                if (c == '\'') {
-                    break;
-                } else if (c == '\\') {
-                    advance(t);
-                    if (current(t) == '\0') {
-                        fprintf(stderr, "Unterminated escape sequence at line %d, col %d\n",
-                                t->line, t->col);
-                        exit(1);
-                    }
-                    advance(t);
-                } else if (c == '\0') {
-                    fprintf(stderr,
-                            "Unterminated string literal starting at line %d, "
-                            "col %d\n",
-                            t->line, t->col);
-                    exit(1);
-                } else {
-                    advance(t);
-                }
-            }
-
-            kind = TOKEN_STRING;
-            data.str_val = start;
-
-            advance(t);
-            break;
-            //
+            struct token token = scan_string(t, '\'');
+            token.span = start;
+            token.span.end = t->pos;
+            return token;
         }
         case '"': {
-            advance(t);
-            const char* start = t->src + t->pos;
-
-            while (true) {
-                char c = current(t);
-                if (c == '"') {
-                    break;
-                } else if (c == '\\') {
-                    advance(t);
-                    if (current(t) == '\0') {
-                        fprintf(stderr, "Unterminated escape sequence at line %d, col %d\n",
-                                t->line, t->col);
-                        exit(1);
-                    }
-                    advance(t);
-                } else if (c == '\0') {
-                    fprintf(stderr,
-                            "Unterminated string literal starting at line %d, "
-                            "col %d\n",
-                            t->line, t->col);
-                    exit(1);
-                } else {
-                    advance(t);
-                }
-            }
-
-            kind = TOKEN_STRING;
-            data.str_val = start;
-
-            advance(t);
-            break;
+            struct token token = scan_string(t, '"');
+            token.span = start;
+            token.span.end = t->pos;
+            return token;
         }
         default:
             if (isdigit(c)) {

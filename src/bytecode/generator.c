@@ -194,7 +194,7 @@ static inline size_t generator_add_identifier(struct generator* generator, struc
 static inline size_t generator_add_str_contant(struct generator* generator,
                                                char* data,
                                                struct span* str_span) {
-    const size_t len = str_span->end - 1 - str_span->start - 1;
+    const size_t len = (str_span->end - 1) - (str_span->start - 1);
     char* buffer = malloc(len);
     memcpy(buffer, data, len);
     buffer[len] = '\0';
