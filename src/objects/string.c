@@ -13,7 +13,6 @@ LU_NATIVE_FN(String_to_string) {
 }
 
 LU_NATIVE_FN(String_char_at) {
-    //
     int64_t index;
     LU_TRY_UNPACK_INT(vm, args, 0, &index);
 
@@ -38,7 +37,7 @@ LU_NATIVE_FN(String_char_at) {
 
 LU_NATIVE_FN(String_substring) {
     int64_t start, end;
-    LU_TRY_UNPACK_ARGS(vm, "ii", argc, args, &start, &end)
+    LU_TRY_UNPACK_ARGS(vm, "ii", argc, args, &start, &end);
     struct string_block* block = calloc(1, sizeof(struct string_block) + end - start + 1);
     block->next = block->prev = nullptr;
     block->prev = vm->istate->string_pool.last_block;

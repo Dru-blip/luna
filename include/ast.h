@@ -11,6 +11,7 @@ struct ast_node;
 enum ast_node_kind {
     AST_NODE_INT,
     AST_NODE_BOOL,
+    AST_NODE_FLOAT,
     AST_NODE_NONE,
     AST_NODE_STR,
     AST_NODE_UNOP,
@@ -109,6 +110,7 @@ struct ast_fn_decl {
 
 union ast_node_data {
     int64_t int_val;
+    double float_val;
     char* id;
     struct ast_node* node;
     struct ast_pair pair;

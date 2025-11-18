@@ -11,8 +11,6 @@ LU_NATIVE_FN(Object_to_string) {
 }
 
 LU_NATIVE_FN(Object_has_property) {
-    if (argc == 0)
-        LU_RETURN_NONE();
     struct lu_value key_val = args[0];
     if (!lu_is_string(key_val)) {
         lu_raise_error(vm->istate, "Key must be a string");

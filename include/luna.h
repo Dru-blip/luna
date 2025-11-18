@@ -12,6 +12,8 @@ typedef struct lu_value lu_value;
 #define LU_EXPORT __attribute__((visibility("default")))
 #define ALWAYS_INLINE __attribute__((always_inline))
 
+typedef void (*module_init_func)(struct lu_istate*, struct lu_module*);
+
 #define LU_NATIVE_FN(NAME)                                                   \
     LU_EXPORT struct lu_value NAME(struct lu_vm* vm, struct lu_object* self, \
                                    struct lu_value* args, uint8_t argc)
@@ -44,7 +46,7 @@ typedef struct lu_value lu_value;
 
 #define LU_TRY_UNPACK_OBJ(vm, args, idx, dest)                                                   \
     do {                                                                                         \
-        if (!lu_is_obj((args)[(idx)])) {                                                         \
+        if (!lu_is_object((args)[(idx)])) {                                                      \
             const char* got_type_str_name = lu_value_get_type_name((args)[(idx)]);               \
             const char* expected_type_str_name = "object";                                       \
             char buffer[256];                                                                    \
@@ -53,7 +55,7 @@ typedef struct lu_value lu_value;
             lu_raise_error((vm)->istate, buffer);                                                \
             return lu_value_none();                                                              \
         }                                                                                        \
-        *(struct lu_obj**)(dest) = (args)[(idx)].object;                                         \
+        *(struct lu_object**)(dest) = (args)[(idx)].object;                                      \
     } while (0)
 
 #define LU_TRY_UNPACK_STR(vm, args, idx, dest)                                                   \
@@ -123,10 +125,23 @@ ALWAYS_INLINE static inline const char* get_type_name_from_mnemonics(char c) {
 }
 
 ALWAYS_INLINE static inline void lu_register_native_fn(struct lu_istate* state,
-                                                       struct lu_object* obj, const char* name_str,
-                                                       native_func_t func, int pc) {
+                                                       struct lu_object* obj,
+                                                       const char* name_str,
+                                                       native_func_t func,
+                                                       int pc) {
     struct lu_string* fname = lu_intern_string(state, (char*)name_str);
     struct lu_function* fobj = lu_native_function_new(state, fname, func, pc);
+    lu_obj_set(obj, fname, lu_value_object((struct lu_object*)fobj));
+}
+
+ALWAYS_INLINE static inline void lu_register_native_fn_variadic(struct lu_istate* state,
+                                                                struct lu_object* obj,
+                                                                const char* name_str,
+                                                                native_func_t func,
+                                                                int pc) {
+    struct lu_string* fname = lu_intern_string(state, (char*)name_str);
+    struct lu_function* fobj = lu_native_function_new(state, fname, func, pc);
+    fobj->is_variadic = true;
     lu_obj_set(obj, fname, lu_value_object((struct lu_object*)fobj));
 }
 
@@ -136,7 +151,8 @@ ALWAYS_INLINE static inline void lu_register_native_fn(struct lu_istate* state,
 ALWAYS_INLINE static inline void lu_register_native_fn_with_name(struct lu_istate* state,
                                                                  struct lu_object* obj,
                                                                  struct lu_string* fname,
-                                                                 native_func_t func, int pc) {
+                                                                 native_func_t func,
+                                                                 int pc) {
     struct lu_function* fobj = lu_native_function_new(state, fname, func, pc);
     lu_obj_set(obj, fname, lu_value_object((struct lu_object*)fobj));
 }

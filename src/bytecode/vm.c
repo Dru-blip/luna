@@ -267,26 +267,59 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
     CASE(OPCODE_LOAD_SUBSCR) : {
         struct lu_value obj_val = registers[instr->binary_op.left_reg];
         struct lu_value computed_index = registers[instr->binary_op.right_reg];
-        if (lu_is_array(obj_val)) {
-            if (lu_is_int(computed_index)) {
-                int64_t index = lu_as_int(computed_index);
-                if (index < 0) {
-                    goto invalid_array_index;
-                }
-                struct lu_value value = lu_array_get(lu_as_array(obj_val), index);
-                if (lu_is_undefined(value)) {
-                    char buffer[256];
-                    snprintf(buffer, sizeof(buffer), "index %ld out of bounds (array length %ld)",
-                             index, lu_array_length(lu_as_array(obj_val)));
-                    lu_raise_error(vm->istate, buffer);
-                    goto error_reporter;
-                }
-                registers[instr->binary_op.result_reg] = value;
-                DISPATCH_NEXT();
-            }
+        if (lu_is_object(obj_val)) {
+            struct lu_value result =
+                lu_as_object(obj_val)->vtable->subscr(vm, lu_as_object(obj_val), computed_index);
+            registers[instr->binary_op.result_reg] = result;
+            DISPATCH_NEXT();
         }
-        // TODO: Implement loading from other types of objects
-        DISPATCH_NEXT();
+        // if (lu_is_array(obj_val)) {
+        //     if (lu_is_int(computed_index)) {
+        //         int64_t index = lu_as_int(computed_index);
+        //         if (index < 0) {
+        //             goto invalid_array_index;
+        //         }
+        //         struct lu_value value = lu_array_get(lu_as_array(obj_val), index);
+        //         if (lu_is_undefined(value)) {
+        //             char buffer[256];
+        //             snprintf(buffer, sizeof(buffer), "index %ld out of bounds (array length
+        //             %ld)",
+        //                      index, lu_array_length(lu_as_array(obj_val)));
+        //             lu_raise_error(vm->istate, buffer);
+        //             goto error_reporter;
+        //         }
+        //         registers[instr->binary_op.result_reg] = value;
+        //         DISPATCH_NEXT();
+        //     }
+
+        //     char buffer[256];
+        //     snprintf(buffer, sizeof(buffer), "array index must be an integer ,got %s",
+        //              lu_value_get_type_name(computed_index));
+        //     lu_raise_error(vm->istate, buffer);
+        //     goto error_reporter;
+        // }
+
+        // if (!lu_is_string(computed_index)) {
+        //     char buffer[256];
+        //     snprintf(buffer, sizeof(buffer), "object accessor must be a string , got %s",
+        //              lu_value_get_type_name(computed_index));
+        //     lu_raise_error(vm->istate, buffer);
+        //     return lu_value_none();
+        // }
+
+        // struct lu_value result = lu_obj_get(lu_as_object(obj_val), lu_as_string(computed_index));
+        // if (lu_is_undefined(result)) {
+        //     char buffer[256];
+        //     struct strbuf sb;
+        //     strbuf_init_static(&sb, buffer, sizeof(buffer));
+        //     strbuf_appendf(&sb, "object has no property '%s'",
+        //                    lu_string_get_cstring(lu_as_string(computed_index)));
+        //     lu_raise_error(vm->istate, buffer);
+        //     return lu_value_none();
+        // }
+
+        lu_raise_error(vm->istate, "invalid member access on non object value");
+        goto error_reporter;
     }
     CASE(OPCODE_STORE_SUBSCR) : {
         struct lu_value obj_val = registers[instr->binary_op.left_reg];
@@ -307,8 +340,22 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
                 }
                 DISPATCH_NEXT();
             }
+            char buffer[256];
+            snprintf(buffer, sizeof(buffer), "array index must be an integer ,got %s",
+                     lu_value_get_type_name(computed_index));
+            lu_raise_error(vm->istate, buffer);
+            goto error_reporter;
         }
-        // TODO: Implement  for objects
+        if (!lu_is_string(computed_index)) {
+            char buffer[256];
+            snprintf(buffer, sizeof(buffer), "object accessor must be a string , got %s",
+                     lu_value_get_type_name(computed_index));
+            lu_raise_error(vm->istate, buffer);
+            return lu_value_none();
+        }
+
+        lu_obj_set(lu_as_object(obj_val), lu_as_string(computed_index),
+                   registers[instr->binary_op.result_reg]);
         DISPATCH_NEXT();
     }
 
@@ -425,6 +472,11 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
         if (func->type == FUNCTION_NATIVE) {
             struct lu_value self = parent_record->registers[instr->call.self_reg];
 
+            if (!func->is_variadic) {
+                if (instr->call.argc != func->param_count) {
+                    goto arg_count_mismatch;
+                }
+            }
             // should refactor, issue: allocating and freeing args may
             // slow down the execution , should move to a preallocated
             // buffer.
@@ -438,6 +490,15 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
                 goto error_reporter;
             }
             DISPATCH_NEXT();
+        }
+
+        if (instr->call.argc != func->param_count) {
+        arg_count_mismatch:
+            char buffer[256];
+            snprintf(buffer, sizeof(buffer), "function '%s' expects %ld argument(s), got %d",
+                     lu_string_get_cstring(func->name), func->param_count, instr->call.argc);
+            lu_raise_error(vm->istate, buffer);
+            goto error_reporter;
         }
 
         lu_vm_push_new_record_with_globals(vm, func->executable, record->globals);

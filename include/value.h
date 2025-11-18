@@ -8,6 +8,9 @@
 #include "ast.h"
 #include "string_interner.h"
 
+struct lu_vm;
+
+
 enum lu_value_type {
     VALUE_BOOL,
     VALUE_NONE,
@@ -83,14 +86,16 @@ enum object_tag {
     OBJECT_TAG_EXECUTABLE,
 };
 
+
 struct lu_object_vtable {
-    bool is_function;
-    bool is_string;
-    bool is_array;
+    bool is_function;  // should be deprecated
+    bool is_string;    // should be deprecated
+    bool is_array;     // should be deprecated
     enum object_tag tag;
     const char* dbg_name;
     void (*finalize)(struct lu_object*);
     void (*visit)(struct lu_object*, struct lu_objectset*);
+    struct lu_value (*subscr)(struct lu_vm* , struct lu_object*, struct lu_value key);
 };
 
 enum lu_string_type {
@@ -126,8 +131,10 @@ struct argument {
 
 struct lu_vm;
 
-typedef struct lu_value (*native_func_t)(struct lu_vm*, struct lu_object*,
-                                         struct lu_value*, uint8_t);
+typedef struct lu_value (*native_func_t)(struct lu_vm*,
+                                         struct lu_object*,
+                                         struct lu_value*,
+                                         uint8_t);
 
 struct lu_function {
     LUNA_OBJECT_HEADER;
@@ -135,6 +142,7 @@ struct lu_function {
     struct lu_string* name;
     struct lu_module* module;
     size_t param_count;
+    bool is_variadic;
     union {
         native_func_t func;
         struct executable* executable;
@@ -162,8 +170,6 @@ struct lu_module {
     struct lu_value exported;
 };
 
-typedef void (*module_init_func)(struct lu_istate*, struct lu_module*);
-
 struct lu_array {
     LUNA_OBJECT_HEADER;
     size_t size;
@@ -183,16 +189,14 @@ struct lu_array_iter {
 #define lu_value_undefined() ((struct lu_value){VALUE_UNDEFINED})
 #define lu_value_int(v) ((struct lu_value){.type = VALUE_INTEGER, .integer = v})
 #define lu_value_bool(v) ((struct lu_value){.type = VALUE_BOOL, .integer = v})
-#define lu_value_object(v) \
-    ((struct lu_value){.type = VALUE_OBJECT, .object = v})
+#define lu_value_object(v) ((struct lu_value){.type = VALUE_OBJECT, .object = v})
 
 #define lu_is_bool(v) ((v).type == VALUE_BOOL)
 #define lu_is_none(v) ((v).type == VALUE_NONE)
 #define lu_is_undefined(v) ((v).type == VALUE_UNDEFINED)
 #define lu_is_int(v) ((v).type == VALUE_INTEGER)
 #define lu_is_object(v) ((v).type == VALUE_OBJECT)
-#define lu_is_function(v) \
-    (lu_is_object(v) && lu_as_object(v)->vtable->is_function)
+#define lu_is_function(v) (lu_is_object(v) && lu_as_object(v)->vtable->is_function)
 #define lu_is_string(v) (lu_is_object(v) && lu_as_object(v)->vtable->is_string)
 #define lu_is_array(v) (lu_is_object(v) && lu_as_object(v)->vtable->is_array)
 #define lu_is_executable(v) \
@@ -206,8 +210,7 @@ struct lu_array_iter {
 
 #define lu_obj_get(obj, key) lu_object_get_property(obj, key)
 #define lu_obj_get_ref(obj, key) lu_object_get_property_ref(obj, key)
-#define lu_obj_set(obj, key, value) \
-    lu_property_map_set(&(obj)->properties, key, value)
+#define lu_obj_set(obj, key, value) lu_property_map_set(&(obj)->properties, key, value)
 #define lu_obj_remove(obj, key) lu_property_map_remove(&(obj)->properties, key)
 
 #define lu_obj_size(obj) (obj)->properties.size
@@ -217,9 +220,15 @@ struct lu_array_iter {
     (val.type == VALUE_BOOL && val.integer == false) || (val.type == VALUE_NONE)
 #define lu_is_truthy(val) !lu_is_falsy(val)
 
-static inline struct lu_value lu_bool(bool v) { return lu_value_bool(v); }
-static inline struct lu_value lu_int(int64_t v) { return lu_value_int(v); }
-static inline struct lu_value lu_none(void) { return lu_value_none(); }
+static inline struct lu_value lu_bool(bool v) {
+    return lu_value_bool(v);
+}
+static inline struct lu_value lu_int(int64_t v) {
+    return lu_value_int(v);
+}
+static inline struct lu_value lu_none(void) {
+    return lu_value_none();
+}
 static inline struct lu_value lu_undefined(void) {
     return lu_value_undefined();
 }
@@ -241,31 +250,30 @@ bool lu_string_equal(struct lu_string* a, struct lu_string* b);
 
 void lu_property_map_init(struct property_map* map, size_t capacity);
 void lu_property_map_deinit(struct property_map* map);
-void lu_property_map_set(struct property_map* map, struct lu_string* key,
-                         struct lu_value value);
+void lu_property_map_set(struct property_map* map, struct lu_string* key, struct lu_value value);
 bool lu_property_map_has(struct property_map* map, struct lu_string* key);
-struct lu_value lu_property_map_get(struct property_map* map,
-                                    struct lu_string* key);
-struct lu_value* lu_property_map_get_ref(struct property_map* map,
-                                         struct lu_string* key);
+struct lu_value lu_property_map_get(struct property_map* map, struct lu_string* key);
+struct lu_value* lu_property_map_get_ref(struct property_map* map, struct lu_string* key);
 
 // TODO: implement property remove
 void lu_property_map_remove(struct property_map* map, struct lu_string* key);
 
 struct lu_object* lu_object_new(struct lu_istate* state);
 struct lu_object* lu_object_new_sized(struct lu_istate* state, size_t size);
-struct lu_value lu_object_get_property(struct lu_object* obj,
-                                       struct lu_string* key);
-struct lu_value* lu_object_get_property_ref(struct lu_object* obj,
-                                            struct lu_string* key);
+struct lu_value lu_object_get_property(struct lu_object* obj, struct lu_string* key);
+struct lu_value* lu_object_get_property_ref(struct lu_object* obj, struct lu_string* key);
+struct lu_value lu_object_subscr(struct lu_vm* vm, struct lu_object* obj, struct lu_value key);
 struct lu_object_vtable* lu_object_get_default_vtable();
 struct lu_string* lu_string_new(struct lu_istate* state, char* data);
-struct lu_string* lu_small_string_new(struct lu_istate* state, char* data,
-                                      size_t length, size_t hash);
-struct lu_string* lu_string_from_block(struct lu_istate* state,
-                                       struct string_block* block);
-struct lu_string* lu_string_concat(struct lu_istate* state, struct lu_value lhs,
+struct lu_string* lu_small_string_new(struct lu_istate* state,
+                                      char* data,
+                                      size_t length,
+                                      size_t hash);
+struct lu_string* lu_string_from_block(struct lu_istate* state, struct string_block* block);
+struct lu_string* lu_string_concat(struct lu_istate* state,
+                                   struct lu_value lhs,
                                    struct lu_value rhs);
+struct lu_value lu_string_subscr(struct lu_vm* vm, struct lu_object* obj, struct lu_value key);
 
 struct lu_function* lu_function_new(struct lu_istate* state,
                                     struct lu_string* name,
@@ -277,13 +285,19 @@ struct lu_function* lu_native_function_new(struct lu_istate* state,
                                            native_func_t native_func,
                                            size_t param_count);
 
-struct lu_module* lu_module_new(struct lu_istate* state, struct lu_string* name,
+struct lu_module* lu_module_new(struct lu_istate* state,
+                                struct lu_string* name,
                                 struct ast_program* program);
+
+struct lu_module* lu_native_module_new(struct lu_istate* state,
+                                       struct lu_string* name,
+                                       void* module_handle);
 
 struct lu_array* lu_array_new(struct lu_istate* state);
 void lu_array_push(struct lu_array* array, struct lu_value value);
 struct lu_value lu_array_get(struct lu_array* array, size_t index);
 int lu_array_set(struct lu_array* array, size_t index, struct lu_value value);
+struct lu_value lu_array_subscr(struct lu_vm* vm, struct lu_object* obj, struct lu_value key);
 
 void lu_raise_error(struct lu_istate* state, char* message);
 
@@ -293,30 +307,27 @@ struct lu_objectset* lu_objectset_new(size_t initial_capacity);
 bool lu_objectset_add(struct lu_objectset* set, struct lu_object* key);
 void lu_objectset_free(struct lu_objectset* set);
 
-static inline struct lu_objectset_iter lu_objectset_iter_new(
-    struct lu_objectset* set) {
+static inline struct lu_objectset_iter lu_objectset_iter_new(struct lu_objectset* set) {
     struct lu_objectset_iter iter = {set, 0};
     return iter;
 }
 
-static inline struct lu_object* lu_objectset_iter_next(
-    struct lu_objectset_iter* iter) {
+static inline struct lu_object* lu_objectset_iter_next(struct lu_objectset_iter* iter) {
     while (iter->index < iter->set->capacity) {
         struct lu_object* key = iter->set->entries[iter->index++];
-        if (key) return key;
+        if (key)
+            return key;
     }
     return nullptr;
 }
 
-static inline struct property_map_iter property_map_iter_new(
-    struct property_map* map) {
+static inline struct property_map_iter property_map_iter_new(struct property_map* map) {
     struct property_map_iter iter = {map, 0};
     iter.chain = map->head;
     return iter;
 }
 
-static inline struct property_map_entry* property_map_iter_next(
-    struct property_map_iter* iter) {
+static inline struct property_map_entry* property_map_iter_next(struct property_map_iter* iter) {
     struct property_map_entry* current = iter->chain;
     if (current) {
         iter->chain = current->next_in_order;
@@ -353,14 +364,15 @@ static inline int64_t lu_strcmp(struct lu_string* a, struct lu_string* b) {
     char* adata = lu_string_get_cstring(a);
     char* bdata = lu_string_get_cstring(b);
     int64_t cmp_res = memcmp(adata, bdata, min_len);
-    if (cmp_res != 0) return cmp_res;
+    if (cmp_res != 0)
+        return cmp_res;
     return a->length < b->length ? -1 : a->length > b->length;
 }
 
-static inline bool lu_value_strict_equals(struct lu_value a,
-                                          struct lu_value b) {
+static inline bool lu_value_strict_equals(struct lu_value a, struct lu_value b) {
     // strict comparison
-    if (a.type != b.type) return false;
+    if (a.type != b.type)
+        return false;
     switch (a.type) {
         case VALUE_BOOL:
         case VALUE_INTEGER:

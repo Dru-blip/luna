@@ -7,10 +7,14 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <dlfcn.h>
 #include "bytecode/vm.h"
 #include "luna.h"
 #include "strbuf.h"
 #include "string_interner.h"
+#include "value.h"
+
+static const char* lib_search_path = "/usr/local/lib/luna";
 
 LU_NATIVE_FN(print_func) {
     // size_t arg_count = vm->records[vm->rp - 1].function->param_count;
@@ -77,6 +81,7 @@ LU_NATIVE_FN(len) {
 // import module
 LU_NATIVE_FN(import_module) {
     // TODO: handle package format (foo.bar)
+    // TODO: check if path is string
     struct lu_value file_path_value = LU_ARG_GET(args, 0);
     // TODO: add checks for file path
     struct lu_value module = lu_obj_get(vm->istate->module_cache, lu_as_string(file_path_value));
@@ -131,6 +136,79 @@ LU_NATIVE_FN(import_module) {
     free(path_buffer);
 
     return result;
+}
+
+LU_NATIVE_FN(load) {
+    struct lu_string* name_str;
+    LU_TRY_UNPACK_STR(vm, args, 0, &name_str);
+
+    struct lu_value cached_module = lu_obj_get(vm->istate->native_module_cache, name_str);
+    if (!lu_is_undefined(cached_module)) {
+        return cached_module;
+    }
+
+    char* name = lu_string_get_cstring(name_str);
+    DIR* dir;
+
+    struct dirent* file_info;
+
+    struct strbuf sb;
+    char err_buffer[256];
+    strbuf_init_static(&sb, err_buffer, sizeof(err_buffer));
+
+    if ((dir = opendir(lib_search_path)) == nullptr) {
+        strbuf_appendf(&sb, "failed to read file: '%s'", lib_search_path);
+        lu_raise_error(vm->istate, err_buffer);
+        LU_RETURN_UNDEF();
+    }
+
+    char lib_name[PATH_MAX];
+    snprintf(lib_name, PATH_MAX, "liblu%s.so", name);
+
+    char* path_buffer = nullptr;
+    while ((file_info = readdir(dir)) != nullptr) {
+        if (strcmp(file_info->d_name, lib_name) == 0) {
+            path_buffer = malloc(PATH_MAX + 256);
+            snprintf(path_buffer, PATH_MAX + 256, "%s/%s", lib_search_path, file_info->d_name);
+            break;
+        }
+    }
+
+    if (path_buffer == nullptr) {
+        closedir(dir);
+        strbuf_appendf(&sb, "failed to find library: '%s'", name);
+        lu_raise_error(vm->istate, err_buffer);
+        return lu_value_undefined();
+    }
+
+    void* module_handle = dlopen(path_buffer, RTLD_LAZY | RTLD_LOCAL);
+
+    if (module_handle == nullptr) {
+        free(path_buffer);
+        closedir(dir);
+        strbuf_appendf(&sb, "failed to load library: '%s'", name);
+        lu_raise_error(vm->istate, err_buffer);
+        return lu_value_undefined();
+    }
+
+    struct lu_module* module =
+        lu_native_module_new(vm->istate, lu_intern_string(vm->istate, name), module_handle);
+
+    module_init_func init_func = dlsym(module_handle, "lu_module_init");
+
+    if (init_func == nullptr) {
+        free(path_buffer);
+        closedir(dir);
+        strbuf_appendf(&sb, "failed to find init function in library: '%s'", name);
+        lu_raise_error(vm->istate, err_buffer);
+        return lu_value_undefined();
+    }
+
+    init_func(vm->istate, module);
+    module->exported = lu_value_object(module);
+    lu_obj_set(vm->istate->native_module_cache, name_str, module->exported);
+    free(path_buffer);
+    return module->exported;
 }
 
 // console methods
@@ -190,9 +268,10 @@ LU_NATIVE_FN(Math_abs) {
 // --------------------
 
 void lu_init_global_object(struct lu_istate* state) {
-    lu_register_native_fn(state, state->vm->global_object, "print", print_func, UINT8_MAX);
+    lu_register_native_fn_variadic(state, state->vm->global_object, "print", print_func, UINT8_MAX);
     lu_register_native_fn(state, state->vm->global_object, "raise", raise_func, 0);
     lu_register_native_fn(state, state->vm->global_object, "import", import_module, 1);
+    lu_register_native_fn(state, state->vm->global_object, "load", load, 1);
     lu_register_native_fn(state, state->vm->global_object, "len", len, 1);
 
     lu_register_native_fn(state, state->vm->global_object, "Array", Array, 0);

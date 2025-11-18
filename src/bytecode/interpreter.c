@@ -100,6 +100,7 @@ struct lu_istate* lu_istate_new() {
 
     state->global_object = lu_object_new(state);
     state->module_cache = lu_object_new(state);
+    state->native_module_cache = lu_object_new(state);
     state->running_module = nullptr;
     state->main_module = nullptr;
     state->vm = lu_vm_new(state);
@@ -172,7 +173,7 @@ struct lu_value lu_run_program(struct lu_istate* state, const char* filepath) {
     struct executable* executable = generator_generate(state, program);
     if (state->error) {
         if (state->running_module != state->main_module) {
-            state->vm->status = VM_STATUS_HALT;
+            // state->vm->status = VM_STATUS_HALT;
             return lu_value_undefined();
         }
         struct lu_string* str = lu_as_string(lu_obj_get(state->error, state->names.message));

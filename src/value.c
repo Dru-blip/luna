@@ -1,5 +1,6 @@
 #include "value.h"
 
+#include <dlfcn.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -72,8 +73,7 @@ static void lu_object_visit(struct lu_object* self, struct lu_objectset* set) {
     }
 }
 
-static void lu_function_visit(struct lu_object* self,
-                              struct lu_objectset* set) {
+static void lu_function_visit(struct lu_object* self, struct lu_objectset* set) {
     lu_objectset_add(set, lu_cast(struct lu_function, self)->name);
     lu_objectset_add(set, lu_cast(struct lu_function, self)->executable);
     lu_object_visit(self, set);
@@ -120,9 +120,14 @@ static void lu_module_visit(struct lu_object* self, struct lu_objectset* set) {
 
 static void lu_module_finalize(struct lu_object* self) {
     struct lu_module* module = lu_cast(struct lu_module, self);
-    free(module->program.source);
-    arrfree(module->program.tokens);
-    arena_destroy(&module->program.allocator);
+    if (module->type == MODULE_NATIVE) {
+        dlclose(module->module_handle);
+    } else {
+        free(module->program.source);
+        arrfree(module->program.tokens);
+        arena_destroy(&module->program.allocator);
+    }
+
     lu_object_finalize(self);
 }
 
@@ -133,6 +138,7 @@ static struct lu_object_vtable lu_object_default_vtable = {
     .is_array = false,
     .finalize = lu_object_finalize,
     .visit = lu_object_visit,
+    .subscr = lu_object_subscr,
     .dbg_name = "Object",
 };
 
@@ -142,6 +148,7 @@ static struct lu_object_vtable lu_string_vtable = {
     .is_array = false,
     .finalize = lu_string_finalize,
     .visit = lu_object_visit,
+    .subscr = lu_string_subscr,
     .dbg_name = "String",
 };
 
@@ -151,6 +158,7 @@ static struct lu_object_vtable lu_function_vtable = {
     .is_array = false,
     .finalize = lu_object_finalize,
     .visit = lu_function_visit,
+    .subscr = lu_object_subscr,
     .dbg_name = "Function",
 };
 
@@ -160,6 +168,7 @@ static struct lu_object_vtable lu_array_vtable = {
     .is_array = true,
     .finalize = lu_array_finalize,
     .visit = lu_array_visit,
+    .subscr = lu_array_subscr,
     .dbg_name = "Array",
 };
 
@@ -169,12 +178,15 @@ static struct lu_object_vtable lu_module_vtable = {
     .is_array = false,
     .finalize = lu_module_finalize,
     .visit = lu_module_visit,
+    .subscr = lu_object_subscr,
     .dbg_name = "Module",
 };
 
 bool lu_string_equal(struct lu_string* a, struct lu_string* b) {
-    if (a == b) return true;
-    if (a->length != b->length) return false;
+    if (a == b)
+        return true;
+    if (a->length != b->length)
+        return false;
 
     // refactor
     if ((a->type == STRING_SMALL || a->type == STRING_SMALL_INTERNED) &&
@@ -189,8 +201,7 @@ bool lu_string_equal(struct lu_string* a, struct lu_string* b) {
     return strncmp(a->data, b->data, a->length) == 0;
 }
 
-static const char* lu_value_type_names[] = {"bool", "none", "undefined",
-                                            "integer", "object"};
+static const char* lu_value_type_names[] = {"bool", "none", "undefined", "integer", "object"};
 
 const char* lu_value_get_type_name(struct lu_value a) {
     if (!lu_is_object(a)) {
@@ -226,12 +237,13 @@ void lu_property_map_deinit(struct property_map* map) {
 
 static bool lu_property_map_add_entry(struct property_map* map,
                                       struct property_map_entry** entries,
-                                      size_t capacity, struct lu_string* key,
-                                      struct lu_value value, bool is_resize) {
+                                      size_t capacity,
+                                      struct lu_string* key,
+                                      struct lu_value value,
+                                      bool is_resize) {
     size_t index = key->hash & (capacity - 1);
 
-    struct property_map_entry* new_entry =
-        malloc(sizeof(struct property_map_entry));
+    struct property_map_entry* new_entry = malloc(sizeof(struct property_map_entry));
     new_entry->key = key;
     new_entry->value = value;
     new_entry->next = new_entry->prev = nullptr;
@@ -274,8 +286,8 @@ static void property_map_resize(struct property_map* map, size_t capacity) {
     for (size_t i = 0; i < map->capacity; i++) {
         struct property_map_entry* entry = map->entries[i];
         while (entry) {
-            lu_property_map_add_entry(map, new_entries, new_capacity,
-                                      entry->key, entry->value, true);
+            lu_property_map_add_entry(map, new_entries, new_capacity, entry->key, entry->value,
+                                      true);
             entry = entry->next;
         }
     }
@@ -285,21 +297,17 @@ static void property_map_resize(struct property_map* map, size_t capacity) {
     map->capacity = new_capacity;
 }
 
-void lu_property_map_set(struct property_map* map, struct lu_string* key,
-                         struct lu_value value) {
-    if (((float)(map->size + 1) / map->capacity) >=
-        LU_PROPERTY_MAP_LOAD_FACTOR) {
+void lu_property_map_set(struct property_map* map, struct lu_string* key, struct lu_value value) {
+    if (((float)(map->size + 1) / map->capacity) >= LU_PROPERTY_MAP_LOAD_FACTOR) {
         size_t new_capacity = map->capacity * 2;
         property_map_resize(map, new_capacity);
     }
-    if (lu_property_map_add_entry(map, map->entries, map->capacity, key, value,
-                                  false)) {
+    if (lu_property_map_add_entry(map, map->entries, map->capacity, key, value, false)) {
         map->size++;
     };
 }
 
-struct lu_value lu_property_map_get(struct property_map* map,
-                                    struct lu_string* key) {
+struct lu_value lu_property_map_get(struct property_map* map, struct lu_string* key) {
     size_t index = (key->hash) & (map->capacity - 1);
 
     struct property_map_entry* entry = map->entries[index];
@@ -313,8 +321,7 @@ struct lu_value lu_property_map_get(struct property_map* map,
     return lu_value_undefined();
 }
 
-struct lu_value* lu_property_map_get_ref(struct property_map* map,
-                                         struct lu_string* key) {
+struct lu_value* lu_property_map_get_ref(struct property_map* map, struct lu_string* key) {
     //
     size_t index = (key->hash) & (map->capacity - 1);
 
@@ -347,16 +354,14 @@ bool lu_property_map_has(struct property_map* map, struct lu_string* key) {
 void lu_property_map_remove(struct property_map* map, struct lu_string* key) {}
 
 inline struct lu_object* lu_object_new(struct lu_istate* state) {
-    struct lu_object* obj =
-        heap_allocate_object(state->heap, sizeof(struct lu_object));
+    struct lu_object* obj = heap_allocate_object(state->heap, sizeof(struct lu_object));
     lu_property_map_init(&obj->properties, 4);
     obj->vtable = &lu_object_default_vtable;
     obj->prototype = state->object_prototype;
     return obj;
 }
 
-inline struct lu_object* lu_object_new_sized(struct lu_istate* state,
-                                             size_t size) {
+inline struct lu_object* lu_object_new_sized(struct lu_istate* state, size_t size) {
     struct lu_object* obj = heap_allocate_object(state->heap, size);
     lu_property_map_init(&obj->properties, 4);
     obj->vtable = &lu_object_default_vtable;
@@ -364,8 +369,7 @@ inline struct lu_object* lu_object_new_sized(struct lu_istate* state,
     return obj;
 }
 
-struct lu_value lu_object_get_property(struct lu_object* obj,
-                                       struct lu_string* key) {
+struct lu_value lu_object_get_property(struct lu_object* obj, struct lu_string* key) {
     struct lu_object* curr = obj;
     while (curr) {
         struct lu_value value = lu_property_map_get(&curr->properties, key);
@@ -377,12 +381,10 @@ struct lu_value lu_object_get_property(struct lu_object* obj,
     return lu_value_undefined();
 }
 
-struct lu_value* lu_object_get_property_ref(struct lu_object* obj,
-                                            struct lu_string* key) {
+struct lu_value* lu_object_get_property_ref(struct lu_object* obj, struct lu_string* key) {
     struct lu_object* curr = obj;
     while (curr) {
-        struct lu_value* value =
-            lu_property_map_get_ref(&curr->properties, key);
+        struct lu_value* value = lu_property_map_get_ref(&curr->properties, key);
         if (value) {
             return value;
         }
@@ -391,14 +393,24 @@ struct lu_value* lu_object_get_property_ref(struct lu_object* obj,
     return nullptr;
 }
 
+struct lu_value lu_object_subscr(struct lu_vm* vm, struct lu_object* obj, struct lu_value key) {
+    if (lu_is_string(key)) {
+        return lu_obj_get(obj, lu_as_string(key));
+    }
+
+    lu_raise_error(vm->istate, "Invalid key type");
+    return lu_value_undefined();
+}
+
 inline struct lu_object_vtable* lu_object_get_default_vtable() {
     return &lu_object_default_vtable;
 }
 
-struct lu_string* lu_small_string_new(struct lu_istate* state, char* data,
-                                      size_t length, size_t hash) {
-    struct lu_string* str =
-        lu_object_new_sized(state, sizeof(struct lu_string) + length + 1);
+struct lu_string* lu_small_string_new(struct lu_istate* state,
+                                      char* data,
+                                      size_t length,
+                                      size_t hash) {
+    struct lu_string* str = lu_object_new_sized(state, sizeof(struct lu_string) + length + 1);
     str->type = STRING_SMALL_INTERNED;
     str->hash = hash;
     str->length = length;
@@ -419,8 +431,7 @@ struct lu_string* lu_string_new(struct lu_istate* state, char* data) {
 
     bool is_small = len <= STRING_SMALL_MAX_LENGTH;
 
-    size_t required_size = is_small ? sizeof(struct lu_string) + len + 1
-                                    : sizeof(struct lu_string);
+    size_t required_size = is_small ? sizeof(struct lu_string) + len + 1 : sizeof(struct lu_string);
     struct lu_string* str = lu_object_new_sized(state, required_size);
     str->vtable = &lu_string_vtable;
     str->hash = hash;
@@ -443,11 +454,9 @@ struct lu_string* lu_string_new(struct lu_istate* state, char* data) {
     return str;
 }
 
-struct lu_string* lu_string_from_block(struct lu_istate* state,
-                                       struct string_block* block) {
+struct lu_string* lu_string_from_block(struct lu_istate* state, struct string_block* block) {
     size_t hash = hash_str(block->data, block->length);
-    struct lu_string* str =
-        lu_object_new_sized(state, sizeof(struct lu_string));
+    struct lu_string* str = lu_object_new_sized(state, sizeof(struct lu_string));
     str->vtable = &lu_string_vtable;
     str->hash = hash;
     str->length = block->length;
@@ -457,16 +466,14 @@ struct lu_string* lu_string_from_block(struct lu_istate* state,
     return str;
 }
 
-static struct lu_string* lu_integer_to_string(struct lu_istate* state,
-                                              int64_t value) {
+static struct lu_string* lu_integer_to_string(struct lu_istate* state, int64_t value) {
     char buffer[65];
     snprintf(buffer, sizeof(buffer), "%ld", value);
     buffer[64] = '\0';
     return lu_string_new(state, buffer);
 }
 
-static struct lu_string* lu_value_to_string(struct lu_istate* state,
-                                            struct lu_value value) {
+static struct lu_string* lu_value_to_string(struct lu_istate* state, struct lu_value value) {
     switch (value.type) {
         case VALUE_INTEGER: {
             return lu_integer_to_string(state, lu_as_int(value));
@@ -485,8 +492,7 @@ static struct lu_string* lu_value_to_string(struct lu_istate* state,
     }
 }
 
-static struct string_block* string_block_raw_new(struct lu_istate* state,
-                                                 size_t size) {
+static struct string_block* string_block_raw_new(struct lu_istate* state, size_t size) {
     struct string_block* block = malloc(sizeof(struct string_block) + size + 1);
     block->next = block->prev = nullptr;
 
@@ -498,7 +504,8 @@ static struct string_block* string_block_raw_new(struct lu_istate* state,
     return block;
 }
 
-struct lu_string* lu_string_concat(struct lu_istate* state, struct lu_value lhs,
+struct lu_string* lu_string_concat(struct lu_istate* state,
+                                   struct lu_value lhs,
                                    struct lu_value rhs) {
     struct lu_string* lhs_str = nullptr;
     struct lu_string* rhs_str = nullptr;
@@ -519,11 +526,9 @@ struct lu_string* lu_string_concat(struct lu_istate* state, struct lu_value lhs,
     struct string_block* block = string_block_raw_new(state, len);
 
     memcpy(block->data, lu_string_get_cstring(lhs_str), lhs_str->length);
-    memcpy(block->data + lhs_str->length, lu_string_get_cstring(rhs_str),
-           rhs_str->length);
+    memcpy(block->data + lhs_str->length, lu_string_get_cstring(rhs_str), rhs_str->length);
 
-    struct lu_string* str =
-        lu_object_new_sized(state, sizeof(struct lu_string));
+    struct lu_string* str = lu_object_new_sized(state, sizeof(struct lu_string));
     str->block = block;
     str->length = len;
     str->vtable = &lu_string_vtable;
@@ -534,17 +539,37 @@ struct lu_string* lu_string_concat(struct lu_istate* state, struct lu_value lhs,
     return str;
 }
 
+struct lu_value lu_string_subscr(struct lu_vm* vm, struct lu_object* obj, struct lu_value key) {
+    if (lu_is_int(key)) {
+        int64_t index = lu_as_int(key);
+        struct lu_string* str = lu_cast(struct lu_string, obj);
+        if (index < 0 || index >= str->length) {
+            // TODO: add more context to the message.
+            lu_raise_error(vm->istate, "Index out of bounds");
+            return lu_value_undefined();
+        }
+        char c[2] = {'\0', '\0'};
+        if (str->type == STRING_SMALL || str->type == STRING_SMALL_INTERNED) {
+            c[0] = str->Sms[index];
+        } else {
+            c[0] = str->block->data[index];
+        }
+        return lu_value_object(lu_string_new(vm->istate, c));
+    }
+    return lu_object_subscr(vm, obj, key);
+}
+
 struct lu_function* lu_function_new(struct lu_istate* state,
                                     struct lu_string* name,
                                     struct lu_module* module,
                                     struct executable* executable) {
-    struct lu_function* func =
-        lu_object_new_sized(state, sizeof(struct lu_function));
+    struct lu_function* func = lu_object_new_sized(state, sizeof(struct lu_function));
     func->type = FUNCTION_USER;
     func->name = name;
     func->module = module;
     func->executable = executable;
     func->vtable = &lu_function_vtable;
+    func->param_count = executable->param_count;
 
     return func;
 }
@@ -553,8 +578,7 @@ struct lu_function* lu_native_function_new(struct lu_istate* state,
                                            struct lu_string* name,
                                            native_func_t native_func,
                                            size_t param_count) {
-    struct lu_function* func =
-        lu_object_new_sized(state, sizeof(struct lu_function));
+    struct lu_function* func = lu_object_new_sized(state, sizeof(struct lu_function));
     func->type = FUNCTION_NATIVE;
     func->name = name;
     func->func = native_func;
@@ -565,8 +589,7 @@ struct lu_function* lu_native_function_new(struct lu_istate* state,
 }
 
 struct lu_array* lu_array_new(struct lu_istate* state) {
-    struct lu_array* array =
-        lu_object_new_sized(state, sizeof(struct lu_array));
+    struct lu_array* array = lu_object_new_sized(state, sizeof(struct lu_array));
     array->capacity = 4;
     array->size = 0;
     array->vtable = &lu_array_vtable;
@@ -578,8 +601,7 @@ struct lu_array* lu_array_new(struct lu_istate* state) {
 void lu_array_push(struct lu_array* array, struct lu_value value) {
     if (array->size + 1 >= array->capacity) {
         array->capacity *= 2;
-        array->elements =
-            realloc(array->elements, array->capacity * sizeof(struct lu_value));
+        array->elements = realloc(array->elements, array->capacity * sizeof(struct lu_value));
     }
     array->elements[array->size++] = value;
 }
@@ -600,27 +622,59 @@ int lu_array_set(struct lu_array* array, size_t index, struct lu_value value) {
     return 0;
 }
 
-struct lu_module* lu_module_new(struct lu_istate* state, struct lu_string* name,
+struct lu_value lu_array_subscr(struct lu_vm* vm, struct lu_object* obj, struct lu_value key) {
+    if (lu_is_int(key)) {
+        int64_t index = lu_as_int(key);
+        struct lu_array* array = lu_cast(struct lu_array, obj);
+        if (index < 0 || index >= array->size) {
+            // TODO: add more context to the message.
+            lu_raise_error(vm->istate, "Index out of bounds");
+            return lu_value_undefined();
+        }
+
+        return lu_array_get(array, index);
+    }
+    return lu_object_subscr(vm, obj, key);
+}
+
+struct lu_module* lu_module_new(struct lu_istate* state,
+                                struct lu_string* name,
                                 struct ast_program* program) {
-    struct lu_module* mod =
-        lu_object_new_sized(state, sizeof(struct lu_module));
+    struct lu_module* mod = lu_object_new_sized(state, sizeof(struct lu_module));
     mod->program = *program;
     mod->name = name;
     mod->type = MODULE_USER;
     mod->vtable = &lu_module_vtable;
-    mod->exported = lu_value_undefined();
+    mod->exported = lu_value_none();
 
     return mod;
 }
 
-static void extract_source_line_info(struct lu_istate* state, struct span* loc,
+struct lu_module* lu_native_module_new(struct lu_istate* state,
+                                       struct lu_string* name,
+                                       void* module_handle) {
+    //
+    struct lu_module* mod = lu_object_new_sized(state, sizeof(struct lu_module));
+    mod->module_handle = module_handle;
+    mod->name = name;
+    mod->type = MODULE_NATIVE;
+    mod->vtable = &lu_module_vtable;
+    mod->exported = lu_value_none();
+
+    return mod;
+}
+
+static void extract_source_line_info(struct lu_istate* state,
+                                     struct span* loc,
                                      size_t* line_start_offset,
                                      size_t* line_length) {
     int64_t line_start = loc->start, line_end = loc->end;
     const char* source = state->running_module->program.source;
     size_t source_length = state->running_module->program.source_length;
-    while (line_start > 0 && source[line_start - 1] != '\n') line_start--;
-    while (line_end < source_length && source[line_end] != '\n') line_end++;
+    while (line_start > 0 && source[line_start - 1] != '\n')
+        line_start--;
+    while (line_end < source_length && source[line_end] != '\n')
+        line_end++;
     *line_length = line_end - line_start;
     *line_start_offset = line_start;
 }
@@ -633,13 +687,11 @@ void lu_raise_error(struct lu_istate* state, char* message) {
     struct strbuf sb;
     strbuf_init_static(&sb, buffer, sizeof(buffer));
 
-    lu_obj_set(error, state->names.message,
-               lu_value_object(lu_string_new(state, message)));
+    lu_obj_set(error, state->names.message, lu_value_object(lu_string_new(state, message)));
 
     size_t line_start_offset, line_length;
     extract_source_line_info(state, loc, &line_start_offset, &line_length);
-    const char* src_line_start =
-        state->running_module->program.source + line_start_offset;
+    const char* src_line_start = state->running_module->program.source + line_start_offset;
 
     strbuf_append(&sb, "  | \n");
     strbuf_appendf(&sb, "%d | ", loc->line);
@@ -656,20 +708,16 @@ void lu_raise_error(struct lu_istate* state, char* message) {
     }
     strbuf_appendf(&sb, "%s\n", reset);
 
-    strbuf_appendf(&sb, "%sTraceback (most recent call first):\n%s", YEL,
-                   reset);
+    strbuf_appendf(&sb, "%sTraceback (most recent call first):\n%s", YEL, reset);
     for (size_t i = state->vm->rp; i > 0; i--) {
         struct activation_record* record = &state->vm->records[i - 1];
-        struct span* span =
-            &record->executable->instructions_span[record->ip - 1];
+        struct span* span = &record->executable->instructions_span[record->ip - 1];
         strbuf_appendf(&sb, "\tat %s%s%s (%s%s:%d:%d%s)\n", BLU,
-                       lu_string_get_cstring(record->executable->name), reset,
-                       BLU, record->executable->file_path, span->line,
-                       span->col, reset);
+                       lu_string_get_cstring(record->executable->name), reset, BLU,
+                       record->executable->file_path, span->line, span->col, reset);
     }
 
-    lu_obj_set(error, state->names.traceback,
-               lu_value_object(lu_string_new(state, buffer)));
+    lu_obj_set(error, state->names.traceback, lu_value_object(lu_string_new(state, buffer)));
 
     state->error_location = *loc;
     state->error = error;
@@ -708,7 +756,8 @@ static void lu_objectset_resize(struct lu_objectset* set, size_t new_cap) {
         if (key) {
             size_t mask = new_cap - 1;
             size_t idx = lu_ptr_hash(key) & mask;
-            while (set->entries[idx]) idx = (idx + 1) & mask;
+            while (set->entries[idx])
+                idx = (idx + 1) & mask;
             set->entries[idx] = key;
             set->size++;
         }
@@ -718,7 +767,8 @@ static void lu_objectset_resize(struct lu_objectset* set, size_t new_cap) {
 }
 
 bool lu_objectset_add(struct lu_objectset* set, struct lu_object* key) {
-    if (!key) return false;
+    if (!key)
+        return false;
     if (((float)(set->size + 1) / set->capacity) >= LU_PROPERTY_MAP_LOAD_FACTOR)
         lu_objectset_resize(set, set->capacity * 2);
 
@@ -732,13 +782,15 @@ bool lu_objectset_add(struct lu_objectset* set, struct lu_object* key) {
             set->size++;
             return true;
         }
-        if (existing == key) return false;
+        if (existing == key)
+            return false;
         index = (index + 1) & mask;
     }
 }
 
 void lu_objectset_free(struct lu_objectset* set) {
-    if (!set) return;
+    if (!set)
+        return;
     free(set->entries);
     free(set);
 }

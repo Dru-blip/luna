@@ -43,7 +43,8 @@ static void skip_whitespace(struct tokenizer* t) {
                     t->col += 2;
                     while (1) {
                         c = current(t);
-                        if (c == '\n' || c == '\0') break;
+                        if (c == '\n' || c == '\0')
+                            break;
                         advance(t);
                     }
                     continue;
@@ -54,9 +55,8 @@ static void skip_whitespace(struct tokenizer* t) {
                     while (1) {
                         c = current(t);
                         if (c == '\0') {
-                            fprintf(stderr,
-                                    "Unterminated block comment at %d:%d\n",
-                                    t->line, t->col);
+                            fprintf(stderr, "Unterminated block comment at %d:%d\n", t->line,
+                                    t->col);
                             exit(1);
                         }
                         if (c == '\n') {
@@ -66,8 +66,7 @@ static void skip_whitespace(struct tokenizer* t) {
                             t->line_start = t->pos;
                             continue;
                         }
-                        if (c == '*' && t->pos + 1 < t->len &&
-                            t->src[t->pos + 1] == '/') {
+                        if (c == '*' && t->pos + 1 < t->len && t->src[t->pos + 1] == '/') {
                             advance(t);
                             advance(t);
                             break;
@@ -82,6 +81,89 @@ static void skip_whitespace(struct tokenizer* t) {
             break;
         }
     }
+}
+
+static struct token scan_string(struct tokenizer* t, char quote) {
+    advance(t);
+
+    size_t cap = 64;
+    size_t len = 0;
+    char* buf = malloc(cap);
+
+    while (true) {
+        char c = current(t);
+
+        if (c == '\0') {
+            fprintf(stderr, "Unterminated string literal at %d:%d\n", t->line, t->col);
+            exit(1);
+        }
+
+        if (c == quote)
+            break;
+        if (c == '\\') {
+            advance(t);
+            char e = current(t);
+            if (e == '\0') {
+                fprintf(stderr, "Unterminated escape sequence\n");
+                exit(1);
+            }
+
+            char decoded;
+            switch (e) {
+                case 'n':
+                    decoded = '\n';
+                    break;
+                case 't':
+                    decoded = '\t';
+                    break;
+                case 'r':
+                    decoded = '\r';
+                    break;
+                case '\\':
+                    decoded = '\\';
+                    break;
+                case '\'':
+                    decoded = '\'';
+                    break;
+                case '"':
+                    decoded = '"';
+                    break;
+                case '0':
+                    decoded = '\0';
+                    break;
+                default:
+                    decoded = e;
+                    break;
+            }
+
+            if (len + 1 >= cap) {
+                cap *= 2;
+                buf = realloc(buf, cap);
+            }
+
+            buf[len++] = decoded;
+
+            advance(t);
+            continue;
+        }
+
+        if (len + 1 >= cap) {
+            cap *= 2;
+            buf = realloc(buf, cap);
+        }
+
+        buf[len++] = c;
+        advance(t);
+    }
+
+    advance(t);
+
+    buf[len] = '\0';
+
+    struct token tok;
+    tok.kind = TOKEN_STRING;
+    tok.data.str_val = buf;
+    return tok;
 }
 
 static struct token next_token(struct tokenizer* t) {
@@ -127,38 +209,31 @@ static struct token next_token(struct tokenizer* t) {
             break;
         case '+':
             advance(t);
-            kind = (current(t) == '=') ? (advance(t), TOKEN_PLUS_EQUAL)
-                                       : TOKEN_PLUS;
+            kind = (current(t) == '=') ? (advance(t), TOKEN_PLUS_EQUAL) : TOKEN_PLUS;
             break;
         case '-':
             advance(t);
-            kind = (current(t) == '=') ? (advance(t), TOKEN_MINUS_EQUAL)
-                                       : TOKEN_MINUS;
+            kind = (current(t) == '=') ? (advance(t), TOKEN_MINUS_EQUAL) : TOKEN_MINUS;
             break;
         case '*':
             advance(t);
-            kind = (current(t) == '=') ? (advance(t), TOKEN_ASTERISK_EQUAL)
-                                       : TOKEN_ASTERISK;
+            kind = (current(t) == '=') ? (advance(t), TOKEN_ASTERISK_EQUAL) : TOKEN_ASTERISK;
             break;
         case '/':
             advance(t);
-            kind = (current(t) == '=') ? (advance(t), TOKEN_SLASH_EQUAL)
-                                       : TOKEN_SLASH;
+            kind = (current(t) == '=') ? (advance(t), TOKEN_SLASH_EQUAL) : TOKEN_SLASH;
             break;
         case '%':
             advance(t);
-            kind = (current(t) == '=') ? (advance(t), TOKEN_MODULUS_EQUAL)
-                                       : TOKEN_MODULUS;
+            kind = (current(t) == '=') ? (advance(t), TOKEN_MODULUS_EQUAL) : TOKEN_MODULUS;
             break;
         case '=':
             advance(t);
-            kind = (current(t) == '=') ? (advance(t), TOKEN_EQUAL_EQUAL)
-                                       : TOKEN_EQUAL;
+            kind = (current(t) == '=') ? (advance(t), TOKEN_EQUAL_EQUAL) : TOKEN_EQUAL;
             break;
         case '!':
             advance(t);
-            kind = (current(t) == '=') ? (advance(t), TOKEN_BANG_EQUAL)
-                                       : TOKEN_BANG;
+            kind = (current(t) == '=') ? (advance(t), TOKEN_BANG_EQUAL) : TOKEN_BANG;
             break;
         case '<':
             advance(t);
@@ -184,13 +259,11 @@ static struct token next_token(struct tokenizer* t) {
             break;
         case '&':
             advance(t);
-            kind = (current(t) == '&') ? (advance(t), TOKEN_AMPERSAND_AMPERSAND)
-                                       : TOKEN_AMPERSAND;
+            kind = (current(t) == '&') ? (advance(t), TOKEN_AMPERSAND_AMPERSAND) : TOKEN_AMPERSAND;
             break;
         case '|':
             advance(t);
-            kind = (current(t) == '|') ? (advance(t), TOKEN_PIPE_PIPE)
-                                       : TOKEN_PIPE;
+            kind = (current(t) == '|') ? (advance(t), TOKEN_PIPE_PIPE) : TOKEN_PIPE;
             break;
         case ',':
             advance(t);
@@ -204,53 +277,42 @@ static struct token next_token(struct tokenizer* t) {
             advance(t);
             kind = TOKEN_COLON;
             break;
+
+        case '\'': {
+            struct token token = scan_string(t, '\'');
+            token.span = start;
+            token.span.end = t->pos;
+            return token;
+        }
         case '"': {
-            advance(t);
-            const char* start = t->src + t->pos;
-
-            while (true) {
-                char c = current(t);
-                if (c == '"') {
-                    break;
-                } else if (c == '\\') {
-                    advance(t);
-                    if (current(t) == '\0') {
-                        fprintf(
-                            stderr,
-                            "Unterminated escape sequence at line %d, col %d\n",
-                            t->line, t->col);
-                        exit(1);
-                    }
-                    advance(t);
-                } else if (c == '\0') {
-                    fprintf(stderr,
-                            "Unterminated string literal starting at line %d, "
-                            "col %d\n",
-                            t->line, t->col);
-                    exit(1);
-                } else {
-                    advance(t);
-                }
-            }
-
-            kind = TOKEN_STRING;
-            data.str_val = start;
-
-            advance(t);
-            break;
+            struct token token = scan_string(t, '"');
+            token.span = start;
+            token.span.end = t->pos;
+            return token;
         }
         default:
             if (isdigit(c)) {
                 size_t start_pos = t->pos;
-                while (isdigit(current(t))) advance(t);
+                kind = TOKEN_INTEGER;
+                while (isdigit(current(t)))
+                    advance(t);
+                if (current(t) == '.') {
+                    advance(t);
+                    while (isdigit(current(t)))
+                        advance(t);
+                    kind = TOKEN_FLOAT;
+                }
                 size_t len = t->pos - start_pos;
                 char* num_str = strndup(t->src + start_pos, len);
-                data.int_val = strtoll(num_str, nullptr, 10);
+                if (kind == TOKEN_INTEGER)
+                    data.int_val = strtoll(num_str, nullptr, 10);
+                else
+                    data.float_val = strtod(num_str, nullptr);
                 free(num_str);
-                kind = TOKEN_INTEGER;
-            } else if (isalpha(c) || c == '_') {
+            } else if (isalpha(c) || c == '_' || c=='@') {
                 size_t start_pos = t->pos;
-                while (isalnum(current(t)) || current(t) == '_') advance(t);
+                while (isalnum(current(t)) || current(t) == '_' || current(t) == '@')
+                    advance(t);
                 size_t len = t->pos - start_pos;
                 char* ident = strndup(t->src + start_pos, len);
                 kind = lookup_keyword(ident);
@@ -281,7 +343,8 @@ struct token* tokenize(const char* source) {
     while (tokenizer.pos <= tokenizer.len) {
         struct token tok = next_token(&tokenizer);
         arrput(tokens, tok);
-        if (tok.kind == TOKEN_EOF) break;
+        if (tok.kind == TOKEN_EOF)
+            break;
     }
 
     return tokens;

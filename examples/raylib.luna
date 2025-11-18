@@ -1,0 +1,15 @@
+let rl=load("raylib")
+
+rl.initWindow(800, 600, "Raylib Example")
+
+loop{
+    if(rl.windowShouldClose()){
+        break
+    }
+    rl.beginDrawing()
+    rl.clearBackground(rl.ORANGE)
+    rl.endDrawing()
+}
+
+
+rl.closeWindow()

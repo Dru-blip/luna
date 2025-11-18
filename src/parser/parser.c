@@ -18,8 +18,7 @@ static struct operator operators[] = {
     {OPERATOR_ASSIGN, TOKEN_EQUAL, 1, 1, OP_ASSIGN_SIMPLE, AST_NODE_ASSIGN},
 
     {OPERATOR_INFIX, TOKEN_PIPE_PIPE, 15, 16, OP_LOR, AST_NODE_BINOP},
-    {OPERATOR_INFIX, TOKEN_AMPERSAND_AMPERSAND, 18, 19, OP_LAND,
-     AST_NODE_BINOP},
+    {OPERATOR_INFIX, TOKEN_AMPERSAND_AMPERSAND, 18, 19, OP_LAND, AST_NODE_BINOP},
 
     {OPERATOR_INFIX, TOKEN_EQUAL_EQUAL, 35, 36, OP_EQ, AST_NODE_BINOP},
     {OPERATOR_INFIX, TOKEN_BANG_EQUAL, 35, 36, OP_NEQ, AST_NODE_BINOP},
@@ -40,12 +39,10 @@ static struct operator operators[] = {
 
     {OPERATOR_POSTFIX, TOKEN_LPAREN, 99, 100, OP_CALL, AST_NODE_CALL},
     {OPERATOR_POSTFIX, TOKEN_DOT, 99, 100, OP_MEMBER, AST_NODE_MEMBER_EXPR},
-    {OPERATOR_POSTFIX, TOKEN_LBRACKET, 99, 100, OP_COMPUTED_MEMBER,
-     AST_NODE_COMPUTED_MEMBER_EXPR},
+    {OPERATOR_POSTFIX, TOKEN_LBRACKET, 99, 100, OP_COMPUTED_MEMBER, AST_NODE_COMPUTED_MEMBER_EXPR},
 };
 
-static const uint32_t operator_table_len =
-    sizeof(operators) / sizeof(operators[0]);
+static const uint32_t operator_table_len = sizeof(operators) / sizeof(operators[0]);
 
 static bool is_valid_operator(struct operator** opinfo, enum token_kind kind) {
     for (uint32_t i = 0; i < operator_table_len; i++) {
@@ -58,9 +55,9 @@ static bool is_valid_operator(struct operator** opinfo, enum token_kind kind) {
 }
 
 static struct ast_node* make_node(struct parser* parser,
-                                  enum ast_node_kind kind, struct span span) {
-    struct ast_node* node =
-        arena_alloc(&parser->allocator, sizeof(struct ast_node));
+                                  enum ast_node_kind kind,
+                                  struct span span) {
+    struct ast_node* node = arena_alloc(&parser->allocator, sizeof(struct ast_node));
     node->kind = kind;
     node->span = span;
     return node;
@@ -84,8 +81,7 @@ static struct token* parser_eat(struct parser* parser) {
     return tok;
 }
 
-static struct token* parse_expected(struct parser* parser,
-                                    enum token_kind kind) {
+static struct token* parse_expected(struct parser* parser, enum token_kind kind) {
     if (parser->cur_token->kind != kind) {
         printf("expected %s\n", token_labels[kind]);
         exit(EXIT_FAILURE);
@@ -102,37 +98,36 @@ static struct ast_node* parse_primary_expression(struct parser* parser) {
 
     switch (token->kind) {
         case TOKEN_INTEGER: {
-            struct ast_node* node =
-                make_node(parser, AST_NODE_INT, token->span);
+            struct ast_node* node = make_node(parser, AST_NODE_INT, token->span);
             node->data.int_val = token->data.int_val;
+            return node;
+        }
+        case TOKEN_FLOAT: {
+            struct ast_node* node = make_node(parser, AST_NODE_FLOAT, token->span);
+            node->data.float_val = token->data.float_val;
             return node;
         }
         case TOKEN_KEYWORD_TRUE:
         case TOKEN_KEYWORD_FALSE: {
-            struct ast_node* node =
-                make_node(parser, AST_NODE_BOOL, token->span);
+            struct ast_node* node = make_node(parser, AST_NODE_BOOL, token->span);
             node->data.int_val = token->kind == TOKEN_KEYWORD_TRUE;
             return node;
         }
         case TOKEN_IDENTIFIER: {
-            struct ast_node* node =
-                make_node(parser, AST_NODE_IDENTIFIER, token->span);
+            struct ast_node* node = make_node(parser, AST_NODE_IDENTIFIER, token->span);
             return node;
         }
         case TOKEN_STRING: {
-            struct ast_node* node =
-                make_node(parser, AST_NODE_STR, token->span);
+            struct ast_node* node = make_node(parser, AST_NODE_STR, token->span);
             node->data.id = token->data.str_val;
             return node;
         }
         case TOKEN_KEYWORD_SELF: {
-            struct ast_node* node =
-                make_node(parser, AST_NODE_SELF_EXPR, token->span);
+            struct ast_node* node = make_node(parser, AST_NODE_SELF_EXPR, token->span);
             return node;
         }
         case TOKEN_KEYWORD_NONE: {
-            struct ast_node* node =
-                make_node(parser, AST_NODE_NONE, token->span);
+            struct ast_node* node = make_node(parser, AST_NODE_NONE, token->span);
             return node;
         }
         default: {
@@ -149,8 +144,8 @@ static struct ast_node* parse_prefix_expression(struct parser* parser) {
         case TOKEN_MINUS: {
             parser_advance(parser);
             struct ast_node* argument = parse_expression(parser, 0);
-            struct ast_node* node = make_node(
-                parser, AST_NODE_UNOP, SPAN_MERGE(token->span, argument->span));
+            struct ast_node* node =
+                make_node(parser, AST_NODE_UNOP, SPAN_MERGE(token->span, argument->span));
             node->data.unop = (struct ast_unop){
                 .op = token->kind == TOKEN_PLUS ? OP_UPLUS : OP_NEGATE,
                 .is_prefix = true,
@@ -161,8 +156,8 @@ static struct ast_node* parse_prefix_expression(struct parser* parser) {
         case TOKEN_BANG: {
             parser_advance(parser);
             struct ast_node* argument = parse_expression(parser, 0);
-            struct ast_node* node = make_node(
-                parser, AST_NODE_UNOP, SPAN_MERGE(token->span, argument->span));
+            struct ast_node* node =
+                make_node(parser, AST_NODE_UNOP, SPAN_MERGE(token->span, argument->span));
             node->data.unop = (struct ast_unop){
                 .op = OP_LNOT,
                 .is_prefix = true,
@@ -180,9 +175,8 @@ static struct ast_node* parse_prefix_expression(struct parser* parser) {
                 }
                 arrput(elements, element);
             }
-            struct ast_node* node =
-                make_node(parser, AST_NODE_ARRAY_EXPR,
-                          SPAN_MERGE(token->span, parser->cur_token->span));
+            struct ast_node* node = make_node(parser, AST_NODE_ARRAY_EXPR,
+                                              SPAN_MERGE(token->span, parser->cur_token->span));
             parse_expected(parser, TOKEN_RBRACKET);
             node->data.list = elements;
             return node;
@@ -213,9 +207,8 @@ static struct ast_node* parse_prefix_expression(struct parser* parser) {
                 };
                 arrput(properties, property);
             }
-            struct ast_node* node =
-                make_node(parser, AST_NODE_OBJECT_EXPR,
-                          SPAN_MERGE(token->span, parser->cur_token->span));
+            struct ast_node* node = make_node(parser, AST_NODE_OBJECT_EXPR,
+                                              SPAN_MERGE(token->span, parser->cur_token->span));
             parse_expected(parser, TOKEN_RBRACE);
             node->data.list = properties;
             return node;
@@ -225,8 +218,8 @@ static struct ast_node* parse_prefix_expression(struct parser* parser) {
             struct ast_node** params = nullptr;
             parse_param_list(parser, &params);
             struct ast_node* body = parse_stmt(parser);
-            struct ast_node* node = make_node(
-                parser, AST_NODE_FN_EXPR, SPAN_MERGE(token->span, body->span));
+            struct ast_node* node =
+                make_node(parser, AST_NODE_FN_EXPR, SPAN_MERGE(token->span, body->span));
             node->data.fn_decl = (struct ast_fn_decl){
                 .params = params,
                 .body = body,
@@ -239,8 +232,7 @@ static struct ast_node* parse_prefix_expression(struct parser* parser) {
     }
 }
 
-static void parse_call_args(struct parser* parser, uint8_t* argc,
-                            struct ast_node*** args) {
+static void parse_call_args(struct parser* parser, uint8_t* argc, struct ast_node*** args) {
     while (!check(parser, TOKEN_RPAREN)) {
         struct ast_node* arg = parse_expression(parser, 0);
         if (check(parser, TOKEN_COMMA)) {
@@ -260,8 +252,7 @@ static struct ast_node* parse_postfix_expression(struct parser* parser,
         uint8_t argc = 0;
         parse_call_args(parser, &argc, &args);
         struct ast_node* call =
-            make_node(parser, AST_NODE_CALL,
-                      SPAN_MERGE(lhs->span, parser->cur_token->span));
+            make_node(parser, AST_NODE_CALL, SPAN_MERGE(lhs->span, parser->cur_token->span));
         call->data.call = (struct ast_call){
             .callee = lhs,
             .argc = argc,
@@ -273,8 +264,7 @@ static struct ast_node* parse_postfix_expression(struct parser* parser,
     if (op == OP_MEMBER) {
         struct token* property_token = parse_expected(parser, TOKEN_IDENTIFIER);
         struct ast_node* member_expr =
-            make_node(parser, AST_NODE_MEMBER_EXPR,
-                      SPAN_MERGE(lhs->span, property_token->span));
+            make_node(parser, AST_NODE_MEMBER_EXPR, SPAN_MERGE(lhs->span, property_token->span));
         member_expr->data.member_expr = (struct ast_member_expr){
             .object = lhs,
             .property_name = property_token->span,
@@ -284,9 +274,8 @@ static struct ast_node* parse_postfix_expression(struct parser* parser,
 
     if (op == OP_COMPUTED_MEMBER) {
         struct ast_node* property = parse_expression(parser, 0);
-        struct ast_node* member_expr =
-            make_node(parser, AST_NODE_COMPUTED_MEMBER_EXPR,
-                      SPAN_MERGE(lhs->span, parser->cur_token->span));
+        struct ast_node* member_expr = make_node(parser, AST_NODE_COMPUTED_MEMBER_EXPR,
+                                                 SPAN_MERGE(lhs->span, parser->cur_token->span));
         parse_expected(parser, TOKEN_RBRACKET);
         member_expr->data.pair = (struct ast_pair){
             .fst = lhs,
@@ -303,17 +292,18 @@ static struct ast_node* parse_expression(struct parser* parser, int8_t mbp) {
     while (true) {
         struct operator* op = nullptr;
         struct token* token = current_token(parser);
-        if (!is_valid_operator(&op, token->kind)) break;
+        if (!is_valid_operator(&op, token->kind))
+            break;
 
-        if (op->lbp < mbp) break;
+        if (op->lbp < mbp)
+            break;
         parser_advance(parser);
         if (op->kind == OPERATOR_POSTFIX) {
             lhs = parse_postfix_expression(parser, op->op, token, lhs);
             continue;
         }
         struct ast_node* rhs = parse_expression(parser, op->rbp);
-        struct ast_node* bin =
-            make_node(parser, op->node_kind, SPAN_MERGE(lhs->span, rhs->span));
+        struct ast_node* bin = make_node(parser, op->node_kind, SPAN_MERGE(lhs->span, rhs->span));
         bin->data.binop = (struct ast_binop){
             .lhs = lhs,
             .op = op->op,
@@ -327,8 +317,8 @@ static struct ast_node* parse_expression(struct parser* parser, int8_t mbp) {
 static struct ast_node* parse_return(struct parser* parser) {
     struct token* ret_token = parser_eat(parser);
     struct ast_node* expr = parse_expression(parser, 0);
-    struct ast_node* node = make_node(parser, AST_NODE_RETURN,
-                                      SPAN_MERGE(ret_token->span, expr->span));
+    struct ast_node* node =
+        make_node(parser, AST_NODE_RETURN, SPAN_MERGE(ret_token->span, expr->span));
     node->data.node = expr;
     return node;
 }
@@ -337,13 +327,13 @@ static struct ast_node* parse_block(struct parser* parser) {
     struct token* token = parse_expected(parser, TOKEN_LBRACE);
     struct ast_node** stmts = nullptr;
     while (!check(parser, TOKEN_RBRACE)) {
-        if (check(parser, TOKEN_EOF)) exit(EXIT_FAILURE);
+        if (check(parser, TOKEN_EOF))
+            exit(EXIT_FAILURE);
         struct ast_node* stmt = parse_stmt(parser);
         arrput(stmts, stmt);
     }
     struct ast_node* node =
-        make_node(parser, AST_NODE_BLOCK,
-                  SPAN_MERGE(token->span, parser->cur_token->span));
+        make_node(parser, AST_NODE_BLOCK, SPAN_MERGE(token->span, parser->cur_token->span));
     node->data.list = stmts;
     parse_expected(parser, TOKEN_RBRACE);
     return node;
@@ -353,19 +343,21 @@ static struct ast_node* parse_if_stmt(struct parser* parser) {
     // TODO: flatten the if else if recursive chains into array of if
     // statements.
     struct token* token = parser_eat(parser);
-    if (check(parser, TOKEN_LPAREN)) parser_advance(parser);
+    if (check(parser, TOKEN_LPAREN))
+        parser_advance(parser);
     struct ast_node* test = parse_expression(parser, 0);
-    if (check(parser, TOKEN_RPAREN)) parser_advance(parser);
+    if (check(parser, TOKEN_RPAREN))
+        parser_advance(parser);
     struct ast_node* consequent = parse_stmt(parser);
     struct ast_node* alternate = nullptr;
     if (check(parser, TOKEN_KEYWORD_ELSE)) {
         parser_advance(parser);
-        if (check(parser, TOKEN_EOF)) exit(EXIT_FAILURE);
+        if (check(parser, TOKEN_EOF))
+            exit(EXIT_FAILURE);
         alternate = parse_stmt(parser);
     }
     struct ast_node* node =
-        make_node(parser, AST_NODE_IF_STMT,
-                  SPAN_MERGE(token->span, parser->cur_token->span));
+        make_node(parser, AST_NODE_IF_STMT, SPAN_MERGE(token->span, parser->cur_token->span));
     node->data.if_stmt = (struct ast_if_stmt){
         .test = test,
         .consequent = consequent,
@@ -387,20 +379,22 @@ static struct ast_node* parse_continue_stmt(struct parser* parser) {
 static struct ast_node* parse_loop_stmt(struct parser* parser) {
     struct token* token = parser_eat(parser);
     struct ast_node* body = parse_stmt(parser);
-    struct ast_node* node = make_node(parser, AST_NODE_LOOP_STMT,
-                                      SPAN_MERGE(token->span, body->span));
+    struct ast_node* node =
+        make_node(parser, AST_NODE_LOOP_STMT, SPAN_MERGE(token->span, body->span));
     node->data.node = body;
     return node;
 }
 
 static struct ast_node* parse_while_stmt(struct parser* parser) {
     struct token* token = parser_eat(parser);
-    if (check(parser, TOKEN_LPAREN)) parser_advance(parser);
+    if (check(parser, TOKEN_LPAREN))
+        parser_advance(parser);
     struct ast_node* test = parse_expression(parser, 0);
-    if (check(parser, TOKEN_RPAREN)) parser_advance(parser);
+    if (check(parser, TOKEN_RPAREN))
+        parser_advance(parser);
     struct ast_node* body = parse_stmt(parser);
-    struct ast_node* node = make_node(parser, AST_NODE_WHILE_STMT,
-                                      SPAN_MERGE(token->span, body->span));
+    struct ast_node* node =
+        make_node(parser, AST_NODE_WHILE_STMT, SPAN_MERGE(token->span, body->span));
     node->data.pair = (struct ast_pair){.fst = test, .snd = body};
     return node;
 }
@@ -422,8 +416,8 @@ static struct ast_node* parse_for_stmt(struct parser* parser) {
 
     parse_expected(parser, TOKEN_RPAREN);
     struct ast_node* body = parse_stmt(parser);
-    struct ast_node* node = make_node(parser, AST_NODE_FOR_STMT,
-                                      SPAN_MERGE(token->span, body->span));
+    struct ast_node* node =
+        make_node(parser, AST_NODE_FOR_STMT, SPAN_MERGE(token->span, body->span));
     if (right) {
         node->kind = AST_NODE_FOR_IN_STMT;
         node->data.for_in_stmt = (struct ast_for_in_stmt){
@@ -457,7 +451,7 @@ static struct ast_node* parse_let_decl(struct parser* parser) {
         span = SPAN_MERGE(token->span, value->span);
     }
 
-    struct ast_node* node = make_node(parser, AST_NODE_LET_DECL,span);
+    struct ast_node* node = make_node(parser, AST_NODE_LET_DECL, span);
     node->data.let_decl = (struct ast_let_decl){
         .name_span = id->span,
         .value = value,
@@ -469,9 +463,9 @@ static void parse_param_list(struct parser* parser, struct ast_node*** params) {
     parse_expected(parser, TOKEN_LPAREN);
     while (!check(parser, TOKEN_RPAREN)) {
         struct token* param_id = parse_expected(parser, TOKEN_IDENTIFIER);
-        struct ast_node* param =
-            make_node(parser, AST_NODE_PARAM, param_id->span);
-        if (check(parser, TOKEN_COMMA)) parser_advance(parser);
+        struct ast_node* param = make_node(parser, AST_NODE_PARAM, param_id->span);
+        if (check(parser, TOKEN_COMMA))
+            parser_advance(parser);
         arrput(*params, param);
     }
     parse_expected(parser, TOKEN_RPAREN);
@@ -483,8 +477,8 @@ static struct ast_node* parse_fn_decl(struct parser* parser) {
     struct ast_node** params = nullptr;
     parse_param_list(parser, &params);
     struct ast_node* body = parse_stmt(parser);
-    struct ast_node* node = make_node(parser, AST_NODE_FN_DECL,
-                                      SPAN_MERGE(token->span, body->span));
+    struct ast_node* node =
+        make_node(parser, AST_NODE_FN_DECL, SPAN_MERGE(token->span, body->span));
     node->data.fn_decl = (struct ast_fn_decl){
         .name_span = id->span,
         .params = params,
@@ -519,8 +513,7 @@ static struct ast_node* parse_stmt(struct parser* parser) {
         default: {
             struct ast_node* expr = parse_expression(parser, 0);
             struct ast_node* node =
-                make_node(parser, AST_NODE_EXPR_STMT,
-                          SPAN_MERGE(token->span, expr->span));
+                make_node(parser, AST_NODE_EXPR_STMT, SPAN_MERGE(token->span, expr->span));
             node->data.node = expr;
             return node;
         }
