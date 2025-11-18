@@ -25,7 +25,6 @@ struct lu_vm* lu_vm_new(struct lu_istate* istate) {
 }
 
 void lu_vm_destroy(struct lu_vm* vm) {
-    //
     free(vm);
 }
 
@@ -41,19 +40,6 @@ static void lu_vm_push_new_record_with_globals(struct lu_vm* vm,
     record.max_register_count = executable->max_register_count;
     record.registers = nullptr;
     arrsetlen(record.registers, record.max_register_count);
-
-    arrput(vm->records, record);
-    vm->rp++;
-}
-
-static void lu_vm_push_new_native_record_with_globals(struct lu_vm* vm,
-                                                      struct lu_globals* globals,
-                                                      struct span* span) {
-    struct activation_record record;
-    record.type = ACTIVATION_RECORD_TYPE_NATIVE;
-    record.native_call_site = *span;
-
-    record.globals = globals;
 
     arrput(vm->records, record);
     vm->rp++;

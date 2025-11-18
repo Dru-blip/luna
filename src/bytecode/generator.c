@@ -694,7 +694,6 @@ static inline uint32_t generate_function_expr(struct generator* generator, struc
 }
 
 static uint32_t generate_object_expr(struct generator* generator, struct ast_node* expr) {
-    //
     uint32_t dst_reg = generator_allocate_register(generator);
 
     struct instruction new_object_instr = {.opcode = OPCODE_NEW_OBJECT, .destination_reg = dst_reg};
