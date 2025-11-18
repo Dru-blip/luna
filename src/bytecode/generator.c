@@ -667,6 +667,12 @@ static inline uint32_t generate_function_expr(struct generator* generator, struc
     generator_switch_basic_block(generator, fn_entry_block);
     generate_stmt(generator, expr->data.fn_decl.body);
 
+    uint32_t none_reg = generator_allocate_register(generator);
+    struct instruction none_instr = {.opcode = OPCODE_LOAD_NONE, .destination_reg = none_reg};
+    struct instruction instr = {.opcode = OPCODE_RET, .destination_reg = none_reg};
+    emit_instruction(generator, none_instr, expr->span);
+    emit_instruction(generator, instr, expr->span);
+
     struct executable* fn_executable = generator_make_executable(generator);
     fn_executable->param_count = num_params;
     fn_executable->name = name_string;
@@ -1064,7 +1070,6 @@ static inline void generate_fn_decl(struct generator* generator, struct ast_node
     struct instruction none_instr = {.opcode = OPCODE_LOAD_NONE, .destination_reg = none_reg};
     struct instruction instr = {.opcode = OPCODE_RET, .destination_reg = none_reg};
     emit_instruction(generator, none_instr, stmt->span);
-
     emit_instruction(generator, instr, stmt->span);
 
     struct executable* fn_executable = generator_make_executable(generator);

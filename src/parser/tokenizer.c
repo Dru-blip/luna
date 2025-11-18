@@ -309,9 +309,9 @@ static struct token next_token(struct tokenizer* t) {
                 else
                     data.float_val = strtod(num_str, nullptr);
                 free(num_str);
-            } else if (isalpha(c) || c == '_') {
+            } else if (isalpha(c) || c == '_' || c=='@') {
                 size_t start_pos = t->pos;
-                while (isalnum(current(t)) || current(t) == '_')
+                while (isalnum(current(t)) || current(t) == '_' || current(t) == '@')
                     advance(t);
                 size_t len = t->pos - start_pos;
                 char* ident = strndup(t->src + start_pos, len);
