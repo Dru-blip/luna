@@ -560,18 +560,29 @@ static inline uint32_t load_callee_by_name(struct generator* generator, struct a
     // ---------------------------------------------------
 }
 
-static inline uint32_t generate_subscript_expr(struct generator* generator, struct ast_node* expr) {
+static inline uint32_t generate_subscript_expr(struct generator* generator,
+                                               struct ast_node* expr,
+                                               uint32_t* self_reg) {
+    uint32_t obj_reg = generate_expr(generator, expr->data.pair.fst);
+    if (self_reg) {
+        *self_reg = obj_reg;
+    }
     struct instruction instr = {
         .opcode = OPCODE_LOAD_SUBSCR,
         .binary_op.result_reg = generator_allocate_register(generator),
-        .binary_op.left_reg = generate_expr(generator, expr->data.pair.fst),
+        .binary_op.left_reg = obj_reg,
         .binary_op.right_reg = generate_expr(generator, expr->data.pair.snd)};
     emit_instruction(generator, instr, expr->span);
     return instr.binary_op.result_reg;
 }
 
-static uint32_t generate_member_expr(struct generator* generator, struct ast_node* expr) {
+static uint32_t generate_member_expr(struct generator* generator,
+                                     struct ast_node* expr,
+                                     uint32_t* self_reg) {
     uint32_t obj = generate_expr(generator, expr->data.member_expr.object);
+    if (self_reg) {
+        *self_reg = obj;
+    }
     uint32_t dst_reg = generator_allocate_register(generator);
     char* name = generator->program.source + expr->data.member_expr.property_name.start;
     uint32_t name_len =
@@ -608,16 +619,13 @@ static inline uint32_t generate_call_expr(struct generator* generator, struct as
             break;
         }
         case AST_NODE_COMPUTED_MEMBER_EXPR: {
-            call_instr.call.self_reg =
-                generate_expr(generator, expr->data.call.callee->data.pair.fst);
-            call_instr.call.callee_reg = generate_subscript_expr(generator, expr->data.call.callee);
+            call_instr.call.callee_reg = generate_subscript_expr(generator, expr->data.call.callee,
+                                                                 &call_instr.call.self_reg);
             break;
         }
         case AST_NODE_MEMBER_EXPR: {
-            uint32_t object_reg =
-                generate_expr(generator, expr->data.call.callee->data.member_expr.object);
-            call_instr.call.callee_reg = generate_member_expr(generator, expr->data.call.callee);
-            call_instr.call.self_reg = object_reg;
+            call_instr.call.callee_reg =
+                generate_member_expr(generator, expr->data.call.callee, &call_instr.call.self_reg);
             break;
         }
         default: {
@@ -763,10 +771,10 @@ static uint32_t generate_expr(struct generator* generator, struct ast_node* expr
             return generate_call_expr(generator, expr);
         }
         case AST_NODE_MEMBER_EXPR: {
-            return generate_member_expr(generator, expr);
+            return generate_member_expr(generator, expr, nullptr);
         }
         case AST_NODE_COMPUTED_MEMBER_EXPR: {
-            return generate_subscript_expr(generator, expr);
+            return generate_subscript_expr(generator, expr, nullptr);
         }
         case AST_NODE_FN_EXPR: {
             return generate_function_expr(generator, expr);
