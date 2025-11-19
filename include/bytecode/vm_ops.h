@@ -1,5 +1,6 @@
 #include <stdio.h>
 
+#include "luna.h"
 #include "value.h"
 #include "vm.h"
 
@@ -14,7 +15,9 @@
     lu_raise_error(vm->istate, buffer);                                                          \
     return lu_value_none();
 
-static inline struct lu_value lu_vm_op_add(struct lu_vm* vm, struct lu_value a, struct lu_value b) {
+ALWAYS_INLINE static inline struct lu_value lu_vm_op_add(struct lu_vm* vm,
+                                                         struct lu_value a,
+                                                         struct lu_value b) {
     if (IS_NUMERIC(a) && IS_NUMERIC(b)) {
         return lu_value_int(a.integer + b.integer);
     }
@@ -26,7 +29,9 @@ static inline struct lu_value lu_vm_op_add(struct lu_vm* vm, struct lu_value a, 
     RAISE_TYPE_ERROR(vm, "+", a, b);
 }
 
-static inline struct lu_value lu_vm_op_sub(struct lu_vm* vm, struct lu_value a, struct lu_value b) {
+ALWAYS_INLINE static inline struct lu_value lu_vm_op_sub(struct lu_vm* vm,
+                                                         struct lu_value a,
+                                                         struct lu_value b) {
     if (IS_NUMERIC(a) && IS_NUMERIC(b)) {
         return lu_value_int(a.integer - b.integer);
     }
@@ -34,7 +39,9 @@ static inline struct lu_value lu_vm_op_sub(struct lu_vm* vm, struct lu_value a, 
     RAISE_TYPE_ERROR(vm, "-", a, b);
 }
 
-static inline struct lu_value lu_vm_op_mul(struct lu_vm* vm, struct lu_value a, struct lu_value b) {
+ALWAYS_INLINE static inline struct lu_value lu_vm_op_mul(struct lu_vm* vm,
+                                                         struct lu_value a,
+                                                         struct lu_value b) {
     if (IS_NUMERIC(a) && IS_NUMERIC(b)) {
         return lu_value_int(a.integer * b.integer);
     }
@@ -42,13 +49,15 @@ static inline struct lu_value lu_vm_op_mul(struct lu_vm* vm, struct lu_value a, 
     RAISE_TYPE_ERROR(vm, "*", a, b);
 }
 
-static inline struct lu_value lu_vm_op_div(struct lu_vm* vm, struct lu_value a, struct lu_value b) {
+ALWAYS_INLINE static inline struct lu_value lu_vm_op_div(struct lu_vm* vm,
+                                                         struct lu_value a,
+                                                         struct lu_value b) {
     if (IS_NUMERIC(a) && IS_NUMERIC(b)) {
         if (b.integer == 0) {
             lu_raise_error(vm->istate, "Division by zero");
             return lu_value_none();
         }
-        return lu_value_int(a.integer * b.integer);
+        return lu_value_int(a.integer / b.integer);
     }
 
     RAISE_TYPE_ERROR(vm, "/", a, b);
@@ -56,7 +65,9 @@ static inline struct lu_value lu_vm_op_div(struct lu_vm* vm, struct lu_value a, 
 
 #define STR_CMP(a, b) (lu_strcmp(lu_as_string(a), lu_as_string(b)))
 
-static inline struct lu_value lu_vm_op_lt(struct lu_vm* vm, struct lu_value a, struct lu_value b) {
+ALWAYS_INLINE static inline struct lu_value lu_vm_op_lt(struct lu_vm* vm,
+                                                        struct lu_value a,
+                                                        struct lu_value b) {
     if (IS_NUMERIC(a) && IS_NUMERIC(b)) {
         return lu_value_bool(a.integer < b.integer);
     }
@@ -68,7 +79,9 @@ static inline struct lu_value lu_vm_op_lt(struct lu_vm* vm, struct lu_value a, s
     RAISE_TYPE_ERROR(vm, "<", a, b);
 }
 
-static inline struct lu_value lu_vm_op_lte(struct lu_vm* vm, struct lu_value a, struct lu_value b) {
+ALWAYS_INLINE static inline struct lu_value lu_vm_op_lte(struct lu_vm* vm,
+                                                         struct lu_value a,
+                                                         struct lu_value b) {
     if (IS_NUMERIC(a) && IS_NUMERIC(b)) {
         return lu_value_bool(a.integer <= b.integer);
     }
@@ -80,7 +93,9 @@ static inline struct lu_value lu_vm_op_lte(struct lu_vm* vm, struct lu_value a, 
     RAISE_TYPE_ERROR(vm, "<=", a, b);
 }
 
-static inline struct lu_value lu_vm_op_gt(struct lu_vm* vm, struct lu_value a, struct lu_value b) {
+ALWAYS_INLINE static inline struct lu_value lu_vm_op_gt(struct lu_vm* vm,
+                                                        struct lu_value a,
+                                                        struct lu_value b) {
     if (IS_NUMERIC(a) && IS_NUMERIC(b)) {
         return lu_value_bool(a.integer > b.integer);
     }
@@ -92,7 +107,9 @@ static inline struct lu_value lu_vm_op_gt(struct lu_vm* vm, struct lu_value a, s
     RAISE_TYPE_ERROR(vm, ">", a, b);
 }
 
-static inline struct lu_value lu_vm_op_gte(struct lu_vm* vm, struct lu_value a, struct lu_value b) {
+ALWAYS_INLINE static inline struct lu_value lu_vm_op_gte(struct lu_vm* vm,
+                                                         struct lu_value a,
+                                                         struct lu_value b) {
     if (IS_NUMERIC(a) && IS_NUMERIC(b)) {
         return lu_value_bool(a.integer >= b.integer);
     }
@@ -104,10 +121,14 @@ static inline struct lu_value lu_vm_op_gte(struct lu_vm* vm, struct lu_value a, 
     RAISE_TYPE_ERROR(vm, ">=", a, b);
 }
 
-static inline struct lu_value lu_vm_op_eq(struct lu_vm* vm, struct lu_value a, struct lu_value b) {
+ALWAYS_INLINE static inline struct lu_value lu_vm_op_eq(struct lu_vm* vm,
+                                                        struct lu_value a,
+                                                        struct lu_value b) {
     return lu_value_bool(lu_value_strict_equals(a, b));
 }
 
-static inline struct lu_value lu_vm_op_neq(struct lu_vm* vm, struct lu_value a, struct lu_value b) {
+ALWAYS_INLINE static inline struct lu_value lu_vm_op_neq(struct lu_vm* vm,
+                                                         struct lu_value a,
+                                                         struct lu_value b) {
     return lu_value_bool(!lu_value_strict_equals(a, b));
 }

@@ -5,6 +5,8 @@
 
 #include "bytecode/interpreter.h"
 #include "bytecode/ir.h"
+#include "bytecode/register_list.h"
+#include "luna.h"
 #include "stb_ds.h"
 // #include "value.h"
 #include "bytecode/vm_ops.h"
@@ -12,15 +14,16 @@
 #include "string_interner.h"
 #include "value.h"
 
+#define REGISTER_POOL_SLOTS (1024 * 256)
 #define lu_has_error(vm) (vm)->istate->error != nullptr
 #define IS_NUMERIC(a) (lu_is_int(a) || lu_is_bool(a))
 
 struct lu_vm* lu_vm_new(struct lu_istate* istate) {
     struct lu_vm* vm = malloc(sizeof(struct lu_vm));
-    vm->records = nullptr;
     vm->rp = 0;
     vm->istate = istate;
     vm->global_object = lu_object_new(istate);
+    register_list_init(&vm->reg_list, REGISTER_POOL_SLOTS);
     return vm;
 }
 
@@ -28,9 +31,9 @@ void lu_vm_destroy(struct lu_vm* vm) {
     free(vm);
 }
 
-static void lu_vm_push_new_record_with_globals(struct lu_vm* vm,
-                                               struct executable* executable,
-                                               struct lu_globals* globals) {
+ALWAYS_INLINE static void lu_vm_push_new_record_with_globals(struct lu_vm* vm,
+                                                             struct executable* executable,
+                                                             struct lu_globals* globals) {
     struct activation_record record;
     record.executable = executable;
     record.ip = 0;
@@ -38,11 +41,12 @@ static void lu_vm_push_new_record_with_globals(struct lu_vm* vm,
     record.globals = globals;
 
     record.max_register_count = executable->max_register_count;
-    record.registers = nullptr;
-    arrsetlen(record.registers, record.max_register_count);
+    record.registers = register_list_alloc_registers(&vm->reg_list, executable->max_register_count);
 
-    arrput(vm->records, record);
-    vm->rp++;
+    // arrsetlen(record.registers, record.max_register_count);
+
+    // arrput(vm->records, record);
+    vm->records[vm->rp++] = record;
 }
 
 static void lu_vm_push_new_record(struct lu_vm* vm, struct executable* executable) {
@@ -56,14 +60,27 @@ static void lu_vm_push_new_record(struct lu_vm* vm, struct executable* executabl
     record.max_register_count = executable->max_register_count;
     record.registers = nullptr;
     arrsetlen(record.registers, record.max_register_count);
-    arrput(vm->records, record);
-    vm->rp++;
+    // arrput(vm->records, record);
+    vm->records[vm->rp++] = record;
 }
 
 struct lu_value lu_run_executable(struct lu_istate* state, struct executable* executable) {
     lu_vm_push_new_record(state->vm, executable);
     struct activation_record* record = &state->vm->records[state->vm->rp - 1];
     return lu_vm_run_record(state->vm, record, false);
+}
+
+ALWAYS_INLINE static inline bool check_arity(struct lu_function* func,
+                                             uint32_t argc,
+                                             struct lu_vm* vm) {
+    if (!func->is_variadic && argc != func->param_count) {
+        char buffer[256];
+        snprintf(buffer, sizeof(buffer), "function '%s' expects %ld argument(s), got %d",
+                 lu_string_get_cstring(func->name), func->param_count, argc);
+        lu_raise_error(vm->istate, buffer);
+        return false;
+    }
+    return true;
 }
 
 struct lu_value lu_vm_run_record(struct lu_vm* vm,
@@ -259,50 +276,6 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
             registers[instr->binary_op.result_reg] = result;
             DISPATCH_NEXT();
         }
-        // if (lu_is_array(obj_val)) {
-        //     if (lu_is_int(computed_index)) {
-        //         int64_t index = lu_as_int(computed_index);
-        //         if (index < 0) {
-        //             goto invalid_array_index;
-        //         }
-        //         struct lu_value value = lu_array_get(lu_as_array(obj_val), index);
-        //         if (lu_is_undefined(value)) {
-        //             char buffer[256];
-        //             snprintf(buffer, sizeof(buffer), "index %ld out of bounds (array length
-        //             %ld)",
-        //                      index, lu_array_length(lu_as_array(obj_val)));
-        //             lu_raise_error(vm->istate, buffer);
-        //             goto error_reporter;
-        //         }
-        //         registers[instr->binary_op.result_reg] = value;
-        //         DISPATCH_NEXT();
-        //     }
-
-        //     char buffer[256];
-        //     snprintf(buffer, sizeof(buffer), "array index must be an integer ,got %s",
-        //              lu_value_get_type_name(computed_index));
-        //     lu_raise_error(vm->istate, buffer);
-        //     goto error_reporter;
-        // }
-
-        // if (!lu_is_string(computed_index)) {
-        //     char buffer[256];
-        //     snprintf(buffer, sizeof(buffer), "object accessor must be a string , got %s",
-        //              lu_value_get_type_name(computed_index));
-        //     lu_raise_error(vm->istate, buffer);
-        //     return lu_value_none();
-        // }
-
-        // struct lu_value result = lu_obj_get(lu_as_object(obj_val), lu_as_string(computed_index));
-        // if (lu_is_undefined(result)) {
-        //     char buffer[256];
-        //     struct strbuf sb;
-        //     strbuf_init_static(&sb, buffer, sizeof(buffer));
-        //     strbuf_appendf(&sb, "object has no property '%s'",
-        //                    lu_string_get_cstring(lu_as_string(computed_index)));
-        //     lu_raise_error(vm->istate, buffer);
-        //     return lu_value_none();
-        // }
 
         lu_raise_error(vm->istate, "invalid member access on non object value");
         goto error_reporter;
@@ -455,52 +428,41 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
         struct activation_record* parent_record = record;
 
         struct lu_function* func = lu_as_function(callee_val);
+
+        if (!check_arity(func, instr->call.argc, vm))
+            goto error_reporter;
+
         if (func->type == FUNCTION_NATIVE) {
             struct lu_value self = parent_record->registers[instr->call.self_reg];
 
-            if (!func->is_variadic) {
-                if (instr->call.argc != func->param_count) {
-                    goto arg_count_mismatch;
-                }
-            }
-            // should refactor, issue: allocating and freeing args may
-            // slow down the execution , should move to a preallocated
-            // buffer.
-            struct lu_value args[8] = {};
             for (uint32_t i = 0; i < instr->call.argc; i++) {
-                args[i] = registers[instr->call.args_reg[i]];
+                vm->native_args[i] = registers[instr->call.args_reg[i]];
             }
             registers[instr->call.ret_reg] =
-                func->func(vm, lu_as_object(self), args, instr->call.argc);
+                func->func(vm, lu_as_object(self), vm->native_args, instr->call.argc);
             if (lu_has_error(vm)) {
                 goto error_reporter;
             }
             DISPATCH_NEXT();
-        }
+        } else {
+            if (vm->rp + 1 >= VM_MAX_RECORDS) {
+                lu_raise_error(vm->istate, "Stack overflow: maximum call stack reached");
+                goto error_reporter;
+            }
+            lu_vm_push_new_record_with_globals(vm, func->executable, record->globals);
+            record = &vm->records[vm->rp - 1];
+            LOAD_RECORD(record);
+            record->caller_ret_reg = instr->call.ret_reg;
 
-        if (instr->call.argc != func->param_count) {
-        arg_count_mismatch:
-            char buffer[256];
-            snprintf(buffer, sizeof(buffer), "function '%s' expects %ld argument(s), got %d",
-                     lu_string_get_cstring(func->name), func->param_count, instr->call.argc);
-            lu_raise_error(vm->istate, buffer);
-            goto error_reporter;
+            registers[0] = parent_record->registers[instr->call.self_reg];
+            for (uint32_t i = 0; i < instr->call.argc; i++) {
+                registers[i + 1] = parent_record->registers[instr->call.args_reg[i]];
+            }
+            DISPATCH_NEXT();
         }
-
-        lu_vm_push_new_record_with_globals(vm, func->executable, record->globals);
-        record = &vm->records[vm->rp - 1];
-        LOAD_RECORD(record);
-        record->caller_ret_reg = instr->call.ret_reg;
-
-        registers[0] = parent_record->registers[instr->call.self_reg];
-        for (uint32_t i = 0; i < instr->call.argc; i++) {
-            registers[i + 1] = parent_record->registers[instr->call.args_reg[i]];
-        }
-        DISPATCH_NEXT();
     }
     CASE(OPCODE_RET) : {
-        const struct activation_record child_record = arrpop(vm->records);
-        vm->rp--;
+        struct activation_record child_record = vm->records[--vm->rp];
 
         if (vm->rp < 1 || vm->istate->running_module != vm->istate->main_module || as_callback) {
             return child_record.registers[instr->destination_reg];
@@ -509,6 +471,23 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
         record = &vm->records[vm->rp - 1];
         LOAD_RECORD(record);
         registers[child_record.caller_ret_reg] = child_record.registers[instr->destination_reg];
+
+        //-----------------
+        // Should investigate
+        //  Observation:
+        //   why freeing registers makes it go very faster. (i forgot to free them before causing
+        //   memory leaks) its 3X difference in speed.
+        //  Chatgpt response:
+        //  // Possible reasons freeing registers makes the VM much faster:
+        //  1) Keeps memory footprint small → better cache locality, fewer cache/TLB misses.
+        //  2) Prevents allocator slowdown from many unfreed tiny buffers piling up.
+        //  3) New allocations come from fast tcache instead of fragmented heap space.
+        //  4) Improved memory locality helps branch prediction & CPU pipeline efficiency.
+        //  5) Avoids silent per-call memory growth that gradually slows execution.
+        // arrfree(child_record.registers);
+        register_list_free_registers(&vm->reg_list, child_record.max_register_count);
+        //-----------------
+
         DISPATCH_NEXT();
     }
     CASE(OPCODE_HLT) : {

@@ -215,8 +215,9 @@ struct lu_value lu_call(struct lu_vm* vm,
     record.registers = nullptr;
     arrsetlen(record.registers, record.max_register_count);
     record.registers[0] = lu_value_object(self);
-    arrput(vm->records, record);
-    vm->rp++;
+    // arrput(vm->records, record);
+    vm->records[vm->rp++] = record;
+    // vm->rp++;
     //-------------------------------------------
 
     struct activation_record* rec = &vm->records[vm->rp - 1];

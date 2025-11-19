@@ -32,7 +32,7 @@ install_headers(
 )
 
 install_headers(
-    ['include/bytecode/interpreter.h','include/bytecode/vm.h','include/bytecode/ir.h','include/bytecode/vm_ops.h'],
+    ['include/bytecode/interpreter.h','include/bytecode/vm.h','include/bytecode/ir.h','include/bytecode/vm_ops.h','include/bytecode/register_list.h'],
     subdir : 'luna/bytecode'
 )
 

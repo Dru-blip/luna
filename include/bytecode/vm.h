@@ -1,6 +1,9 @@
 #pragma once
+#include "bytecode/register_list.h"
 #include "ir.h"
 #include "value.h"
+
+#define VM_MAX_RECORDS 2048
 
 struct lu_globals {
     struct lu_value* fast_slots;
@@ -37,18 +40,19 @@ enum lu_vm_status {
 
 struct lu_vm {
     enum lu_vm_status status;  // unused
-    struct activation_record* records;
+    struct activation_record records[VM_MAX_RECORDS];
     struct lu_object* global_object;
     size_t rp;
     struct lu_istate* istate;
     struct lu_globals* globals;
+    struct lu_value native_args[8];
+    struct register_list reg_list;
 };
 
 #define lu_vm_active_record(vm) ((vm)->records[(vm)->rp - 1])
 
 #define lu_vm_current_ip_span(vm) \
-    (lu_vm_active_record(vm)      \
-         .executable->instructions_span[(lu_vm_active_record(vm).ip) - 1])
+    (lu_vm_active_record(vm).executable->instructions_span[(lu_vm_active_record(vm).ip) - 1])
 
 struct lu_vm* lu_vm_new(struct lu_istate* istate);
 void lu_vm_destroy(struct lu_vm* vm);
