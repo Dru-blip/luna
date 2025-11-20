@@ -263,6 +263,10 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
             lu_raise_error(vm->istate, buffer);
             goto error_reporter;
         }
+        if (lu_is_function(value)) {
+            value = lu_value_object(
+                lu_wrap_bound_function(vm->istate, lu_as_function(value), lu_as_object(obj_val)));
+        }
         registers[instr->binary_op.result_reg] = value;
 
         DISPATCH_NEXT();
@@ -449,12 +453,17 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
                 lu_raise_error(vm->istate, "Stack overflow: maximum call stack reached");
                 goto error_reporter;
             }
+            enum lu_function_type func_type = func->type;
+            struct lu_bound_function* bound_func = func->bound_func;
+            func = func_type == FUNCTION_BOUND ? bound_func->func : func;
             lu_vm_push_new_record_with_globals(vm, func->executable, record->globals);
             record = &vm->records[vm->rp - 1];
             LOAD_RECORD(record);
             record->caller_ret_reg = instr->call.ret_reg;
 
-            registers[0] = parent_record->registers[instr->call.self_reg];
+            registers[0] = func_type == FUNCTION_BOUND
+                               ? lu_value_object(bound_func->self)
+                               : parent_record->registers[instr->call.self_reg];
             for (uint32_t i = 0; i < instr->call.argc; i++) {
                 registers[i + 1] = parent_record->registers[instr->call.args_reg[i]];
             }

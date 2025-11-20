@@ -24,4 +24,3 @@ fn MakeLexer(source){
 let lex=MakeLexer("source")
 
 lex.advance()
-print(lex.pos)

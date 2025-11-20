@@ -131,6 +131,13 @@ static void lu_module_finalize(struct lu_object* self) {
     lu_object_finalize(self);
 }
 
+static void lu_bound_function_visit(struct lu_object* self, struct lu_objectset* set) {
+    struct lu_bound_function* func = lu_cast(struct lu_bound_function, self);
+    lu_objectset_add(set, func->self);
+    lu_objectset_add(set, func->func);
+    lu_object_visit(self, set);
+}
+
 // Object V-Tables
 static struct lu_object_vtable lu_object_default_vtable = {
     .is_function = false,
@@ -180,6 +187,16 @@ static struct lu_object_vtable lu_module_vtable = {
     .visit = lu_module_visit,
     .subscr = lu_object_subscr,
     .dbg_name = "Module",
+};
+
+static struct lu_object_vtable lu_bound_function_vtable = {
+    .is_function = true,
+    .is_string = false,
+    .is_array = false,
+    .finalize = lu_object_finalize,
+    .visit = lu_bound_function_visit,
+    .subscr = lu_object_subscr,
+    .dbg_name = "Bound Function",
 };
 
 bool lu_string_equal(struct lu_string* a, struct lu_string* b) {
@@ -586,6 +603,31 @@ struct lu_function* lu_native_function_new(struct lu_istate* state,
     func->vtable = &lu_function_vtable;
 
     return func;
+}
+
+struct lu_bound_function* lu_bound_function_new(struct lu_istate* state,
+                                                struct lu_function* func,
+                                                struct lu_object* self) {
+    struct lu_bound_function* bound_func =
+        lu_object_new_sized(state, sizeof(struct lu_bound_function));
+    bound_func->func = func;
+    bound_func->self = self;
+    bound_func->vtable = &lu_bound_function_vtable;
+
+    return bound_func;
+}
+
+struct lu_function* lu_wrap_bound_function(struct lu_istate* state,
+                                           struct lu_function* func,
+                                           struct lu_object* self) {
+    struct lu_bound_function* bound_func = lu_bound_function_new(state, func, self);
+    struct lu_function* wrapper = lu_object_new_sized(state, sizeof(struct lu_function));
+    wrapper->type = FUNCTION_BOUND;
+    wrapper->name = func->name;
+    wrapper->vtable = &lu_function_vtable;
+    wrapper->module = func->module;
+    wrapper->bound_func = bound_func;
+    return wrapper;
 }
 
 struct lu_array* lu_array_new(struct lu_istate* state) {

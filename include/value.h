@@ -10,7 +10,6 @@
 
 struct lu_vm;
 
-
 enum lu_value_type {
     VALUE_BOOL,
     VALUE_NONE,
@@ -86,7 +85,6 @@ enum object_tag {
     OBJECT_TAG_EXECUTABLE,
 };
 
-
 struct lu_object_vtable {
     bool is_function;  // should be deprecated
     bool is_string;    // should be deprecated
@@ -95,7 +93,7 @@ struct lu_object_vtable {
     const char* dbg_name;
     void (*finalize)(struct lu_object*);
     void (*visit)(struct lu_object*, struct lu_objectset*);
-    struct lu_value (*subscr)(struct lu_vm* , struct lu_object*, struct lu_value key);
+    struct lu_value (*subscr)(struct lu_vm*, struct lu_object*, struct lu_value key);
 };
 
 enum lu_string_type {
@@ -122,6 +120,7 @@ struct lu_string {
 enum lu_function_type {
     FUNCTION_USER,
     FUNCTION_NATIVE,
+    FUNCTION_BOUND,
 };
 
 struct argument {
@@ -150,7 +149,14 @@ struct lu_function {
             struct ast_node** params;
             struct ast_node* body;
         };
+        struct lu_bound_function* bound_func;
     };
+};
+
+struct lu_bound_function {
+    LUNA_OBJECT_HEADER;
+    struct lu_function* func;
+    struct lu_object* self;
 };
 
 enum lu_module_type {
@@ -284,6 +290,14 @@ struct lu_function* lu_native_function_new(struct lu_istate* state,
                                            struct lu_string* name,
                                            native_func_t native_func,
                                            size_t param_count);
+
+struct lu_bound_function* lu_bound_function_new(struct lu_istate* state,
+                                                struct lu_function* func,
+                                                struct lu_object* self);
+
+struct lu_function* lu_wrap_bound_function(struct lu_istate* state,
+                                           struct lu_function* func,
+                                           struct lu_object* self);
 
 struct lu_module* lu_module_new(struct lu_istate* state,
                                 struct lu_string* name,
