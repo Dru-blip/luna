@@ -436,6 +436,8 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
         if (!check_arity(func, instr->call.argc, vm))
             goto error_reporter;
 
+        // Refactor:
+        // ---------------------------
         if (func->type == FUNCTION_NATIVE) {
             struct lu_value self = parent_record->registers[instr->call.self_reg];
 
@@ -469,6 +471,7 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
             }
             DISPATCH_NEXT();
         }
+        // ---------------------------
     }
     CASE(OPCODE_RET) : {
         struct activation_record child_record = vm->records[--vm->rp];
@@ -484,26 +487,17 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
         //-----------------
         // Should investigate
         //  Observation:
-        //   why freeing registers makes it go very faster. (i forgot to free them before causing
+        //   why freeing registers makes it go very faster. (i forgot to free them before,causing
         //   memory leaks) its 3X difference in speed.
-        //  Chatgpt response:
-        //  // Possible reasons freeing registers makes the VM much faster:
-        //  1) Keeps memory footprint small → better cache locality, fewer cache/TLB misses.
-        //  2) Prevents allocator slowdown from many unfreed tiny buffers piling up.
-        //  3) New allocations come from fast tcache instead of fragmented heap space.
-        //  4) Improved memory locality helps branch prediction & CPU pipeline efficiency.
-        //  5) Avoids silent per-call memory growth that gradually slows execution.
-        // arrfree(child_record.registers);
+        // ** maybe its cache related thing?
         register_list_free_registers(&vm->reg_list, child_record.max_register_count);
         //-----------------
 
         DISPATCH_NEXT();
     }
-    CASE(OPCODE_HLT) : {
-        return lu_value_none();
-    }
-
-    return lu_value_none();
+    CASE(OPCODE_HLT)
+        :
+          return lu_value_none();
 
 invalid_array_index:
     lu_raise_error(vm->istate, "invalid index");

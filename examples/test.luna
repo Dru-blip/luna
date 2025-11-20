@@ -10,7 +10,6 @@ fn MakeLexer(source){
             }
             let char=self.source[self.pos]
             self.pos=self.pos+1
-            print(char)
             if(char=="\n"){
                 self.line=self.line+1
                 self.col=1
@@ -21,6 +20,6 @@ fn MakeLexer(source){
     }
 }
 
-let lex=MakeLexer("source")
+let lex=MakeLexer("\nsource")
 
 lex.advance()

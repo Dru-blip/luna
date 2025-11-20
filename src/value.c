@@ -124,8 +124,8 @@ static void lu_module_finalize(struct lu_object* self) {
         dlclose(module->module_handle);
     } else {
         free(module->program.source);
-        arrfree(module->program.tokens);
-        arena_destroy(&module->program.allocator);
+        // arrfree(module->program.tokens);
+        // arena_destroy(&module->program.allocator);
     }
 
     lu_object_finalize(self);

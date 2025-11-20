@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arena.h"
 #include "ast.h"
 #include "bytecode/interpreter.h"
 #include "bytecode/ir.h"
@@ -352,7 +353,7 @@ static inline uint32_t generate_array_expr(struct generator* generator, struct a
                                            .pair.snd = generate_expr(generator, element)};
         emit_instruction(generator, append_instr, element->span);
     }
-
+    arrfree(expr->data.list);
     return dst_reg;
 }
 
@@ -642,6 +643,7 @@ static inline uint32_t generate_call_expr(struct generator* generator, struct as
     call_instr.call.ret_reg = generator_allocate_register(generator);
 
     emit_instruction(generator, call_instr, expr->span);
+    arrfree(expr->data.call.args);
     return call_instr.call.ret_reg;
 }
 
@@ -669,6 +671,8 @@ static inline uint32_t generate_function_expr(struct generator* generator, struc
         uint32_t param_name_len = param->span.end - param->span.start;
         declare_param(generator, param_name, param_name_len);
     }
+
+    arrfree(expr->data.fn_decl.params);
 
     struct lu_string* name_string = lu_intern_string(generator->state, "<anonymous>");
 
@@ -731,7 +735,7 @@ static uint32_t generate_object_expr(struct generator* generator, struct ast_nod
         };
         emit_instruction(generator, set_prop_instr, prop->span);
     }
-
+    arrfree(expr->data.list);
     return dst_reg;
 }
 
@@ -1070,6 +1074,8 @@ static inline void generate_fn_decl(struct generator* generator, struct ast_node
         declare_param(generator, param_name, param_name_len);
     }
 
+    arrfree(stmt->data.fn_decl.params);
+
     generator_switch_basic_block(generator, fn_entry_block);
     generate_stmt(generator, stmt->data.fn_decl.body);
 
@@ -1175,6 +1181,11 @@ struct executable* generator_generate(struct lu_istate* state, struct ast_progra
 
     struct executable* executable = generator_make_executable(generator);
     executable->name = lu_intern_string(state, "<module>");
+    arrfree(generator->local_variables);
+    arrfree(generator->global_variables);
+    arrfree(generator->blocks);
+    arena_destroy(&program.allocator);
+    arrfree(program.tokens);
     return executable;
 }
 
