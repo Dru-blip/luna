@@ -210,6 +210,7 @@ struct lu_array_iter {
 
 #define lu_as_int(v) ((v).integer)
 #define lu_as_function(v) ((struct lu_function*)lu_as_object(v))
+#define lu_as_bound_function(v) ((struct lu_bound_function*)lu_as_object(v))
 #define lu_as_object(v) ((v).object)
 #define lu_as_string(v) ((struct lu_string*)lu_as_object(v))
 #define lu_as_array(v) ((struct lu_array*)lu_as_object(v))

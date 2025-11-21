@@ -83,6 +83,22 @@ ALWAYS_INLINE static inline bool check_arity(struct lu_function* func,
     return true;
 }
 
+ALWAYS_INLINE static inline bool check_is_function(struct lu_vm* vm,
+                                                   struct lu_value* registers,
+                                                   struct lu_value callee_val) {
+    if (!lu_is_function(callee_val)) {
+        const char* calle_type_name = lu_value_get_type_name(callee_val);
+        char buffer[256];
+        snprintf(buffer, sizeof(buffer),
+                 "attempt to call a non function value"
+                 " (%s)",
+                 calle_type_name);
+        lu_raise_error(vm->istate, buffer);
+        return true;
+    }
+    return false;
+}
+
 struct lu_value lu_vm_run_record(struct lu_vm* vm,
                                  struct activation_record* record,
                                  bool as_callback) {
@@ -416,22 +432,19 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
         registers[instr->binary_op.result_reg] = lu_value_object(func);
         DISPATCH_NEXT();
     }
+
+#define GET_FUNCTION(callee_)                                                                   \
+    lu_as_function(callee_)->type == FUNCTION_BOUND ? lu_as_function(callee_)->bound_func->func \
+                                                    : lu_as_function(callee_);
     CASE(OPCODE_CALL) : {
         struct lu_value callee_val = registers[instr->call.callee_reg];
-        if (!lu_is_function(callee_val)) {
-            const char* calle_type_name = lu_value_get_type_name(callee_val);
-            char buffer[256];
-            snprintf(buffer, sizeof(buffer),
-                     "attempt to call a non function value"
-                     " (%s)",
-                     calle_type_name);
-            lu_raise_error(vm->istate, buffer);
+
+        if (check_is_function(vm, registers, callee_val))
             goto error_reporter;
-        }
 
         struct activation_record* parent_record = record;
 
-        struct lu_function* func = lu_as_function(callee_val);
+        struct lu_function* func = GET_FUNCTION(callee_val);
 
         if (!check_arity(func, instr->call.argc, vm))
             goto error_reporter;
@@ -495,9 +508,7 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
 
         DISPATCH_NEXT();
     }
-    CASE(OPCODE_HLT)
-        :
-          return lu_value_none();
+    CASE(OPCODE_HLT) : return lu_value_none();
 
 invalid_array_index:
     lu_raise_error(vm->istate, "invalid index");

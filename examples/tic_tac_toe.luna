@@ -24,7 +24,6 @@ fn check_winner() {
         if (board[a] != EMPTY_CELL && board[a] == board[b] && board[b] == board[c]) {
             return board[a]
         }
-
     }
 
     return none
