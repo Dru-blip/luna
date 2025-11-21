@@ -1,4 +1,5 @@
-class Lexer{}
-
-
-print(Lexer)
+class Lexer{
+    fn @new(){
+       self.pos=0
+    }
+}

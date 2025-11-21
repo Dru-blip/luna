@@ -472,7 +472,7 @@ static void parse_param_list(struct parser* parser, struct ast_node*** params) {
 }
 
 static struct ast_node* parse_fn_decl(struct parser* parser) {
-    struct token* token = parser_eat(parser);
+    struct token* token = parse_expected(parser, TOKEN_KEYWORD_FN);
     struct token* id = parse_expected(parser, TOKEN_IDENTIFIER);
     struct ast_node** params = nullptr;
     parse_param_list(parser, &params);
@@ -492,11 +492,17 @@ static struct ast_node* parse_class_decl(struct parser* parser) {
     struct token* id = parse_expected(parser, TOKEN_IDENTIFIER);
 
     parse_expected(parser, TOKEN_LBRACE);
+    struct ast_node** members = nullptr;
+    while (!check(parser, TOKEN_RBRACE)) {
+        struct ast_node* member = parse_fn_decl(parser);
+        arrput(members, member);
+    }
     parse_expected(parser, TOKEN_RBRACE);
     struct ast_node* node =
         make_node(parser, AST_NODE_CLASS_DECL, SPAN_MERGE(token->span, parser->cur_token->span));
     node->data.class_decl = (struct ast_class_decl){
         .name_span = id->span,
+        .members = members,
     };
     return node;
 }

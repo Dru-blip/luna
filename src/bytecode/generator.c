@@ -1044,7 +1044,11 @@ static inline void generate_for_in_stmt(struct generator* generator, struct ast_
     generator_switch_basic_block(generator, end_block);
 }
 
-static inline void generate_fn_decl(struct generator* generator, struct ast_node* stmt) {
+static inline void generate_fn_decl(struct generator* generator,
+                                    struct ast_node* stmt,
+                                    bool as_class_method,
+                                    uint32_t* function_register,
+                                    uint32_t* function_name_index) {
     char* name = generator->program.source + stmt->data.fn_decl.name_span.start;
     uint32_t name_len = stmt->data.fn_decl.name_span.end - stmt->data.fn_decl.name_span.start;
     char* name_copy = malloc(name_len + 1);
@@ -1106,13 +1110,17 @@ static inline void generate_fn_decl(struct generator* generator, struct ast_node
 
     emit_instruction(generator, make_fn_instr, stmt->span);
 
-    struct instruction store_func_instr;
-    store_func_instr.opcode =
-        var->scope == SCOPE_GLOBAL ? OPCODE_STORE_GLOBAL_BY_INDEX : OPCODE_MOV;
-    store_func_instr.mov.src_reg = make_fn_instr.binary_op.result_reg;
-    store_func_instr.mov.dest_reg = var->allocated_reg;
-    emit_instruction(generator, store_func_instr, stmt->span);
-
+    if (as_class_method) {
+        *function_name_index = name_index;
+        *function_register = make_fn_instr.binary_op.result_reg;
+    } else {
+        struct instruction store_func_instr;
+        store_func_instr.opcode =
+            var->scope == SCOPE_GLOBAL ? OPCODE_STORE_GLOBAL_BY_INDEX : OPCODE_MOV;
+        store_func_instr.mov.src_reg = make_fn_instr.binary_op.result_reg;
+        store_func_instr.mov.dest_reg = var->allocated_reg;
+        emit_instruction(generator, store_func_instr, stmt->span);
+    }
     free(name_copy);
 }
 
@@ -1142,6 +1150,22 @@ static void generate_class_decl(struct generator* generator, struct ast_node* st
     store_class_instr.mov.src_reg = class_reg;
     store_class_instr.mov.dest_reg = var->allocated_reg;
     emit_instruction(generator, store_class_instr, stmt->span);
+
+    uint32_t members = arrlen(stmt->data.class_decl.members);
+    for (uint32_t i = 0; i < members; i++) {
+        struct ast_node* member = stmt->data.class_decl.members[i];
+
+        uint32_t method_index, method_name;
+        generate_fn_decl(generator, member, true, &method_index, &method_name);
+
+        struct instruction set_prop_instr = {
+            .opcode = OPCODE_OBJECT_SET_PROPERTY,
+            .binary_op.left_reg = method_name,
+            .binary_op.right_reg = method_index,
+            .binary_op.result_reg = class_reg,
+        };
+        emit_instruction(generator, set_prop_instr, member->span);
+    }
 
     free(name_copy);
 }
@@ -1186,7 +1210,7 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
             return generate_for_in_stmt(generator, stmt);
         }
         case AST_NODE_FN_DECL: {
-            return generate_fn_decl(generator, stmt);
+            return generate_fn_decl(generator, stmt, false, nullptr, nullptr);
         }
         case AST_NODE_CLASS_DECL: {
             return generate_class_decl(generator, stmt);
