@@ -502,7 +502,7 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
         //  Observation:
         //   why freeing registers makes it go very faster. (i forgot to free them before,causing
         //   memory leaks) its 3X difference in speed.
-        // ** maybe its cache related thing?
+        // *** maybe its cache related thing?
         register_list_free_registers(&vm->reg_list, child_record.max_register_count);
         //-----------------
 

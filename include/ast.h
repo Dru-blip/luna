@@ -42,6 +42,7 @@ enum ast_node_kind {
     AST_NODE_FOR_IN_STMT,
     AST_NODE_LET_DECL,
     AST_NODE_FN_DECL,
+    AST_NODE_CLASS_DECL,
 };
 
 struct ast_pair {
@@ -108,6 +109,11 @@ struct ast_fn_decl {
     struct ast_node* body;
 };
 
+struct ast_class_decl {
+    struct span name_span;
+    struct ast_node** members;
+};
+
 union ast_node_data {
     int64_t int_val;
     double float_val;
@@ -129,6 +135,7 @@ union ast_node_data {
     struct ast_for_in_stmt for_in_stmt;
     struct ast_let_decl let_decl;
     struct ast_fn_decl fn_decl;
+    struct ast_class_decl class_decl;
 };
 
 struct ast_node {

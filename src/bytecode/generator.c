@@ -145,7 +145,6 @@ static bool find_variable(struct generator* generator,
 static uint32_t declare_global(struct generator* generator,
                                const char* name,
                                uint32_t name_length) {
-    //
     struct variable* var;
     for (uint32_t i = generator->global_variable_count; i > 0; i--) {
         var = &generator->global_variables[i - 1];
@@ -208,6 +207,11 @@ static inline size_t generator_add_str_contant(struct generator* generator,
 static inline size_t generator_add_executable_contant(struct generator* generator,
                                                       struct executable* executable) {
     arrput(generator->constants, lu_value_object(executable));
+    return generator->constant_counter++;
+}
+
+static inline size_t generator_add_contant(struct generator* generator, struct lu_value value) {
+    arrput(generator->constants, value);
     return generator->constant_counter++;
 }
 
@@ -1112,6 +1116,36 @@ static inline void generate_fn_decl(struct generator* generator, struct ast_node
     free(name_copy);
 }
 
+static void generate_class_decl(struct generator* generator, struct ast_node* stmt) {
+    struct lu_object* class_obj = lu_object_new(generator->state);
+
+    char* name = generator->program.source + stmt->data.class_decl.name_span.start;
+    uint32_t name_len = stmt->data.class_decl.name_span.end - stmt->data.class_decl.name_span.start;
+
+    char* name_copy = malloc(name_len + 1);
+    memcpy(name_copy, name, name_len);
+    name_copy[name_len] = '\0';
+
+    struct lu_string* name_string = lu_intern_string(generator->state, name_copy);
+    uint32_t name_index = generator_add_identifier(generator, name_string);
+
+    struct variable* var;
+    declare_variable(generator, name, name_len, &var);
+
+    uint32_t class_obj_index = generator_add_contant(generator, lu_value_object(class_obj));
+    arrput(GET_CURRENT_BLOCK.instructions_spans, stmt->span);
+    uint32_t class_reg = generator_emit_load_constant(generator, class_obj_index);
+
+    struct instruction store_class_instr;
+    store_class_instr.opcode =
+        var->scope == SCOPE_GLOBAL ? OPCODE_STORE_GLOBAL_BY_INDEX : OPCODE_MOV;
+    store_class_instr.mov.src_reg = class_reg;
+    store_class_instr.mov.dest_reg = var->allocated_reg;
+    emit_instruction(generator, store_class_instr, stmt->span);
+
+    free(name_copy);
+}
+
 static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
     switch (stmt->kind) {
         case AST_NODE_LET_DECL: {
@@ -1153,6 +1187,9 @@ static void generate_stmt(struct generator* generator, struct ast_node* stmt) {
         }
         case AST_NODE_FN_DECL: {
             return generate_fn_decl(generator, stmt);
+        }
+        case AST_NODE_CLASS_DECL: {
+            return generate_class_decl(generator, stmt);
         }
         default: {
             break;

@@ -487,6 +487,20 @@ static struct ast_node* parse_fn_decl(struct parser* parser) {
     return node;
 }
 
+static struct ast_node* parse_class_decl(struct parser* parser) {
+    struct token* token = parser_eat(parser);
+    struct token* id = parse_expected(parser, TOKEN_IDENTIFIER);
+
+    parse_expected(parser, TOKEN_LBRACE);
+    parse_expected(parser, TOKEN_RBRACE);
+    struct ast_node* node =
+        make_node(parser, AST_NODE_CLASS_DECL, SPAN_MERGE(token->span, parser->cur_token->span));
+    node->data.class_decl = (struct ast_class_decl){
+        .name_span = id->span,
+    };
+    return node;
+}
+
 static struct ast_node* parse_stmt(struct parser* parser) {
     struct token* token = parser->cur_token;
     switch (token->kind) {
@@ -510,6 +524,8 @@ static struct ast_node* parse_stmt(struct parser* parser) {
             return parse_fn_decl(parser);
         case TOKEN_KEYWORD_LET:
             return parse_let_decl(parser);
+        case TOKEN_KEYWORD_CLASS:
+            return parse_class_decl(parser);
         default: {
             struct ast_node* expr = parse_expression(parser, 0);
             struct ast_node* node =

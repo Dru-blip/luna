@@ -1,25 +1,4 @@
-fn MakeLexer(source){
-    return {
-        source:source,
-        pos:0,
-        line:1,
-        col:1,
-        advance:fn(){
-            if(self.pos >= len(self.source)){
-                return none
-            }
-            let char=self.source[self.pos]
-            self.pos=self.pos+1
-            if(char=="\n"){
-                self.line=self.line+1
-                self.col=1
-            }else{
-                self.col=self.col+1
-            }
-        }
-    }
-}
+class Lexer{}
 
-let lex=MakeLexer("\nsource")
 
-lex.advance()
+print(Lexer)
