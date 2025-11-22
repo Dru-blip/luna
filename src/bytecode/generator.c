@@ -743,6 +743,75 @@ static uint32_t generate_object_expr(struct generator* generator, struct ast_nod
     return dst_reg;
 }
 
+static uint32_t generate_new_expr(struct generator* generator, struct ast_node* expr) {
+    char* name = generator->program.source + expr->data.new_expr.class_name.start;
+    uint32_t name_len = expr->data.new_expr.class_name.end - expr->data.new_expr.class_name.start;
+    struct variable* class;
+    uint32_t class_reg;
+    if (!find_variable(generator, name, name_len, &class)) {
+        char* name_copy = malloc(name_len + 1);
+        memcpy(name_copy, name, name_len);
+        name_copy[name_len] = '\0';
+
+        struct lu_string* name_string = lu_intern_string(generator->state, name_copy);
+        uint32_t name_index = generator_add_identifier(generator, name_string);
+
+        class_reg = generator_allocate_register(generator);
+        struct instruction instr = {
+            .opcode = OPCODE_LOAD_GLOBAL_BY_NAME, .pair.fst = name_index, .pair.snd = class_reg};
+        emit_instruction(generator, instr, expr->span);
+        free(name_copy);
+    } else {
+        if (class->scope == SCOPE_LOCAL || class->scope == SCOPE_PARAM) {
+            class_reg = class->allocated_reg;
+        } else {
+            class_reg = generator_allocate_register(generator);
+            struct instruction instr = {.opcode = OPCODE_LOAD_GLOBAL_BY_INDEX,
+                                        .mov.dest_reg = class_reg,
+                                        .mov.src_reg = class->allocated_reg};
+            emit_instruction(generator, instr, expr->span);
+        }
+    }
+
+    uint32_t obj_reg = generator_allocate_register(generator);
+
+    struct instruction new_object_instr = {.opcode = OPCODE_NEW_OBJECT, .destination_reg = obj_reg};
+    emit_instruction(generator, new_object_instr, expr->span);
+
+    struct instruction instance_instr = {.opcode = OPCODE_MAKE_INSTANCE};
+    instance_instr.pair.fst = obj_reg;
+    instance_instr.pair.snd = class_reg;
+    emit_instruction(generator, instance_instr, expr->span);
+
+    struct lu_string* name_string = lu_intern_string(generator->state, "@new");
+    uint32_t name_index = generator_add_identifier(generator, name_string);
+
+    uint32_t constructor_reg = generator_allocate_register(generator);
+    struct instruction get_prop_instr = {
+        .opcode = OPCODE_OBJECT_GET_PROPERTY,
+        .binary_op.left_reg = obj_reg,
+        .binary_op.right_reg = name_index,
+        .binary_op.result_reg = constructor_reg,
+    };
+    emit_instruction(generator, get_prop_instr, expr->span);
+
+    struct instruction call_instr;
+    call_instr.opcode = OPCODE_CALL;
+    call_instr.call.argc = arrlen(expr->data.new_expr.args);
+    call_instr.call.callee_reg = constructor_reg;
+    call_instr.call.self_reg = obj_reg;
+    call_instr.call.args_reg = nullptr;
+
+    for (uint8_t i = 0; i < call_instr.call.argc; ++i) {
+        uint32_t arg_reg = generate_expr(generator, expr->data.new_expr.args[i]);
+        arrput(call_instr.call.args_reg, arg_reg);
+    }
+
+    emit_instruction(generator, call_instr, expr->span);
+
+    return obj_reg;
+}
+
 static uint32_t generate_expr(struct generator* generator, struct ast_node* expr) {
     switch (expr->kind) {
         case AST_NODE_SELF_EXPR: {
@@ -789,6 +858,9 @@ static uint32_t generate_expr(struct generator* generator, struct ast_node* expr
         }
         case AST_NODE_OBJECT_EXPR: {
             return generate_object_expr(generator, expr);
+        }
+        case AST_NODE_NEW_EXPR: {
+            return generate_new_expr(generator, expr);
         }
         default: {
             return 0;

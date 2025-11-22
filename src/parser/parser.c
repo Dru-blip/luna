@@ -226,6 +226,27 @@ static struct ast_node* parse_prefix_expression(struct parser* parser) {
             };
             return node;
         }
+        case TOKEN_KEYWORD_NEW: {
+            token = parser_eat(parser);
+            struct token* class_name = parse_expected(parser, TOKEN_IDENTIFIER);
+            struct ast_node** args = nullptr;
+
+            parse_expected(parser, TOKEN_LPAREN);
+            while (!check(parser, TOKEN_RPAREN)) {
+                arrput(args, parse_expression(parser, 0));
+                if (check(parser, TOKEN_COMMA)) {
+                    parser_advance(parser);
+                }
+            }
+            struct token* rparen = parse_expected(parser, TOKEN_RPAREN);
+            struct ast_node* node =
+                make_node(parser, AST_NODE_NEW_EXPR, SPAN_MERGE(token->span, rparen->span));
+            node->data.new_expr = (struct ast_new_expr){
+                .class_name = class_name->span,
+                .args = args,
+            };
+            return node;
+        }
         default: {
             return parse_primary_expression(parser);
         }

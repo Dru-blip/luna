@@ -1,5 +1,13 @@
 class Lexer{
-    fn @new(){
+    fn @new(source){
        self.pos=0
+       self.col=1
+       self.line=1
+       self.source=source
+    }
+
+    fn advance(){
+        self.col=self.col+1
+        self.pos=self.pos+1
     }
 }

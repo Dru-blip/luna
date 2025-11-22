@@ -67,6 +67,8 @@ enum opcode {
     OPCODE_GET_ITER,
     OPCODE_ITER_NEXT,
 
+    OPCODE_MAKE_INSTANCE,
+
     OPCODE_HLT,
 };
 

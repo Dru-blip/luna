@@ -29,6 +29,7 @@ enum ast_node_kind {
     AST_NODE_ARRAY_EXPR,
     AST_NODE_FN_EXPR,
     AST_NODE_SELF_EXPR,
+    AST_NODE_NEW_EXPR,
 
     AST_NODE_EXPR_STMT,
     AST_NODE_RETURN,
@@ -79,6 +80,11 @@ struct ast_object_property {
     bool shorthand;
 };
 
+struct ast_new_expr {
+    struct span class_name;
+    struct ast_node** args;
+};
+
 struct ast_if_stmt {
     struct ast_node* test;
     struct ast_node* consequent;
@@ -124,6 +130,7 @@ union ast_node_data {
     struct ast_binop binop;
     struct ast_call call;
     struct ast_member_expr member_expr;
+    struct ast_new_expr new_expr;
     struct ast_if_stmt if_stmt;
     // DANGER: memory leak happens here
     // this list is externally managed

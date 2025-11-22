@@ -56,6 +56,7 @@ static const char* opcode_names[] = {
     "ObjectGetProperty",
     "GetIter",
     "IterNext",
+    "MakeInstance",
     "Hlt",
 };
 

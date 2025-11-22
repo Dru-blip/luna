@@ -125,6 +125,7 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
         [OPCODE_NEW_ARRAY] = &&handle_OPCODE_NEW_ARRAY,
         [OPCODE_ARRAY_APPEND] = &&handle_OPCODE_ARRAY_APPEND,
         [OPCODE_NEW_OBJECT] = &&handle_OPCODE_NEW_OBJECT,
+        [OPCODE_MAKE_INSTANCE] = &&handle_OPCODE_MAKE_INSTANCE,
         [OPCODE_OBJECT_SET_PROPERTY] = &&handle_OPCODE_OBJECT_SET_PROPERTY,
         [OPCODE_OBJECT_GET_PROPERTY] = &&handle_OPCODE_OBJECT_GET_PROPERTY,
         [OPCODE_LOAD_SUBSCR] = &&handle_OPCODE_LOAD_SUBSCR,
@@ -250,6 +251,17 @@ struct lu_value lu_vm_run_record(struct lu_vm* vm,
     }
     CASE(OPCODE_NEW_OBJECT) : {
         registers[instr->destination_reg] = lu_value_object(lu_object_new(vm->istate));
+        DISPATCH_NEXT();
+    }
+    CASE(OPCODE_MAKE_INSTANCE) : {
+        struct lu_value class = registers[instr->pair.snd];
+        if (!lu_is_object(class)) {
+            lu_raise_error(vm->istate, "invalid class type");
+            goto error_reporter;
+        }
+        struct lu_object* instance = lu_object_new(vm->istate);
+        instance->prototype = lu_as_object(class);
+        registers[instr->pair.fst] = lu_value_object(instance);
         DISPATCH_NEXT();
     }
     CASE(OPCODE_OBJECT_SET_PROPERTY) : {
