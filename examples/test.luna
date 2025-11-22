@@ -7,7 +7,9 @@ class Lexer{
     }
 
     fn advance(){
-        self.col=self.col+1
-        self.pos=self.pos+1
+        self.col+=1
+       self.pos+=1
     }
 }
+
+let lexer=new Lexer("5+6")

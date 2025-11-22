@@ -248,6 +248,10 @@ static enum opcode binop_to_opcode[] = {
     OPCODE_TEST_NOT_EQUAL,
 };
 
+static enum opcode assign_op_to_opcode[] = {
+    OPCODE_ADD, OPCODE_ADD, OPCODE_SUB, OPCODE_MUL, OPCODE_DIV,
+};
+
 static enum opcode unop_to_opcode[] = {
     OPCODE_UNARY_PLUS,
     OPCODE_UNARY_MINUS,
@@ -450,14 +454,27 @@ static inline uint32_t generate_binop(struct generator* generator, struct ast_no
 static inline void generate_simple_assign(struct generator* generator,
                                           struct ast_node* lhs,
                                           uint32_t val_reg,
-                                          struct span span) {
+                                          struct span span,
+                                          enum assign_op op) {
     uint32_t name_len;
     char* name = extract_name_and_len(generator, lhs, &name_len);
 
     struct variable* var;
     if (!find_variable(generator, name, name_len, &var)) {
+        // TODO: compiler error segfaults.
         lu_raise_error(generator->state, "undeclared variable");
         return;
+    }
+
+    if (op != OP_ASSIGN_SIMPLE) {
+        uint32_t lhs_val = generate_expr(generator, lhs);
+        struct instruction instr = {};
+        instr.binary_op.left_reg = lhs_val;
+        instr.binary_op.right_reg = val_reg;
+        instr.binary_op.result_reg = val_reg;
+        instr.opcode = assign_op_to_opcode[op];
+        arrput(GET_CURRENT_BLOCK.instructions_spans, span);
+        arrput(GET_CURRENT_BLOCK.instructions, instr);
     }
 
     struct instruction instr = {
@@ -481,7 +498,8 @@ static inline void generate_subscript_assign(struct generator* generator,
 static inline void generate_object_property_assign(struct generator* generator,
                                                    struct ast_node* lhs,
                                                    uint32_t val_reg,
-                                                   struct span span) {
+                                                   struct span span,
+                                                   enum assign_op op) {
     uint32_t obj = generate_expr(generator, lhs->data.member_expr.object);
     char* name = generator->program.source + lhs->data.member_expr.property_name.start;
     uint32_t name_len =
@@ -494,6 +512,17 @@ static inline void generate_object_property_assign(struct generator* generator,
     struct lu_string* name_string = lu_intern_string(generator->state, name_copy);
     free(name_copy);
     uint32_t name_index = generator_add_identifier(generator, name_string);
+
+    if (op != OP_ASSIGN_SIMPLE) {
+        uint32_t lhs_val = generate_expr(generator, lhs);
+        struct instruction instr = {};
+        instr.binary_op.left_reg = lhs_val;
+        instr.binary_op.right_reg = val_reg;
+        instr.binary_op.result_reg = val_reg;
+        instr.opcode = assign_op_to_opcode[op];
+        arrput(GET_CURRENT_BLOCK.instructions_spans, span);
+        arrput(GET_CURRENT_BLOCK.instructions, instr);
+    }
 
     struct instruction instr = {
         .opcode = OPCODE_OBJECT_SET_PROPERTY,
@@ -509,7 +538,8 @@ static inline uint32_t generate_assign_expr(struct generator* generator, struct 
 
     switch (expr->data.binop.lhs->kind) {
         case AST_NODE_IDENTIFIER: {
-            generate_simple_assign(generator, expr->data.binop.lhs, val_reg, expr->span);
+            generate_simple_assign(generator, expr->data.binop.lhs, val_reg, expr->span,
+                                   expr->data.binop.op);
             break;
         }
         case AST_NODE_COMPUTED_MEMBER_EXPR: {
@@ -517,7 +547,8 @@ static inline uint32_t generate_assign_expr(struct generator* generator, struct 
             break;
         }
         case AST_NODE_MEMBER_EXPR: {
-            generate_object_property_assign(generator, expr->data.binop.lhs, val_reg, expr->span);
+            generate_object_property_assign(generator, expr->data.binop.lhs, val_reg, expr->span,
+                                            expr->data.binop.op);
             break;
         }
         default:
