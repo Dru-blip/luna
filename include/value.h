@@ -33,6 +33,7 @@ struct property_map_entry {
     struct lu_value value;
     struct property_map_entry *next, *prev;
     struct property_map_entry* next_in_order;
+    struct property_map_entry* prev_in_order;
 };
 
 struct property_map {
@@ -385,7 +386,6 @@ static inline int64_t lu_strcmp(struct lu_string* a, struct lu_string* b) {
 }
 
 static inline bool lu_value_strict_equals(struct lu_value a, struct lu_value b) {
-    // strict comparison
     if (a.type != b.type)
         return false;
     switch (a.type) {

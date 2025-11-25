@@ -143,10 +143,12 @@ static void collect_roots(struct heap* heap, struct lu_objectset* roots) {
     // lu_objectset_add(roots, heap->istate->global_object);
     lu_objectset_add(roots, heap->istate->vm->global_object);
     lu_objectset_add(roots, heap->istate->module_cache);
+    lu_objectset_add(roots, heap->istate->native_module_cache);
     lu_objectset_add(roots, heap->istate->running_module);
     lu_objectset_add(roots, heap->istate->main_module);
     lu_objectset_add(roots, heap->istate->object_prototype);
     lu_objectset_add(roots, heap->istate->array_prototype);
+    lu_objectset_add(roots, heap->istate->string_prototype);
 
     if (heap->istate->error) {
         lu_objectset_add(roots, heap->istate->error);
@@ -186,7 +188,7 @@ static void collect_roots(struct heap* heap, struct lu_objectset* roots) {
     string_map_iter_init(&it, &heap->istate->string_pool.strings);
 
     struct string_map_entry* entry;
-    while ((entry = string_map_iter_next(&it))) {
+    while ((entry = string_map_iter_next(&it))!=nullptr) {
         lu_objectset_add(roots, lu_cast(struct lu_object, entry->value));
     }
 
@@ -203,7 +205,7 @@ static void collect_live_cells(struct heap* heap,
 #endif
     struct lu_objectset_iter iter = lu_objectset_iter_new(roots);
     struct lu_object* obj;
-    while ((obj = lu_objectset_iter_next(&iter))) {
+    while ((obj = lu_objectset_iter_next(&iter))!=nullptr) {
         obj->vtable->visit(obj, live_cells);
     }
 #ifdef DEBUG
@@ -223,7 +225,8 @@ static void clear_mark_bits(struct heap* heap) {
 static void mark_live_cells(struct heap* heap, struct lu_objectset* live_cells) {
     struct lu_objectset_iter iter = lu_objectset_iter_new(live_cells);
     struct lu_object* obj;
-    while ((obj = lu_objectset_iter_next(&iter))) {
+    while ((obj = lu_objectset_iter_next(&iter))!=nullptr) {
+        printf("Marking live cell: %p name %s\n", obj, obj->vtable->dbg_name);
         obj->is_marked = true;
     }
 }

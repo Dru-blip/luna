@@ -243,13 +243,38 @@ const char* lu_value_get_type_name(struct lu_value a) {
 void lu_property_map_init(struct property_map* map, size_t capacity) {
     map->capacity = capacity;
     map->size = 0;
-    map->entries = calloc(capacity, sizeof(struct property_map_entry));
+    map->entries = calloc(capacity, sizeof(struct property_map_entry*));
 }
 
 void lu_property_map_deinit(struct property_map* map) {
-    map->size = 0;
-    map->capacity = 0;
+    if (!map)
+        return;
+
+    for (size_t i = 0; i < map->capacity; ++i) {
+        struct property_map_entry* entry = map->entries[i];
+        while (entry) {
+            struct property_map_entry* next = entry->next;
+            free(entry);
+            entry = next;
+        }
+    }
+
     free(map->entries);
+    map->entries = nullptr;
+    map->capacity = 0;
+    map->size = 0;
+    map->head = map->tail = nullptr;
+}
+
+static void insert_node_into_bucket(struct property_map_entry** buckets,
+                                    size_t capacity,
+                                    struct property_map_entry* node) {
+    size_t index = node->key->hash & (capacity - 1);
+    node->next = buckets[index];
+    if (node->next)
+        node->next->prev = node;
+    node->prev = nullptr;
+    buckets[index] = node;
 }
 
 static bool lu_property_map_add_entry(struct property_map* map,
@@ -260,52 +285,51 @@ static bool lu_property_map_add_entry(struct property_map* map,
                                       bool is_resize) {
     size_t index = key->hash & (capacity - 1);
 
-    struct property_map_entry* new_entry = malloc(sizeof(struct property_map_entry));
-    new_entry->key = key;
-    new_entry->value = value;
-    new_entry->next = new_entry->prev = nullptr;
-
     struct property_map_entry* entry = entries[index];
-
     while (entry) {
-        if (lu_string_equal(entry->key, new_entry->key)) {
+        if (lu_string_equal(entry->key, key)) {
             entry->value = value;
-            free(new_entry);
             return false;
         }
         entry = entry->next;
     }
 
-    new_entry->next = entries[index];
-    if (new_entry->next) {
-        new_entry->next->prev = new_entry;
-    }
-    entries[index] = new_entry;
+    struct property_map_entry* new_entry = malloc(sizeof(struct property_map_entry));
+    new_entry->key = key;
+    new_entry->value = value;
 
-    // find a better way to insert the order list
-    if (!is_resize) {
-        if (map->tail) {
-            map->tail->next_in_order = new_entry;
-            map->tail = new_entry;
-        } else {
-            map->head = map->tail = new_entry;
-        }
+    new_entry->next = new_entry->prev = nullptr;
+    new_entry->next_in_order = new_entry->prev_in_order = nullptr;
+
+    insert_node_into_bucket(entries, capacity, new_entry);
+
+    if (map->tail) {
+        map->tail->next_in_order = new_entry;
+        new_entry->prev_in_order = map->tail;
+        map->tail = new_entry;
+    } else {
+        map->head = map->tail = new_entry;
     }
 
     return true;
 }
 
-static void property_map_resize(struct property_map* map, size_t capacity) {
-    size_t new_capacity = capacity;
-    struct property_map_entry** new_entries =
-        calloc(new_capacity, sizeof(struct property_map_entry));
+static void property_map_resize(struct property_map* map, size_t requested_capacity) {
+    size_t new_capacity = requested_capacity;
 
-    for (size_t i = 0; i < map->capacity; i++) {
-        struct property_map_entry* entry = map->entries[i];
-        while (entry) {
-            lu_property_map_add_entry(map, new_entries, new_capacity, entry->key, entry->value,
-                                      true);
-            entry = entry->next;
+    if (new_capacity == map->capacity)
+        return;
+
+    struct property_map_entry** new_entries =
+        calloc(new_capacity, sizeof(struct property_map_entry*));
+
+    for (size_t i = 0; i < map->capacity; ++i) {
+        struct property_map_entry* e = map->entries[i];
+        while (e) {
+            struct property_map_entry* next_old = e->next;
+            e->next = e->prev = NULL;
+            insert_node_into_bucket(new_entries, new_capacity, e);
+            e = next_old;
         }
     }
 
@@ -315,13 +339,14 @@ static void property_map_resize(struct property_map* map, size_t capacity) {
 }
 
 void lu_property_map_set(struct property_map* map, struct lu_string* key, struct lu_value value) {
-    if (((float)(map->size + 1) / map->capacity) >= LU_PROPERTY_MAP_LOAD_FACTOR) {
+    if (((float)(map->size + 1) / (float)map->capacity) >= LU_PROPERTY_MAP_LOAD_FACTOR) {
         size_t new_capacity = map->capacity * 2;
         property_map_resize(map, new_capacity);
     }
+
     if (lu_property_map_add_entry(map, map->entries, map->capacity, key, value, false)) {
         map->size++;
-    };
+    }
 }
 
 struct lu_value lu_property_map_get(struct property_map* map, struct lu_string* key) {
@@ -354,17 +379,7 @@ struct lu_value* lu_property_map_get_ref(struct property_map* map, struct lu_str
 }
 
 bool lu_property_map_has(struct property_map* map, struct lu_string* key) {
-    size_t index = (key->hash) & (map->capacity - 1);
-
-    struct property_map_entry* entry = map->entries[index];
-    while (entry) {
-        if (lu_string_equal(entry->key, key)) {
-            return true;
-        }
-        entry = entry->next;
-    }
-
-    return false;
+    return lu_property_map_get_ref(map, key) != nullptr;
 }
 
 // TODO: remove implement

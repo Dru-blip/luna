@@ -4,6 +4,9 @@
 #include "value.h"
 
 void worklist_enqueue(struct worklist* worklist, struct lu_object* object) {
+    if (!object) {
+        return;
+    }
     struct worklist_item* item = malloc(sizeof(struct worklist_item));
 
     item->object = object;
