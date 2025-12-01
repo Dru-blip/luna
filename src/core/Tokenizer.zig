@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const Token = struct {
+pub const Token = struct {
     tag: Tag,
     loc: Loc,
 
@@ -22,6 +22,8 @@ const Token = struct {
 
         int,
         identifier,
+        keyword_return,
+
         eof,
     };
 
@@ -37,6 +39,7 @@ const Token = struct {
 buffer: [:0]const u8,
 index: usize,
 
+pub const Tokens = std.ArrayList(Token);
 const Tokenizer = @This();
 
 pub fn dump(self: *Tokenizer, token: *const Token) void {
@@ -84,6 +87,10 @@ pub fn next(self: *Tokenizer) Token {
                 } else {
                     continue :state .invalid;
                 }
+            },
+            ' ', '\t', '\r' => {
+                self.index += 1;
+                continue :state .start;
             },
             '+' => continue :state .plus,
             '-' => continue :state .minus,
@@ -149,4 +156,16 @@ pub fn next(self: *Tokenizer) Token {
 
     result.loc.end = self.index;
     return result;
+}
+
+pub fn tokenize(source: [:0]const u8, gpa: std.mem.Allocator) !Tokens {
+    var tokens: Tokens = .empty;
+    var tokenizer = Tokenizer.init(source);
+    while (true) {
+        const token = tokenizer.next();
+        if (token.tag == .eof) break;
+        try tokens.append(gpa, token);
+        // tokenizer.dump(&token);
+    }
+    return tokens;
 }
