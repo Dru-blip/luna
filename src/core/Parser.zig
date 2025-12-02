@@ -7,6 +7,11 @@ const Tokens = @import("Tokenizer.zig").Tokens;
 
 const Parser = @This();
 
+const ParserError = error{
+    SyntaxError,
+    UnexpectedToken,
+} || std.mem.Allocator.Error;
+
 source: []const u8,
 tok_i: usize,
 ast: Ast,
@@ -29,7 +34,7 @@ fn advance(parser: *Parser) void {
     }
 }
 
-fn at_end(parser: *Parser) bool {
+fn atEnd(parser: *Parser) bool {
     return parser.tokens.items[parser.tok_i].tag == .eof;
 }
 
@@ -46,33 +51,39 @@ fn nextToken(p: *Parser) *const Token {
     return &p.tokens.items[p.tok_i];
 }
 
-pub fn parse(p: *Parser) !Ast {
-    while (!p.at_end()) {
-        const stmt = try p.parse_stmt();
-        if (stmt) |node| {
-            try p.ast.nodes.append(p.gpa, node);
-        }
+fn expectToken(p: *Parser, tag: Token.Tag) ParserError!*const Token {
+    if (p.peek().tag == tag) {
+        const token = p.peek();
+        p.advance();
+        return token;
+    }
+    return ParserError.UnexpectedToken;
+}
+
+pub fn parse(p: *Parser) ParserError!Ast {
+    while (!p.atEnd()) {
+        const stmt = try p.parseStmt();
+        try p.ast.nodes.append(p.gpa, stmt);
     }
     return p.ast;
 }
 
-fn parse_stmt(p: *Parser) !?*Node {
+fn parseStmt(p: *Parser) ParserError!*Node {
     const token = p.peek();
     switch (token.tag) {
+        .keyword_return => return p.parseReturnStmt(),
         else => {
-            //TODO: make a utility function to create nodes.
-            const expr = try p.parse_expr(0);
-            var node = try p.ast.make_node(.expr_stmt);
-            node.data.un = expr.?;
-            return node;
+            const expr = try p.parseExpr(0);
+            return p.ast.makeExprStmt(expr);
         },
     }
 }
 
-const Assoc = enum {
-    left,
-    none,
-};
+fn parseReturnStmt(p: *Parser) ParserError!*Node {
+    const token = try p.expectToken(.keyword_return);
+    const expr = try p.parseExpr(0);
+    return p.ast.makeReturnStmt(token.loc.merge(&expr.loc), expr);
+}
 
 const OperInfo = struct {
     lbp: i8,
@@ -87,35 +98,32 @@ const operTable = std.enums.directEnumArrayDefault(Token.Tag, OperInfo, .{ .lbp 
     .slash = .{ .lbp = 70, .rbp = 71, .tag = .div },
 });
 
-fn parse_expr(p: *Parser, min_prec: i8) !?*Node {
-    var lhs = try p.parse_primary_expr();
+fn parseExpr(p: *Parser, min_prec: i8) ParserError!*Node {
+    var lhs = try p.parsePrimaryExpr();
     while (true) {
         const tok_tag = p.tokenTag(p.tok_i);
         const info = operTable[@as(usize, @intCast(@intFromEnum(tok_tag)))];
         if (info.lbp < min_prec) {
             break;
         }
-
-        const oper_token = p.nextToken();
-        const rhs = try p.parse_expr(info.rbp);
-        const node = try p.ast.make_node(info.tag);
-        node.loc = oper_token.loc;
-        node.data.bin = .{ .lhs = lhs.?, .rhs = rhs.? };
-        lhs = node;
+        _ = p.nextToken();
+        const rhs = try p.parseExpr(info.rbp);
+        lhs = try p.ast.makeBinOp(info.tag, lhs.loc.merge(&rhs.loc), lhs, rhs);
     }
     return lhs;
 }
 
-fn parse_primary_expr(p: *Parser) !?*Node {
+fn parsePrimaryExpr(p: *Parser) ParserError!*Node {
     const token = p.peek();
     switch (token.tag) {
         .int => {
             p.advance();
-            const node = try p.ast.make_node(.int_literal);
+            const node = try p.ast.makeNode(.int_literal);
             node.loc = token.loc;
             return node;
         },
-        else => unreachable,
+        else => {
+            return ParserError.SyntaxError;
+        },
     }
-    return null;
 }

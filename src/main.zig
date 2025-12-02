@@ -11,9 +11,10 @@ pub fn main() !void {
         }
     }
     const allocator = gpa.allocator();
-    var tokens = try Tokenizer.tokenize("5", allocator);
+    var tokens = try Tokenizer.tokenize("return 5+6", allocator);
     defer tokens.deinit(allocator);
-    var parser = Parser.init(allocator, "5", tokens);
-    const ast = try parser.parse();
-    std.debug.print("nodes: {d}", .{ast.nodes.items.len});
+    var parser = Parser.init(allocator, "return 5+6", tokens);
+    var ast = try parser.parse();
+    defer ast.deinit();
+    std.debug.print("nodes: {d}\n", .{ast.nodes.items.len});
 }

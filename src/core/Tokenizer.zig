@@ -5,8 +5,19 @@ pub const Token = struct {
     loc: Loc,
 
     pub const Loc = struct {
-        start: usize,
-        end: usize,
+        start: u32,
+        end: u32,
+        line: u32,
+        col: u32,
+
+        pub fn merge(self: Loc, other: *Loc) Loc {
+            return .{
+                .start = self.start,
+                .end = other.end,
+                .line = self.line,
+                .col = self.col,
+            };
+        }
     };
 
     pub const Tag = enum {
@@ -37,7 +48,9 @@ pub const Token = struct {
 };
 
 buffer: [:0]const u8,
-index: usize,
+index: u32,
+line: u32,
+col: u32,
 
 pub const Tokens = std.ArrayList(Token);
 const Tokenizer = @This();
@@ -50,6 +63,8 @@ pub fn init(buffer: [:0]const u8) Tokenizer {
     return .{
         .buffer = buffer,
         .index = if (std.mem.startsWith(u8, buffer, "\xEF\xBB\xBF")) 3 else 0,
+        .line = 1,
+        .col = 1,
     };
 }
 
@@ -64,11 +79,18 @@ const State = enum {
     invalid,
 };
 
+fn advance(self: *Tokenizer) void {
+    self.index += 1;
+    self.col += 1;
+}
+
 pub fn next(self: *Tokenizer) Token {
     var result: Token = .{
         .tag = undefined,
         .loc = .{
             .start = self.index,
+            .line = self.line,
+            .col = self.col,
             .end = undefined,
         },
     };
@@ -80,6 +102,8 @@ pub fn next(self: *Tokenizer) Token {
                     return .{
                         .tag = .eof,
                         .loc = .{
+                            .line = self.line,
+                            .col = self.col,
                             .start = self.index,
                             .end = self.index,
                         },
@@ -89,6 +113,12 @@ pub fn next(self: *Tokenizer) Token {
                 }
             },
             ' ', '\t', '\r' => {
+                self.advance();
+                continue :state .start;
+            },
+            '\n' => {
+                self.line += 1;
+                self.col = 1;
                 self.index += 1;
                 continue :state .start;
             },
@@ -107,31 +137,31 @@ pub fn next(self: *Tokenizer) Token {
             else => continue :state .invalid,
         },
         .plus => {
-            self.index += 1;
+            self.advance();
             switch (self.buffer[self.index]) {
                 else => result.tag = .plus,
             }
         },
         .minus => {
-            self.index += 1;
+            self.advance();
             switch (self.buffer[self.index]) {
                 else => result.tag = .minus,
             }
         },
         .asterisk => {
-            self.index += 1;
+            self.advance();
             switch (self.buffer[self.index]) {
                 else => result.tag = .asterisk,
             }
         },
         .slash => {
-            self.index += 1;
+            self.advance();
             switch (self.buffer[self.index]) {
                 else => result.tag = .slash,
             }
         },
         .identifier => {
-            self.index += 1;
+            self.advance();
             switch (self.buffer[self.index]) {
                 'a'...'z', 'A'...'Z', '_' => continue :state .identifier,
                 else => {
@@ -143,7 +173,7 @@ pub fn next(self: *Tokenizer) Token {
             }
         },
         .int => {
-            self.index += 1;
+            self.advance();
             switch (self.buffer[self.index]) {
                 '0'...'9' => continue :state .int,
                 else => {},
@@ -165,7 +195,6 @@ pub fn tokenize(source: [:0]const u8, gpa: std.mem.Allocator) !Tokens {
         const token = tokenizer.next();
         try tokens.append(gpa, token);
         if (token.tag == .eof) break;
-        // tokenizer.dump(&token);
     }
     return tokens;
 }
