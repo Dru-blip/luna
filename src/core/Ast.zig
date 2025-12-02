@@ -8,19 +8,27 @@ pub const Node = struct {
     loc: Token.Loc,
     data: Data,
 
-    const Tag = enum {
+    pub const Tag = enum {
         root,
         expr_stmt,
+        add,
+        sub,
+        mul,
+        div,
         int_literal,
     };
 
     const Data = union {
         un: *Node,
+        bin: struct {
+            lhs: *Node,
+            rhs: *Node,
+        },
         int: i64,
     };
 };
 
-pub const Nodes = std.ArrayList(Node);
+pub const Nodes = std.ArrayList(*Node);
 
 nodes: Nodes,
 arena: std.heap.ArenaAllocator,

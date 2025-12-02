@@ -9,7 +9,7 @@ pub const Token = struct {
         end: usize,
     };
 
-    const Tag = enum {
+    pub const Tag = enum {
         invalid,
         plus,
         minus,
@@ -163,8 +163,8 @@ pub fn tokenize(source: [:0]const u8, gpa: std.mem.Allocator) !Tokens {
     var tokenizer = Tokenizer.init(source);
     while (true) {
         const token = tokenizer.next();
-        if (token.tag == .eof) break;
         try tokens.append(gpa, token);
+        if (token.tag == .eof) break;
         // tokenizer.dump(&token);
     }
     return tokens;
