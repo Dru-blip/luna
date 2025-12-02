@@ -7,3 +7,6 @@ builddir
 buildDir
 .idea
 callgrind.*
+
+.zig-cache
+zig-out/bin
