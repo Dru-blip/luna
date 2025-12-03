@@ -127,6 +127,7 @@ pub fn next(self: *Tokenizer) Token {
             '*' => continue :state .asterisk,
             '/' => continue :state .slash,
             '0'...'9' => {
+                result.loc.start = self.index;
                 result.tag = .int;
                 continue :state .int;
             },

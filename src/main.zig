@@ -1,6 +1,7 @@
 const std = @import("std");
 const Tokenizer = @import("core/Tokenizer.zig");
 const Parser = @import("core/Parser.zig");
+const Eval = @import("core/Eval.zig");
 
 pub fn main() !void {
     var gpa = std.heap.DebugAllocator(.{}){};
@@ -10,11 +11,12 @@ pub fn main() !void {
             std.debug.print("Memory leak detected\n", .{});
         }
     }
+    const source = "10/5";
     const allocator = gpa.allocator();
-    var tokens = try Tokenizer.tokenize("return 5+6", allocator);
+    var tokens = try Tokenizer.tokenize(source, allocator);
     defer tokens.deinit(allocator);
-    var parser = Parser.init(allocator, "return 5+6", tokens);
+    var parser = Parser.init(allocator, source, tokens);
     var ast = try parser.parse();
     defer ast.deinit();
-    std.debug.print("nodes: {d}\n", .{ast.nodes.items.len});
+    Eval.eval(ast);
 }

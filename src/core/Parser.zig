@@ -10,7 +10,7 @@ const Parser = @This();
 const ParserError = error{
     SyntaxError,
     UnexpectedToken,
-} || std.mem.Allocator.Error;
+} || std.mem.Allocator.Error || std.fmt.ParseIntError;
 
 source: []const u8,
 tok_i: usize,
@@ -118,9 +118,8 @@ fn parsePrimaryExpr(p: *Parser) ParserError!*Node {
     switch (token.tag) {
         .int => {
             p.advance();
-            const node = try p.ast.makeNode(.int_literal);
-            node.loc = token.loc;
-            return node;
+            const value = try std.fmt.parseInt(i64, p.source[token.loc.start..token.loc.end], 10);
+            return try p.ast.makeIntLiteral(token.loc, value);
         },
         else => {
             return ParserError.SyntaxError;
