@@ -2,6 +2,8 @@ const std = @import("std");
 const Tokenizer = @import("core/Tokenizer.zig");
 const Parser = @import("core/Parser.zig");
 const Eval = @import("core/Eval.zig");
+const Gc = @import("core/Gc.zig");
+const LuObject = @import("core/LuObject.zig");
 
 pub fn main() !void {
     var gpa = std.heap.DebugAllocator(.{}){};
@@ -18,5 +20,8 @@ pub fn main() !void {
     var parser = Parser.init(allocator, source, tokens);
     var ast = try parser.parse();
     defer ast.deinit();
-    Eval.eval(ast);
+    var gc = Gc.init(allocator);
+    _ = try LuObject.alloc(&gc);
+
+    // Eval.eval(ast);
 }
