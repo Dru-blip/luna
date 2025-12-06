@@ -37,12 +37,14 @@ pub const Nodes = std.ArrayList(*Node);
 nodes: Nodes,
 arena: std.heap.ArenaAllocator,
 gpa: std.mem.Allocator,
+source: [:0]const u8,
 
-pub fn init(gpa: std.mem.Allocator) Ast {
+pub fn init(gpa: std.mem.Allocator, source: [:0]const u8) Ast {
     return .{
         .arena = std.heap.ArenaAllocator.init(gpa),
         .nodes = .empty,
         .gpa = gpa,
+        .source = source,
     };
 }
 

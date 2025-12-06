@@ -12,17 +12,17 @@ const ParserError = error{
     UnexpectedToken,
 } || std.mem.Allocator.Error || std.fmt.ParseIntError;
 
-source: []const u8,
+source: [:0]const u8,
 tok_i: usize,
 ast: Ast,
 tokens: Tokens,
 gpa: std.mem.Allocator,
 
-pub fn init(gpa: std.mem.Allocator, source: []const u8, tokens: Tokens) Parser {
+pub fn init(gpa: std.mem.Allocator, source: [:0]const u8, tokens: Tokens) Parser {
     return .{
         .source = source,
         .tok_i = 0,
-        .ast = Ast.init(gpa),
+        .ast = Ast.init(gpa, source),
         .gpa = gpa,
         .tokens = tokens,
     };
@@ -65,6 +65,7 @@ pub fn parse(p: *Parser) ParserError!Ast {
         const stmt = try p.parseStmt();
         try p.ast.nodes.append(p.gpa, stmt);
     }
+    p.tokens.deinit(p.gpa);
     return p.ast;
 }
 

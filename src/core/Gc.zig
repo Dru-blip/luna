@@ -62,7 +62,14 @@ pub fn init(allocator: std.mem.Allocator) Gc {
     };
 }
 
-pub fn deinit(_: *Gc) void {}
+pub fn deinit(gc: *Gc) void {
+    for (gc.blocks.items) |block| {
+        gc.gpa.free(block.data);
+    }
+
+    gc.blocks.deinit(gc.gpa);
+    gc.arena.deinit();
+}
 
 pub fn alloc(gc: *Gc, comptime T: anytype) !*T {
     const cell_size = @sizeOf(T);
