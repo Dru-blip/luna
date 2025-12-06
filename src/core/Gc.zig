@@ -32,10 +32,16 @@ const Block = struct {
 pub const GcObject = struct {
     marked: bool = false,
     ptr: *anyopaque,
-    // vtable: *const VTable,
+    status: Status,
+    vtable: *const VTable,
+
+    pub const Status = enum {
+        alive,
+        dead,
+    };
 
     pub const VTable = struct {
-        finalize: *const fn (*anyopaque) void,
+        finalize: *const fn (*anyopaque, *Gc) void,
         visit: *const fn (*anyopaque, *Gc) void,
     };
 
@@ -43,9 +49,11 @@ pub const GcObject = struct {
         return @ptrCast(@alignCast(obj.ptr));
     }
 
-    pub inline fn from(ptr: *anyopaque) GcObject {
+    pub inline fn from(ptr: *anyopaque, vtable: *const VTable) GcObject {
         return .{
             .ptr = ptr,
+            .vtable = vtable,
+            .status = Status.alive,
         };
     }
 };

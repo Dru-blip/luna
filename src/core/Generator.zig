@@ -62,7 +62,7 @@ pub fn generate(g: *Generator) !*Executable {
 }
 
 pub fn finalize(g: *Generator) !*Executable {
-    var executable: *Executable = try g.gc.alloc(Executable);
+    var executable: *Executable = try Executable.new(g.gc);
     executable.constants = try g.constants.toOwnedSlice(g.gpa);
 
     try g.linearizeBasicBlocks(executable);
