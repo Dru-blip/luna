@@ -16,6 +16,15 @@ pub const Inst = struct {
         sub,
         mul,
         div,
+        mod,
+
+        test_lt,
+        test_gt,
+        test_le,
+        test_ge,
+        test_neq,
+        test_eq,
+
         ret,
     };
 

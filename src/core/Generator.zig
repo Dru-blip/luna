@@ -156,48 +156,47 @@ fn genExpr(g: *Generator, node: *Ast.Node) !u32 {
             return reg;
         },
         .add => {
-            const lhs = try g.genExpr(node.data.bin.lhs);
-            const rhs = try g.genExpr(node.data.bin.rhs);
-            const dst = g.allocRegister();
-            try g.addTri(.add, lhs, rhs, dst, node.loc);
-            try g.freeRegister(lhs);
-            try g.freeRegister(rhs);
-            return dst;
+            return g.genBinOp(.add, node);
         },
         .sub => {
-            const lhs = try g.genExpr(node.data.bin.lhs);
-            const rhs = try g.genExpr(node.data.bin.rhs);
-
-            const dst = g.allocRegister();
-            try g.addTri(.sub, lhs, rhs, dst, node.loc);
-            try g.freeRegister(lhs);
-            try g.freeRegister(rhs);
-            return dst;
+            return g.genBinOp(.sub, node);
         },
         .mul => {
-            const lhs = try g.genExpr(node.data.bin.lhs);
-            const rhs = try g.genExpr(node.data.bin.rhs);
-
-            const dst = g.allocRegister();
-            try g.addTri(.mul, lhs, rhs, dst, node.loc);
-            try g.freeRegister(lhs);
-            try g.freeRegister(rhs);
-            return dst;
+            return g.genBinOp(.mul, node);
         },
         .div => {
-            const lhs = try g.genExpr(node.data.bin.lhs);
-            const rhs = try g.genExpr(node.data.bin.rhs);
-
-            const dst = g.allocRegister();
-            try g.addTri(.div, lhs, rhs, dst, node.loc);
-            try g.freeRegister(lhs);
-            try g.freeRegister(rhs);
-            return dst;
+            return g.genBinOp(.div, node);
+        },
+        .mod => {
+            return g.genBinOp(.mod, node);
+        },
+        .less => {
+            return g.genBinOp(.test_lt, node);
+        },
+        .greater => {
+            return g.genBinOp(.test_gt, node);
+        },
+        .less_or_equal => {
+            return g.genBinOp(.test_le, node);
+        },
+        .greater_or_equal => {
+            return g.genBinOp(.test_ge, node);
         },
         else => {
             unreachable;
         },
     }
+}
+
+inline fn genBinOp(g: *Generator, op: Inst.Op, node: *Ast.Node) !u32 {
+    const lhs = try g.genExpr(node.data.bin.lhs);
+    const rhs = try g.genExpr(node.data.bin.rhs);
+
+    const dst = g.allocRegister();
+    try g.addTri(op, lhs, rhs, dst, node.loc);
+    try g.freeRegister(lhs);
+    try g.freeRegister(rhs);
+    return dst;
 }
 
 fn linearizeBasicBlocks(g: *Generator, executable: *Executable) !void {
