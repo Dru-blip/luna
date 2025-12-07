@@ -13,10 +13,27 @@ pub const Node = struct {
         block,
         return_stmt,
         expr_stmt,
+
         add,
         sub,
         mul,
         div,
+        mod,
+
+        less,
+        greater,
+        less_or_equal,
+        greater_or_equal,
+        equal_equal,
+        bang_equal,
+
+        assign,
+        add_assign,
+        sub_assign,
+        mul_assign,
+        div_assign,
+        mod_assign,
+
         int_literal,
     };
 

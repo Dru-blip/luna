@@ -23,9 +23,27 @@ pub const Token = struct {
     pub const Tag = enum {
         invalid,
         plus,
+        plus_equal,
         minus,
+        minus_equal,
         asterisk,
+        asterisk_equal,
         slash,
+        slash_equal,
+        modulus,
+        modulus_equal,
+
+        angle_bracket_left,
+        angle_bracket_right,
+        angle_bracket_left_equal,
+        angle_bracket_right_equal,
+
+        bang,
+
+        equal,
+        equal_equal,
+        bang_equal,
+
         l_paren,
         r_paren,
         l_brace,
@@ -75,7 +93,12 @@ const State = enum {
     minus,
     asterisk,
     slash,
+    modulus,
     int,
+    equal,
+    less,
+    greater,
+    bang,
     invalid,
 };
 
@@ -122,10 +145,31 @@ pub fn next(self: *Tokenizer) Token {
                 self.index += 1;
                 continue :state .start;
             },
+            '(' => {
+                self.advance();
+                result.tag = .l_paren;
+            },
+            ')' => {
+                self.advance();
+                result.tag = .r_paren;
+            },
+            '{' => {
+                self.advance();
+                result.tag = .l_brace;
+            },
+            '}' => {
+                self.advance();
+                result.tag = .r_brace;
+            },
             '+' => continue :state .plus,
             '-' => continue :state .minus,
             '*' => continue :state .asterisk,
             '/' => continue :state .slash,
+            '%' => continue :state .modulus,
+            '<' => continue :state .less,
+            '>' => continue :state .greater,
+            '=' => continue :state .equal,
+            '!' => continue :state .bang,
             '0'...'9' => {
                 result.loc.start = self.index;
                 result.tag = .int;
@@ -140,25 +184,64 @@ pub fn next(self: *Tokenizer) Token {
         .plus => {
             self.advance();
             switch (self.buffer[self.index]) {
+                '=' => result.tag = .plus_equal,
                 else => result.tag = .plus,
             }
         },
         .minus => {
             self.advance();
             switch (self.buffer[self.index]) {
+                '=' => result.tag = .minus_equal,
                 else => result.tag = .minus,
             }
         },
         .asterisk => {
             self.advance();
             switch (self.buffer[self.index]) {
+                '=' => result.tag = .asterisk_equal,
                 else => result.tag = .asterisk,
             }
         },
         .slash => {
             self.advance();
             switch (self.buffer[self.index]) {
+                '=' => result.tag = .slash_equal,
                 else => result.tag = .slash,
+            }
+        },
+        .modulus => {
+            self.advance();
+            switch (self.buffer[self.index]) {
+                '=' => result.tag = .modulus_equal,
+                else => result.tag = .modulus,
+            }
+        },
+        .less => {
+            self.advance();
+            switch (self.buffer[self.index]) {
+                '=' => result.tag = .angle_bracket_left_equal,
+                else => result.tag = .angle_bracket_left,
+            }
+        },
+        .greater => {
+            self.advance();
+            switch (self.buffer[self.index]) {
+                '=' => result.tag = .angle_bracket_right_equal,
+                else => result.tag = .angle_bracket_right,
+            }
+        },
+        .equal => {
+            self.advance();
+            switch (self.buffer[self.index]) {
+                '=' => result.tag = .equal_equal,
+                else => result.tag = .equal,
+            }
+        },
+        .bang => {
+            self.advance();
+            switch (self.buffer[self.index]) {
+                '=' => result.tag = .bang_equal,
+                else => result.tag = .bang,
             }
         },
         .identifier => {

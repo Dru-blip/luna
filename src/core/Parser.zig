@@ -93,10 +93,26 @@ const OperInfo = struct {
 };
 
 const operTable = std.enums.directEnumArrayDefault(Token.Tag, OperInfo, .{ .lbp = -1, .rbp = -1, .tag = Node.Tag.root }, 0, .{
+    .equal = .{ .lbp = 1, .rbp = 1, .tag = .assign },
+    .plus_equal = .{ .lbp = 1, .rbp = 1, .tag = .add_assign },
+    .minus_equal = .{ .lbp = 1, .rbp = 1, .tag = .sub_assign },
+    .asterisk_equal = .{ .lbp = 1, .rbp = 1, .tag = .mul_assign },
+    .slash_equal = .{ .lbp = 1, .rbp = 1, .tag = .div_assign },
+    .modulus_equal = .{ .lbp = 1, .rbp = 1, .tag = .mod_assign },
+
+    .equal_equal = .{ .lbp = 30, .rbp = 31, .tag = .equal_equal },
+    .bang_equal = .{ .lbp = 30, .rbp = 31, .tag = .bang_equal },
+
+    .angle_bracket_left = .{ .lbp = 40, .rbp = 41, .tag = .less },
+    .angle_bracket_right = .{ .lbp = 40, .rbp = 41, .tag = .greater },
+    .angle_bracket_left_equal = .{ .lbp = 40, .rbp = 41, .tag = .less_or_equal },
+    .angle_bracket_right_equal = .{ .lbp = 40, .rbp = 41, .tag = .greater_or_equal },
+
     .plus = .{ .lbp = 60, .rbp = 61, .tag = .add },
     .minus = .{ .lbp = 60, .rbp = 61, .tag = .sub },
     .asterisk = .{ .lbp = 70, .rbp = 71, .tag = .mul },
     .slash = .{ .lbp = 70, .rbp = 71, .tag = .div },
+    .modulus = .{ .lbp = 70, .rbp = 71, .tag = .mod },
 });
 
 fn parseExpr(p: *Parser, min_prec: i8) ParserError!*Node {

@@ -14,7 +14,7 @@ pub fn main() !void {
             std.debug.print("Memory leak detected\n", .{});
         }
     }
-    const source = "10/5";
+    const source = "10<10";
     const allocator = gpa.allocator();
     const tokens = try Tokenizer.tokenize(source, allocator);
     var parser = Parser.init(allocator, source, tokens);
