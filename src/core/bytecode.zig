@@ -38,17 +38,13 @@ pub const Instructions = std.ArrayList(Inst);
 pub const Constants = std.ArrayList(Value);
 
 pub const Executable = struct {
-    meta: GcObject,
     instructions: []Inst,
     spans: []Span,
     constants: Constants.Slice,
     max_register_count: u32,
 
     pub fn new(gc: *Gc) !*Executable {
-        const obj: *Executable = try gc.alloc(Executable);
-        const meta: GcObject = GcObject.from(obj, &vtable);
-        obj.meta = meta;
-        // obj.properties = std.StringHashMap(Value).init(gc.gpa);
+        const obj: *Executable = try gc.allocWithVtable(Executable, &vtable);
         return obj;
     }
 

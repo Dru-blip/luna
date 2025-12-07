@@ -11,34 +11,35 @@ const Block = struct {
     cell_count: u32,
     free_list: ?*Cell,
     data: []u8,
+    bitmap: std.DynamicBitSet,
 
     pub const Cell = struct {
         next: ?*Cell,
     };
 
-    pub fn cell(blk: *Block, i: usize) *Cell {
+    pub inline fn cell(blk: *Block, i: usize) *Cell {
         return @ptrCast(@alignCast(blk.data[i * blk.cell_size ..]));
     }
 
     pub fn allocateCell(blk: *Block) ?*Cell {
         if (blk.free_list) |node| {
+            blk.bitmap.set(blk.indexOf(node));
             blk.free_list = node.next;
             return node;
         }
         return null;
+    }
+
+    pub inline fn indexOf(blk: *Block, value: *Cell) usize {
+        //does not check whether the value is within the block's range
+        return (@intFromPtr(value) - @intFromPtr(blk.data.ptr)) / blk.cell_size;
     }
 };
 
 pub const GcObject = struct {
     marked: bool = false,
     ptr: *anyopaque,
-    status: Status,
     vtable: *const VTable,
-
-    pub const Status = enum {
-        alive,
-        dead,
-    };
 
     pub const VTable = struct {
         finalize: *const fn (*anyopaque, *Gc) void,
@@ -53,7 +54,6 @@ pub const GcObject = struct {
         return .{
             .ptr = ptr,
             .vtable = vtable,
-            .status = Status.alive,
         };
     }
 };
@@ -72,6 +72,7 @@ pub fn init(allocator: std.mem.Allocator) Gc {
 
 pub fn deinit(gc: *Gc) void {
     for (gc.blocks.items) |block| {
+        block.bitmap.deinit();
         gc.gpa.free(block.data);
     }
 
@@ -80,13 +81,40 @@ pub fn deinit(gc: *Gc) void {
 }
 
 pub fn alloc(gc: *Gc, comptime T: anytype) !*T {
-    const cell_size = @sizeOf(T);
+    const obj_size = @sizeOf(T);
+    const header_size = @sizeOf(GcObject);
+    const cell_size = header_size + obj_size;
 
     const block = gc.findSuitableBlock(cell_size) orelse try gc.createBlock(cell_size);
 
     const cell = block.allocateCell() orelse return std.mem.Allocator.Error.OutOfMemory;
 
-    return @ptrCast(cell);
+    const base_int = @intFromPtr(cell);
+    const header: *GcObject = @ptrFromInt(base_int);
+
+    const obj_ptr: *T = @ptrFromInt(base_int + header_size);
+    header.*.ptr = obj_ptr;
+
+    return @ptrCast(obj_ptr);
+}
+
+pub fn allocWithVtable(gc: *Gc, comptime T: anytype, vtable: *const GcObject.VTable) !*T {
+    const obj_size = @sizeOf(T);
+    const header_size = @sizeOf(GcObject);
+    const cell_size = header_size + obj_size;
+
+    const block = gc.findSuitableBlock(cell_size) orelse try gc.createBlock(cell_size);
+
+    const cell = block.allocateCell() orelse return std.mem.Allocator.Error.OutOfMemory;
+
+    const base_int = @intFromPtr(cell);
+    const header: *GcObject = @ptrFromInt(base_int);
+    const obj_ptr: *T = @ptrFromInt(base_int + header_size);
+
+    header.*.vtable = vtable;
+    header.*.ptr = obj_ptr;
+
+    return @ptrCast(obj_ptr);
 }
 
 fn createBlock(gc: *Gc, cell_size: u32) !*Block {
@@ -97,6 +125,7 @@ fn createBlock(gc: *Gc, cell_size: u32) !*Block {
         .cell_count = cell_count,
         .cell_size = cell_size,
         .free_list = null,
+        .bitmap = try std.DynamicBitSet.initEmpty(gc.gpa, cell_count),
         .data = try gc.gpa.alloc(u8, Block.DefaultSize),
     };
 
@@ -124,4 +153,17 @@ inline fn findSuitableBlock(gc: *Gc, cell_size: u32) ?*Block {
         }
     }
     return null;
+}
+
+pub fn collect(gc: *Gc) void {
+    for (gc.blocks.items) |blk| {
+        for (0..blk.cell_count) |i| {
+            const cell = blk.cell(i);
+            const index = blk.indexOf(cell);
+            if (blk.bitmap.isSet(index)) {
+                const obj: *GcObject = @ptrCast(cell);
+                obj.vtable.finalize(obj.ptr, gc);
+            }
+        }
+    }
 }

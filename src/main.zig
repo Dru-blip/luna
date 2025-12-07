@@ -25,6 +25,7 @@ pub fn main() !void {
     var generator = try Generator.init(allocator, ast, &gc);
     defer generator.deinit();
     _ = try generator.generate();
+    gc.collect();
 
     // Eval.eval(ast);
 }

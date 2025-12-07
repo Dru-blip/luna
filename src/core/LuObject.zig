@@ -5,7 +5,6 @@ const GcObject = Gc.GcObject;
 
 const LuObject = @This();
 
-meta: GcObject,
 properties: std.StringHashMap(Value),
 
 pub fn new(gc: *Gc) !*LuObject {
