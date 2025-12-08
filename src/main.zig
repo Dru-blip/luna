@@ -3,7 +3,6 @@ const Tokenizer = @import("core/Tokenizer.zig");
 const Parser = @import("core/Parser.zig");
 const Eval = @import("core/Eval.zig");
 const Gc = @import("core/Gc.zig");
-const LuObject = @import("core/LuObject.zig");
 const Generator = @import("core/Generator.zig");
 
 pub fn main() !void {
@@ -24,7 +23,8 @@ pub fn main() !void {
     defer gc.deinit();
     var generator = try Generator.init(allocator, ast, &gc);
     defer generator.deinit();
-    _ = try generator.generate();
+    const executable = try generator.generate();
+    try executable.print();
     gc.collect();
 
     // Eval.eval(ast);

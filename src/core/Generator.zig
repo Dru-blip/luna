@@ -12,6 +12,8 @@ const Executable = bytecode.Executable;
 const Instructions = bytecode.Instructions;
 const Generator = @This();
 
+pub const GenError = error{} || std.mem.Allocator.Error;
+
 arena: std.heap.ArenaAllocator,
 blocks: std.ArrayList(*BasicBlock),
 gpa: std.mem.Allocator,
@@ -65,6 +67,7 @@ pub fn finalize(g: *Generator) !*Executable {
     var executable: *Executable = try Executable.new(g.gc);
     executable.constants = try g.constants.toOwnedSlice(g.gpa);
 
+    executable.max_register_count = g.register_count;
     try g.linearizeBasicBlocks(executable);
 
     return executable;
@@ -125,13 +128,13 @@ fn addTri(g: *Generator, op: Inst.Op, arg1: u32, arg2: u32, arg3: u32, span: Spa
     try g.addInst(op, .{ .tri = .{ .arg1 = arg1, .arg2 = arg2, .arg3 = arg3 } }, span);
 }
 
-fn genNodes(g: *Generator, nodes: Ast.Nodes) !void {
+fn genNodes(g: *Generator, nodes: Ast.Nodes) GenError!void {
     for (nodes.items) |node| {
         try g.genStmt(node);
     }
 }
 
-fn genStmt(g: *Generator, node: *Ast.Node) !void {
+fn genStmt(g: *Generator, node: *Ast.Node) GenError!void {
     switch (node.tag) {
         .return_stmt => {
             const val = try g.genExpr(node.data.opt.?);
@@ -147,7 +150,7 @@ fn genStmt(g: *Generator, node: *Ast.Node) !void {
     }
 }
 
-fn genExpr(g: *Generator, node: *Ast.Node) !u32 {
+fn genExpr(g: *Generator, node: *Ast.Node) GenError!u32 {
     switch (node.tag) {
         .int_literal => {
             const reg = g.allocRegister();
@@ -156,31 +159,31 @@ fn genExpr(g: *Generator, node: *Ast.Node) !u32 {
             return reg;
         },
         .add => {
-            return g.genBinOp(.add, node);
+            return try g.genBinOp(.add, node);
         },
         .sub => {
-            return g.genBinOp(.sub, node);
+            return try g.genBinOp(.sub, node);
         },
         .mul => {
-            return g.genBinOp(.mul, node);
+            return try g.genBinOp(.mul, node);
         },
         .div => {
-            return g.genBinOp(.div, node);
+            return try g.genBinOp(.div, node);
         },
         .mod => {
-            return g.genBinOp(.mod, node);
+            return try g.genBinOp(.mod, node);
         },
         .less => {
-            return g.genBinOp(.test_lt, node);
+            return try g.genBinOp(.test_lt, node);
         },
         .greater => {
-            return g.genBinOp(.test_gt, node);
+            return try g.genBinOp(.test_gt, node);
         },
         .less_or_equal => {
-            return g.genBinOp(.test_le, node);
+            return try g.genBinOp(.test_le, node);
         },
         .greater_or_equal => {
-            return g.genBinOp(.test_ge, node);
+            return try g.genBinOp(.test_ge, node);
         },
         else => {
             unreachable;
@@ -188,7 +191,7 @@ fn genExpr(g: *Generator, node: *Ast.Node) !u32 {
     }
 }
 
-inline fn genBinOp(g: *Generator, op: Inst.Op, node: *Ast.Node) !u32 {
+inline fn genBinOp(g: *Generator, op: Inst.Op, node: *Ast.Node) GenError!u32 {
     const lhs = try g.genExpr(node.data.bin.lhs);
     const rhs = try g.genExpr(node.data.bin.rhs);
 

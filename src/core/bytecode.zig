@@ -73,4 +73,21 @@ pub const Executable = struct {
         _ = self;
         _ = gc;
     }
+
+    pub fn print(self: *const Executable) !void {
+        var stdout_buffer: [1024]u8 = undefined;
+        var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+        var stdout = &stdout_writer.interface;
+
+        try stdout.print("Executable\n", .{});
+        try stdout.print("Max registers: {d}\n\n", .{self.max_register_count});
+
+        for (self.instructions, 0..) |inst, idx| {
+            try stdout.print("{d:0>4}: {s}", .{ idx, @tagName(inst.op) });
+
+            try stdout.print("\n", .{});
+        }
+
+        try stdout.flush();
+    }
 };

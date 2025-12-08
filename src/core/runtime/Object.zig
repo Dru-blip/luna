@@ -1,16 +1,14 @@
 const std = @import("std");
 const Value = @import("Value.zig");
-const Gc = @import("Gc.zig");
+const Gc = @import("../Gc.zig");
 const GcObject = Gc.GcObject;
 
-const LuObject = @This();
+const Object = @This();
 
 properties: std.StringHashMap(Value),
 
-pub fn new(gc: *Gc) !*LuObject {
-    const obj: *LuObject = try gc.alloc(LuObject);
-    const meta: GcObject = GcObject.from(obj, &vtable);
-    obj.meta = meta;
+pub fn new(gc: *Gc) !*Object {
+    const obj: *Object = try gc.alloc(Object);
     // obj.properties = std.StringHashMap(Value).init(gc.gpa);
     return obj;
 }

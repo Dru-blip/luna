@@ -1,5 +1,4 @@
 const std = @import("std");
-const LuObject = @import("LuObject.zig");
 const Value = @import("Value.zig");
 
 const Gc = @This();
@@ -80,7 +79,12 @@ pub fn deinit(gc: *Gc) void {
     gc.arena.deinit();
 }
 
-pub fn alloc(gc: *Gc, comptime T: anytype) !*T {
+inline fn allocImpl(
+    gc: *Gc,
+    comptime T: anytype,
+    comptime has_vtable: bool,
+    vtable: if (has_vtable) *const GcObject.VTable else void,
+) !*T {
     const obj_size = @sizeOf(T);
     const header_size = @sizeOf(GcObject);
     const cell_size = header_size + obj_size;
@@ -91,30 +95,22 @@ pub fn alloc(gc: *Gc, comptime T: anytype) !*T {
 
     const base_int = @intFromPtr(cell);
     const header: *GcObject = @ptrFromInt(base_int);
-
     const obj_ptr: *T = @ptrFromInt(base_int + header_size);
+
+    if (has_vtable) {
+        header.*.vtable = vtable;
+    }
     header.*.ptr = obj_ptr;
 
     return @ptrCast(obj_ptr);
 }
 
+pub fn alloc(gc: *Gc, comptime T: anytype) !*T {
+    return gc.allocImpl(T, false, {});
+}
+
 pub fn allocWithVtable(gc: *Gc, comptime T: anytype, vtable: *const GcObject.VTable) !*T {
-    const obj_size = @sizeOf(T);
-    const header_size = @sizeOf(GcObject);
-    const cell_size = header_size + obj_size;
-
-    const block = gc.findSuitableBlock(cell_size) orelse try gc.createBlock(cell_size);
-
-    const cell = block.allocateCell() orelse return std.mem.Allocator.Error.OutOfMemory;
-
-    const base_int = @intFromPtr(cell);
-    const header: *GcObject = @ptrFromInt(base_int);
-    const obj_ptr: *T = @ptrFromInt(base_int + header_size);
-
-    header.*.vtable = vtable;
-    header.*.ptr = obj_ptr;
-
-    return @ptrCast(obj_ptr);
+    return gc.allocImpl(T, true, vtable);
 }
 
 fn createBlock(gc: *Gc, cell_size: u32) !*Block {
