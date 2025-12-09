@@ -1,10 +1,11 @@
 const std = @import("std");
 const Value = @import("Value.zig");
+const PropertyMap = @import("runtime/property_map.zig").PropertyMap;
 
 const Gc = @This();
 
 const Block = struct {
-    const DefaultSize = 4 * 1024 * 1024; //4MB
+    const DefaultSize = 1024 * 16; //16 KB
 
     cell_size: u32,
     cell_count: u32,
@@ -39,6 +40,7 @@ pub const GcObject = struct {
     marked: bool = false,
     ptr: *anyopaque,
     vtable: *const VTable,
+    property_map: PropertyMap,
 
     pub const VTable = struct {
         finalize: *const fn (*anyopaque, *Gc) void,
@@ -100,6 +102,7 @@ inline fn allocImpl(
     if (has_vtable) {
         header.*.vtable = vtable;
     }
+    header.property_map = PropertyMap.init(gc.gpa);
     header.*.ptr = obj_ptr;
 
     return @ptrCast(obj_ptr);

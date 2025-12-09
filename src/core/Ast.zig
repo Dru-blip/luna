@@ -27,6 +27,9 @@ pub const Node = struct {
         equal_equal,
         bang_equal,
 
+        @"and",
+        @"or",
+
         assign,
         add_assign,
         sub_assign,

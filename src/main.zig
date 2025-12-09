@@ -1,7 +1,9 @@
 const std = @import("std");
 const Tokenizer = @import("core/Tokenizer.zig");
 const Parser = @import("core/Parser.zig");
-const Eval = @import("core/Eval.zig");
+
+const PropertyMap = @import("core/runtime/property_map.zig").PropertyMap;
+
 const Gc = @import("core/Gc.zig");
 const Generator = @import("core/Generator.zig");
 
@@ -26,6 +28,6 @@ pub fn main() !void {
     const executable = try generator.generate();
     try executable.print();
     gc.collect();
-
+    // std.debug.print("{d}\n", .{@sizeOf(Gc.GcObject)});
     // Eval.eval(ast);
 }
