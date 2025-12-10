@@ -1,5 +1,5 @@
 const std = @import("std");
-const GcObject = @import("Gc.zig").GcObject;
+const Object = @import("runtime/Object.zig");
 const PropertyKey = @import("runtime/property_map.zig").PropertyKey;
 
 const Value = @This();
@@ -16,7 +16,7 @@ pub const Type = enum {
 pub const Data = union(Type) {
     int: i64,
     bool: bool,
-    object: *GcObject,
+    object: *Object,
 };
 
 pub fn fromInt(value: i64) Value {

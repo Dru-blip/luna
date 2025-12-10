@@ -19,7 +19,7 @@ pub const PropertyMap = struct {
     storage: Storage,
 
     pub fn init(gpa: std.mem.Allocator) PropertyMap {
-        return PropertyMap{
+        return .{
             .gpa = gpa,
             .storage = Storage.init(gpa),
         };

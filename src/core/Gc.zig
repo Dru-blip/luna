@@ -1,6 +1,7 @@
 const std = @import("std");
 const Value = @import("Value.zig");
 const PropertyMap = @import("runtime/property_map.zig").PropertyMap;
+const Object = @import("runtime/Object.zig");
 
 const Gc = @This();
 
@@ -36,29 +37,6 @@ const Block = struct {
     }
 };
 
-pub const GcObject = struct {
-    marked: bool = false,
-    ptr: *anyopaque,
-    vtable: *const VTable,
-    property_map: PropertyMap,
-
-    pub const VTable = struct {
-        finalize: *const fn (*anyopaque, *Gc) void,
-        visit: *const fn (*anyopaque, *Gc) void,
-    };
-
-    pub inline fn as(obj: *GcObject, comptime T: anytype) *T {
-        return @ptrCast(@alignCast(obj.ptr));
-    }
-
-    pub inline fn from(ptr: *anyopaque, vtable: *const VTable) GcObject {
-        return .{
-            .ptr = ptr,
-            .vtable = vtable,
-        };
-    }
-};
-
 arena: std.heap.ArenaAllocator,
 blocks: std.ArrayList(*Block),
 gpa: std.mem.Allocator,
@@ -84,11 +62,9 @@ pub fn deinit(gc: *Gc) void {
 inline fn allocImpl(
     gc: *Gc,
     comptime T: anytype,
-    comptime has_vtable: bool,
-    vtable: if (has_vtable) *const GcObject.VTable else void,
 ) !*T {
     const obj_size = @sizeOf(T);
-    const header_size = @sizeOf(GcObject);
+    const header_size = @sizeOf(Object);
     const cell_size = header_size + obj_size;
 
     const block = gc.findSuitableBlock(cell_size) orelse try gc.createBlock(cell_size);
@@ -96,12 +72,15 @@ inline fn allocImpl(
     const cell = block.allocateCell() orelse return std.mem.Allocator.Error.OutOfMemory;
 
     const base_int = @intFromPtr(cell);
-    const header: *GcObject = @ptrFromInt(base_int);
+    const header: *Object = @ptrFromInt(base_int);
     const obj_ptr: *T = @ptrFromInt(base_int + header_size);
 
-    if (has_vtable) {
-        header.*.vtable = vtable;
+    if (!@hasDecl(T, "type_descriptor")) {
+        @compileError("type_descriptor field must be present");
     }
+
+    header.type_descriptor = &T.type_descriptor;
+
     header.property_map = PropertyMap.init(gc.gpa);
     header.*.ptr = obj_ptr;
 
@@ -109,11 +88,7 @@ inline fn allocImpl(
 }
 
 pub fn alloc(gc: *Gc, comptime T: anytype) !*T {
-    return gc.allocImpl(T, false, {});
-}
-
-pub fn allocWithVtable(gc: *Gc, comptime T: anytype, vtable: *const GcObject.VTable) !*T {
-    return gc.allocImpl(T, true, vtable);
+    return gc.allocImpl(T);
 }
 
 fn createBlock(gc: *Gc, cell_size: u32) !*Block {
@@ -160,8 +135,8 @@ pub fn collect(gc: *Gc) void {
             const cell = blk.cell(i);
             const index = blk.indexOf(cell);
             if (blk.bitmap.isSet(index)) {
-                const obj: *GcObject = @ptrCast(cell);
-                obj.vtable.finalize(obj.ptr, gc);
+                const obj: *Object = @ptrCast(cell);
+                obj.type_descriptor.finalize(obj.ptr, gc);
             }
         }
     }

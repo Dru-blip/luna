@@ -2,8 +2,8 @@ const std = @import("std");
 const Span = @import("Tokenizer.zig").Token.Loc;
 const Value = @import("Value.zig");
 
+const Object = @import("runtime/Object.zig");
 const Gc = @import("Gc.zig");
-const GcObject = @import("Gc.zig").GcObject;
 
 pub const Inst = struct {
     op: Op,
@@ -53,11 +53,12 @@ pub const Executable = struct {
     max_register_count: u32,
 
     pub fn new(gc: *Gc) !*Executable {
-        const obj: *Executable = try gc.allocWithVtable(Executable, &vtable);
+        const obj: *Executable = try gc.alloc(Executable);
         return obj;
     }
 
-    const vtable = GcObject.VTable{
+    pub const type_descriptor = Object.TypeDescriptor{
+        .name = "Executable",
         .visit = visit,
         .finalize = finalize,
     };
