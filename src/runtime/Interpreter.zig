@@ -1,17 +1,20 @@
 const std = @import("std");
-const Gc = @import("../Gc.zig");
-const Value = @import("../Value.zig");
-const Ast = @import("../Ast.zig");
+const Gc = @import("../core/Gc.zig");
+const Value = @import("../core/Value.zig");
+const Ast = @import("../core/Ast.zig");
 
 const StringInterner = @import("StringInterner.zig");
 const Vm = @import("Vm.zig");
-const Generator = @import("../Generator.zig");
+const Generator = @import("../core/Generator.zig");
+
+const luna = @import("luna");
 
 const Interpreter = @This();
 
 gc: Gc,
 string_interner: StringInterner,
 vm: *Vm = undefined,
+// running_module: *Module,
 
 pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     var gc = Gc.init(gpa);
@@ -33,6 +36,7 @@ pub fn runFile(i: *Interpreter, path: []const u8) !Value {
     const file_stats = try file.stat();
     var buffer = try i.gc.gpa.alloc(u8, file_stats.size + 1);
 
+    //TODO: should switch to new reader implementation.
     _ = try file.readAll(buffer);
     buffer[file_stats.size] = 0;
 

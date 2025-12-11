@@ -1,5 +1,5 @@
 const std = @import("std");
-const Interpreter = @import("core/runtime/Interpreter.zig");
+const Interpreter = @import("runtime/Interpreter.zig");
 
 pub fn main() !void {
     var gpa = std.heap.DebugAllocator(.{}){};

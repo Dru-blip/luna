@@ -7,9 +7,10 @@ const Tokens = @import("Tokenizer.zig").Tokens;
 
 const Parser = @This();
 
-const ParserError = error{
+pub const ParserError = error{
     SyntaxError,
     UnexpectedToken,
+    UnexpectedEOF,
 } || std.mem.Allocator.Error || std.fmt.ParseIntError;
 
 source: [:0]const u8,
@@ -139,6 +140,9 @@ fn parsePrimaryExpr(p: *Parser) ParserError!*Node {
             return try p.ast.makeIntLiteral(token.loc, value);
         },
         else => {
+            if (token.tag == .eof) {
+                return ParserError.UnexpectedEOF;
+            }
             return ParserError.SyntaxError;
         },
     }

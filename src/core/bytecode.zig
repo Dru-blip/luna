@@ -2,7 +2,7 @@ const std = @import("std");
 const Span = @import("Tokenizer.zig").Token.Loc;
 const Value = @import("Value.zig");
 
-const Object = @import("runtime/Object.zig");
+const Object = @import("../runtime/Object.zig");
 const Gc = @import("Gc.zig");
 
 pub const Inst = struct {

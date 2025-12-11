@@ -1,9 +1,9 @@
 const std = @import("std");
-const Value = @import("../Value.zig");
+const Value = @import("../core/Value.zig");
 const Object = @import("Object.zig");
 const Interpreter = @import("Interpreter.zig");
-const Executable = @import("../bytecode.zig").Executable;
-const Inst = @import("../bytecode.zig").Inst;
+const Executable = @import("../core/bytecode.zig").Executable;
+const Inst = @import("../core/bytecode.zig").Inst;
 
 const Vm = @This();
 

@@ -1,5 +1,5 @@
 const PropertyMap = @import("property_map.zig").PropertyMap;
-const Gc = @import("../Gc.zig");
+const Gc = @import("../core/Gc.zig");
 const Object = @This();
 
 marked: bool = false,

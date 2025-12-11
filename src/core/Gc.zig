@@ -1,7 +1,7 @@
 const std = @import("std");
-const Value = @import("Value.zig");
-const PropertyMap = @import("runtime/property_map.zig").PropertyMap;
-const Object = @import("runtime/Object.zig");
+const Value = @import("../core/Value.zig");
+const PropertyMap = @import("../runtime/property_map.zig").PropertyMap;
+const Object = @import("../runtime/Object.zig");
 
 const Gc = @This();
 

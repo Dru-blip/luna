@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const String = @import("String.zig");
-const Value = @import("../Value.zig");
+const Value = @import("../core/Value.zig");
 
 pub const PropertyKey = union(enum) {
     int: i64,

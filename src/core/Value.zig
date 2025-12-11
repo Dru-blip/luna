@@ -1,6 +1,6 @@
 const std = @import("std");
-const Object = @import("runtime/Object.zig");
-const PropertyKey = @import("runtime/property_map.zig").PropertyKey;
+const Object = @import("../runtime/Object.zig");
+const PropertyKey = @import("../runtime/property_map.zig").PropertyKey;
 
 const Value = @This();
 

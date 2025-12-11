@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const Gc = @import("../Gc.zig");
+const Gc = @import("../core/Gc.zig");
 
 const String = @import("String.zig");
 
