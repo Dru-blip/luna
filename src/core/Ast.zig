@@ -41,6 +41,8 @@ pub const Node = struct {
         mod_assign,
 
         int_literal,
+        bool_literal,
+        none_literal,
     };
 
     const Data = union {
@@ -52,6 +54,8 @@ pub const Node = struct {
         list: []*Node,
         opt: ?*Node,
         int: i64,
+        bool: bool,
+        none: void,
     };
 };
 
@@ -107,6 +111,22 @@ pub fn makeIntLiteral(ast: *Ast, loc: Token.Loc, value: i64) !*Node {
     node.tag = .int_literal;
     node.loc = loc;
     node.data = .{ .int = value };
+    return node;
+}
+
+pub fn makeBoolLiteral(ast: *Ast, loc: Token.Loc, value: bool) !*Node {
+    var node = try ast.arena.allocator().create(Node);
+    node.tag = .bool_literal;
+    node.loc = loc;
+    node.data = .{ .bool = value };
+    return node;
+}
+
+pub fn makeNoneLiteral(ast: *Ast, loc: Token.Loc) !*Node {
+    var node = try ast.arena.allocator().create(Node);
+    node.tag = .none_literal;
+    node.loc = loc;
+    node.data = .{ .none = {} };
     return node;
 }
 

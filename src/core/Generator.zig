@@ -158,6 +158,16 @@ fn genExpr(g: *Generator, node: *Ast.Node) GenError!u32 {
             try g.addBin(.load_const, const_index, reg, node.loc);
             return reg;
         },
+        .bool_literal => {
+            const reg = g.allocRegister();
+            try g.addUn(if (node.data.bool) .load_true else .load_false, reg, node.loc);
+            return reg;
+        },
+        .none_literal => {
+            const reg = g.allocRegister();
+            try g.addUn(.load_none, reg, node.loc);
+            return reg;
+        },
         .add => {
             return try g.genBinOp(.add, node);
         },

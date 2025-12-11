@@ -58,12 +58,18 @@ pub const Token = struct {
         int,
         identifier,
         keyword_return,
+        keyword_true,
+        keyword_false,
+        keyword_none,
 
         eof,
     };
 
     pub const keywords = std.StaticStringMap(Tag).initComptime(.{
         .{ "return", .keyword_return },
+        .{ "true", .keyword_true },
+        .{ "false", .keyword_false },
+        .{ "none", .keyword_none },
     });
 
     pub fn getKeyword(bytes: []const u8) ?Tag {
@@ -284,7 +290,9 @@ pub fn next(self: *Tokenizer) Token {
             switch (self.buffer[self.index]) {
                 'a'...'z', 'A'...'Z', '_' => continue :state .identifier,
                 else => {
-                    const ident = self.buffer[result.loc.start..self.index];
+                    var ident = self.buffer[result.loc.start..self.index];
+                    ident = std.mem.trim(u8, ident, " \t\r\n;");
+
                     if (Token.getKeyword(ident)) |tag| {
                         result.tag = tag;
                     }

@@ -12,6 +12,9 @@ pub const Inst = struct {
     pub const Op = enum {
         hlt,
         load_const,
+        load_true,
+        load_false,
+        load_none,
         add,
         sub,
         mul,

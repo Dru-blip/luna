@@ -79,6 +79,15 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) !Value {
                 registers[data.bin.rhs] = constants[data.bin.lhs];
                 continue :start;
             },
+            .load_true => {
+                registers[data.un] = Value.bool(true);
+            },
+            .load_false => {
+                registers[data.un] = Value.bool(false);
+            },
+            .load_none => {
+                registers[data.un] = Value.none();
+            },
             .mov => {
                 registers[data.bin.rhs] = registers[data.bin.lhs];
                 continue :start;

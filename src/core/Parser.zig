@@ -142,6 +142,18 @@ fn parsePrimaryExpr(p: *Parser) ParserError!*Node {
             const value = try std.fmt.parseInt(i64, p.source[token.loc.start..token.loc.end], 10);
             return try p.ast.makeIntLiteral(token.loc, value);
         },
+        .keyword_none => {
+            p.advance();
+            return try p.ast.makeNoneLiteral(token.loc);
+        },
+        .keyword_true => {
+            p.advance();
+            return try p.ast.makeBoolLiteral(token.loc, true);
+        },
+        .keyword_false => {
+            p.advance();
+            return try p.ast.makeBoolLiteral(token.loc, false);
+        },
         else => {
             if (token.tag == .eof) {
                 return ParserError.UnexpectedEOF;
