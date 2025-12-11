@@ -25,6 +25,10 @@ pub const Inst = struct {
         test_neq,
         test_eq,
 
+        mov,
+        branch,
+        jmp,
+
         ret,
     };
 

@@ -44,6 +44,12 @@ pub const Token = struct {
         equal_equal,
         bang_equal,
 
+        ampersand,
+        ampersand_ampersand,
+
+        pipe,
+        pipe_pipe,
+
         l_paren,
         r_paren,
         l_brace,
@@ -99,6 +105,8 @@ const State = enum {
     less,
     greater,
     bang,
+    ampersand,
+    pipe,
     invalid,
 };
 
@@ -170,6 +178,8 @@ pub fn next(self: *Tokenizer) Token {
             '>' => continue :state .greater,
             '=' => continue :state .equal,
             '!' => continue :state .bang,
+            '&' => continue :state .ampersand,
+            '|' => continue :state .pipe,
             '0'...'9' => {
                 result.loc.start = self.index;
                 result.tag = .int;
@@ -187,6 +197,7 @@ pub fn next(self: *Tokenizer) Token {
                 '=' => result.tag = .plus_equal,
                 else => result.tag = .plus,
             }
+            self.advance();
         },
         .minus => {
             self.advance();
@@ -194,6 +205,7 @@ pub fn next(self: *Tokenizer) Token {
                 '=' => result.tag = .minus_equal,
                 else => result.tag = .minus,
             }
+            self.advance();
         },
         .asterisk => {
             self.advance();
@@ -201,6 +213,7 @@ pub fn next(self: *Tokenizer) Token {
                 '=' => result.tag = .asterisk_equal,
                 else => result.tag = .asterisk,
             }
+            self.advance();
         },
         .slash => {
             self.advance();
@@ -208,6 +221,7 @@ pub fn next(self: *Tokenizer) Token {
                 '=' => result.tag = .slash_equal,
                 else => result.tag = .slash,
             }
+            self.advance();
         },
         .modulus => {
             self.advance();
@@ -215,6 +229,7 @@ pub fn next(self: *Tokenizer) Token {
                 '=' => result.tag = .modulus_equal,
                 else => result.tag = .modulus,
             }
+            self.advance();
         },
         .less => {
             self.advance();
@@ -222,6 +237,7 @@ pub fn next(self: *Tokenizer) Token {
                 '=' => result.tag = .angle_bracket_left_equal,
                 else => result.tag = .angle_bracket_left,
             }
+            self.advance();
         },
         .greater => {
             self.advance();
@@ -229,6 +245,7 @@ pub fn next(self: *Tokenizer) Token {
                 '=' => result.tag = .angle_bracket_right_equal,
                 else => result.tag = .angle_bracket_right,
             }
+            self.advance();
         },
         .equal => {
             self.advance();
@@ -236,6 +253,7 @@ pub fn next(self: *Tokenizer) Token {
                 '=' => result.tag = .equal_equal,
                 else => result.tag = .equal,
             }
+            self.advance();
         },
         .bang => {
             self.advance();
@@ -243,6 +261,23 @@ pub fn next(self: *Tokenizer) Token {
                 '=' => result.tag = .bang_equal,
                 else => result.tag = .bang,
             }
+            self.advance();
+        },
+        .ampersand => {
+            self.advance();
+            switch (self.buffer[self.index]) {
+                '&' => result.tag = .ampersand_ampersand,
+                else => result.tag = .ampersand,
+            }
+            self.advance();
+        },
+        .pipe => {
+            self.advance();
+            switch (self.buffer[self.index]) {
+                '|' => result.tag = .pipe_pipe,
+                else => result.tag = .pipe,
+            }
+            self.advance();
         },
         .identifier => {
             self.advance();

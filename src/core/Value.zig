@@ -98,3 +98,11 @@ pub fn toPropertyKey(value: Value) ?PropertyKey {
         else => null,
     }
 }
+
+pub inline fn isFalsy(v: Value) bool {
+    return v.type == .none or (v.type == .bool and v.data.bool == false);
+}
+
+pub inline fn isTruthy(v: Value) bool {
+    return !isFalsy(v);
+}

@@ -185,6 +185,18 @@ fn genExpr(g: *Generator, node: *Ast.Node) GenError!u32 {
         .greater_or_equal => {
             return try g.genBinOp(.test_ge, node);
         },
+        .equal_equal => {
+            return try g.genBinOp(.test_eq, node);
+        },
+        .bang_equal => {
+            return try g.genBinOp(.test_neq, node);
+        },
+        .@"and" => {
+            return try g.genLogicalOp(.@"and", node);
+        },
+        .@"or" => {
+            return try g.genLogicalOp(.@"or", node);
+        },
         else => {
             unreachable;
         },
@@ -199,6 +211,44 @@ inline fn genBinOp(g: *Generator, op: Inst.Op, node: *Ast.Node) GenError!u32 {
     try g.addTri(op, lhs, rhs, dst, node.loc);
     try g.freeRegister(lhs);
     try g.freeRegister(rhs);
+    return dst;
+}
+
+inline fn genLogicalOp(g: *Generator, op: Ast.Node.Tag, node: *const Ast.Node) GenError!u32 {
+    const lhs = try g.genExpr(node.data.bin.lhs);
+    const dst = g.allocRegister();
+
+    const rhs_block = try g.makeBasicBlock();
+    const end_block = try g.makeBasicBlock();
+
+    try g.addBin(.mov, lhs, dst, node.loc);
+
+    var branch: Inst = .{
+        .op = .branch,
+        .data = .{
+            .tri = .{
+                .op1 = lhs,
+                .op2 = rhs_block.id,
+                .dst = end_block.id,
+            },
+        },
+    };
+
+    if (op == .@"or") {
+        branch.data.tri.op2 = end_block.id;
+        branch.data.tri.dst = rhs_block.id;
+    }
+
+    try g.current_block.instructions.append(g.arena.allocator(), branch);
+    try g.current_block.spans.append(g.arena.allocator(), node.loc);
+
+    g.switchBasicBlock(rhs_block);
+    const rhs = try g.genExpr(node.data.bin.rhs);
+    try g.addBin(.mov, rhs, dst, node.loc);
+
+    try g.addUn(.jmp, end_block.id, node.loc);
+
+    g.switchBasicBlock(end_block);
     return dst;
 }
 
@@ -224,27 +274,19 @@ fn linearizeBasicBlocks(g: *Generator, executable: *Executable) !void {
         try spans.appendSlice(g.gpa, block.spans.items);
     }
 
-    // for (size_t i = 0; i < total_instructions; i++) {
-    //     struct instruction* instr = &flat[i];
-    //     switch (instr->opcode) {
-    //         case OPCODE_JUMP: {
-    //             instr->jmp.target_offset = block_start_offsets[instr->jmp.target_offset];
-    //             break;
-    //         }
-    //         case OPCODE_JMP_IF: {
-    //             instr->jmp_if.true_block_id = block_start_offsets[instr->jmp_if.true_block_id];
-    //             instr->jmp_if.false_block_id = block_start_offsets[instr->jmp_if.false_block_id];
-    //             break;
-    //         }
-    //         case OPCODE_ITER_NEXT: {
-    //             instr->iter_next.jmp_offset = block_start_offsets[instr->iter_next.jmp_offset];
-    //             break;
-    //         }
-    //         default:
-    //             break;
-    //     }
-    // }
-    //
+    for (0..total_instructions) |i| {
+        const instr = &instructions.items[i];
+        switch (instr.op) {
+            .jmp => {
+                instr.data.un = block_start_offsets.items[instr.data.un];
+            },
+            .branch => {
+                instr.data.tri.op2 = block_start_offsets.items[instr.data.tri.op2];
+                instr.data.tri.dst = block_start_offsets.items[instr.data.tri.dst];
+            },
+            else => continue,
+        }
+    }
     executable.instructions = try instructions.toOwnedSlice(g.gpa);
     executable.spans = try spans.toOwnedSlice(g.gpa);
 }

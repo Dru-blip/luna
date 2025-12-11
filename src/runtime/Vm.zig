@@ -79,6 +79,10 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) !Value {
                 registers[data.bin.rhs] = constants[data.bin.lhs];
                 continue :start;
             },
+            .mov => {
+                registers[data.bin.rhs] = registers[data.bin.lhs];
+                continue :start;
+            },
             .add => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
@@ -203,6 +207,18 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) !Value {
                 }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.bool(lhs.toInt() != rhs.toInt());
+                }
+                continue :start;
+            },
+            .jmp => {
+                record.ip = data.un;
+                continue :start;
+            },
+            .branch => {
+                if (registers[data.tri.op1].isTruthy()) {
+                    record.ip = data.tri.op2;
+                } else {
+                    record.ip = data.tri.dst;
                 }
                 continue :start;
             },
