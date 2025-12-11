@@ -9,7 +9,7 @@ const max_small_string_len = 32;
 hash: u64,
 length: usize,
 storage: Storage,
-interned: bool,
+interned: bool = false,
 
 const Storage = union(enum) {
     @"inline": [max_small_string_len]u8,
@@ -23,11 +23,10 @@ const type_descriptor = Object.TypeDescriptor{
 };
 
 pub fn new(gc: *Gc, bytes: []const u8) !*String {
-    var s = try gc.alloc(String);
+    var s: *String = try gc.alloc(String);
 
     s.length = bytes.len;
     s.hash = std.hash.Wyhash.hash(0, bytes);
-    s.interned = false;
 
     if (bytes.len <= max_small_string_len) {
         @memcpy(s.storage.@"inline"[0..bytes.len], bytes);
@@ -61,7 +60,4 @@ fn finalize(self: *anyopaque, gc: *Gc) void {
     }
 }
 
-fn visit(self: *anyopaque, gc: *Gc) void {
-    _ = self;
-    _ = gc;
-}
+fn visit(_: *anyopaque, _: *Gc) void {}

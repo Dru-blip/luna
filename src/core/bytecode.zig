@@ -36,9 +36,9 @@ pub const Inst = struct {
             rhs: u32,
         },
         tri: struct {
-            arg1: u32,
-            arg2: u32,
-            arg3: u32,
+            op1: u32,
+            op2: u32,
+            dst: u32,
         },
     };
 };

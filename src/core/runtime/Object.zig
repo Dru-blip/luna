@@ -17,3 +17,9 @@ pub const TypeDescriptor = struct {
 pub inline fn as(obj: *Object, comptime T: anytype) *T {
     return @ptrCast(@alignCast(obj.ptr));
 }
+
+pub const Base = struct {};
+
+pub fn new(gc: *Gc) *Object {
+    _ = gc.alloc(Base);
+}

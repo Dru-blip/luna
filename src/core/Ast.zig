@@ -1,5 +1,8 @@
 const std = @import("std");
-const Token = @import("Tokenizer.zig").Token;
+const Tokenizer = @import("Tokenizer.zig");
+const Parser = @import("Parser.zig");
+
+const Token = Tokenizer.Token;
 
 const Ast = @This();
 
@@ -77,6 +80,13 @@ pub fn deinit(ast: *Ast) void {
 
     ast.arena.deinit();
     ast.nodes.deinit(ast.gpa);
+}
+
+pub fn parse(source: [:0]const u8, gpa: std.mem.Allocator) !Ast {
+    const tokens = try Tokenizer.tokenize(source, gpa);
+    var parser = Parser.init(gpa, source, tokens);
+
+    return try parser.parse();
 }
 
 pub fn makeNode(ast: *Ast, tag: Node.Tag) !*Node {

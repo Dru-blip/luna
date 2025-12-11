@@ -71,16 +71,15 @@ inline fn allocImpl(
 
     const cell = block.allocateCell() orelse return std.mem.Allocator.Error.OutOfMemory;
 
-    const base_int = @intFromPtr(cell);
-    const header: *Object = @ptrFromInt(base_int);
-    const obj_ptr: *T = @ptrFromInt(base_int + header_size);
+    const obj_base = @intFromPtr(cell);
+    const header: *Object = @ptrFromInt(obj_base);
+    const obj_ptr: *T = @ptrFromInt(obj_base + header_size);
 
     if (!@hasDecl(T, "type_descriptor")) {
         @compileError("type_descriptor field must be present");
     }
 
     header.type_descriptor = &T.type_descriptor;
-
     header.property_map = PropertyMap.init(gc.gpa);
     header.*.ptr = obj_ptr;
 

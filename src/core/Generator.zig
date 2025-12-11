@@ -125,7 +125,7 @@ fn addBin(g: *Generator, op: Inst.Op, lhs: u32, rhs: u32, span: Span) !void {
 }
 
 fn addTri(g: *Generator, op: Inst.Op, arg1: u32, arg2: u32, arg3: u32, span: Span) !void {
-    try g.addInst(op, .{ .tri = .{ .arg1 = arg1, .arg2 = arg2, .arg3 = arg3 } }, span);
+    try g.addInst(op, .{ .tri = .{ .op1 = arg1, .op2 = arg2, .dst = arg3 } }, span);
 }
 
 fn genNodes(g: *Generator, nodes: Ast.Nodes) GenError!void {
@@ -154,7 +154,7 @@ fn genExpr(g: *Generator, node: *Ast.Node) GenError!u32 {
     switch (node.tag) {
         .int_literal => {
             const reg = g.allocRegister();
-            const const_index = try g.addConstant(Value.fromInt(node.data.int));
+            const const_index = try g.addConstant(Value.int(node.data.int));
             try g.addBin(.load_const, const_index, reg, node.loc);
             return reg;
         },
