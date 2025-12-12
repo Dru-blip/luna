@@ -16,6 +16,7 @@ pub const Node = struct {
         block,
         if_stmt,
         loop_stmt,
+        while_stmt,
         break_stmt,
         continue_stmt,
         return_stmt,
@@ -67,6 +68,10 @@ pub const Node = struct {
             @"test": *Node,
             consequent: *Node,
             alternate: ?*Node,
+        },
+        @"while": struct {
+            @"test": *Node,
+            body: *Node,
         },
         let: struct {
             name: []const u8,
@@ -200,5 +205,16 @@ pub fn makeBreakStmt(ast: *Ast, loc: Token.Loc) !*Node {
 pub fn makeContinueStmt(ast: *Ast, loc: Token.Loc) !*Node {
     var node = try makeNode(ast, .continue_stmt, loc);
     node.data = .{ .none = {} };
+    return node;
+}
+
+pub fn makeWhileStmt(ast: *Ast, loc: Token.Loc, @"test": *Node, body: *Node) !*Node {
+    var node = try makeNode(ast, .while_stmt, loc);
+    node.data = .{
+        .@"while" = .{
+            .@"test" = @"test",
+            .body = body,
+        },
+    };
     return node;
 }

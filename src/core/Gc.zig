@@ -63,6 +63,8 @@ inline fn allocImpl(
     gc: *Gc,
     comptime T: anytype,
 ) !*T {
+    //TODO: should check alignment,
+    // if requires should align
     const obj_size = @sizeOf(T);
     const header_size = @sizeOf(Object);
     const cell_size = header_size + obj_size;
@@ -81,7 +83,7 @@ inline fn allocImpl(
 
     header.type_descriptor = &T.type_descriptor;
     header.property_map = PropertyMap.init(gc.gpa);
-    header.*.ptr = obj_ptr;
+    header.ptr = obj_ptr;
 
     return @ptrCast(obj_ptr);
 }

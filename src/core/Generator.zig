@@ -246,6 +246,9 @@ fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
         .let_decl => {
             try g.genLetDecl(node);
         },
+        .while_stmt => {
+            try g.genWhileStmt(node);
+        },
         .loop_stmt => {
             try g.genLoopStmt(node);
         },
@@ -273,6 +276,25 @@ fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
             unreachable;
         },
     }
+}
+
+fn genWhileStmt(g: *Generator, node: *const Ast.Node) GenError!void {
+    const test_block = try g.makeBasicBlock();
+    const body_block = try g.makeBasicBlock();
+    const end_block = try g.makeBasicBlock();
+    const loop_info: LoopInfo = .{
+        .start_block = test_block.id,
+        .end_block = end_block.id,
+    };
+    try g.loop_stack.append(g.gpa, loop_info);
+    g.switchBasicBlock(test_block);
+    const cond = try g.genExpr(node.data.@"while".@"test");
+    try g.addTri(.branch, cond, body_block.id, end_block.id, node.loc);
+    g.switchBasicBlock(body_block);
+    try g.genStmt(node.data.@"while".body);
+    try g.addUn(.jmp, test_block.id, node.loc);
+
+    g.switchBasicBlock(end_block);
 }
 
 fn genLoopStmt(g: *Generator, node: *const Ast.Node) GenError!void {
