@@ -40,7 +40,9 @@ pub fn runFile(i: *Interpreter, path: []const u8) !Value {
     _ = try file.readAll(buffer);
     buffer[file_stats.size] = 0;
 
-    var ast = try Ast.parse(buffer[0..file_stats.size :0], i.gc.gpa);
+    var ast = Ast.parse(buffer[0..file_stats.size :0], i.gc.gpa) catch {
+        return Value.none();
+    };
     defer ast.deinit();
 
     var generator = try Generator.init(i.gc.gpa, ast, &i.gc, &i.string_interner);
