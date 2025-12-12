@@ -75,6 +75,7 @@ fn parseStmt(p: *Parser) ParserError!*Node {
     switch (token.tag) {
         .keyword_let => return p.parseLetDecl(),
         .l_brace => return try p.parseBlockStmt(),
+        .keyword_if => return try p.parseIfStmt(),
         .keyword_return => return p.parseReturnStmt(),
         else => {
             const expr = try p.parseExpr(0);
@@ -89,6 +90,22 @@ fn parseLetDecl(p: *Parser) ParserError!*Node {
     _ = try p.expectToken(.equal);
     const expr = try p.parseExpr(0);
     return p.ast.makeLetDecl(token.loc.merge(&expr.loc), p.source[name.loc.start..name.loc.end], expr);
+}
+
+fn parseIfStmt(p: *Parser) ParserError!*Node {
+    const if_token = try p.expectToken(.keyword_if);
+
+    if (p.peek().tag == .l_paren) {
+        _ = p.advance();
+    }
+    const @"test" = try p.parseExpr(0);
+    const consequent = try p.parseStmt();
+    const alternate = if (p.peek().tag == .keyword_else) blk: {
+        _ = p.advance();
+        break :blk try p.parseStmt();
+    } else null;
+    const loc = if (alternate) |alt| if_token.loc.merge(&alt.loc) else if_token.loc.merge(&consequent.loc);
+    return p.ast.makeIfStmt(loc, @"test", consequent, alternate);
 }
 
 fn parseBlockStmt(p: *Parser) ParserError!*Node {

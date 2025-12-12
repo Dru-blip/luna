@@ -239,6 +239,9 @@ fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
         .let_decl => {
             try g.genLetDecl(node);
         },
+        .if_stmt => {
+            try g.genIfStmt(node);
+        },
         .block => {
             try g.genBlockStmt(node);
         },
@@ -254,6 +257,33 @@ fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
             unreachable;
         },
     }
+}
+
+fn genIfStmt(g: *Generator, node: *const Ast.Node) GenError!void {
+    var current: ?*const Ast.Node = node;
+    const end_block = try g.makeBasicBlock();
+
+    while (current) |stmt| {
+        if (stmt.tag != .if_stmt) break;
+        const true_block = try g.makeBasicBlock();
+        const false_block = try g.makeBasicBlock();
+        const condition = try g.genExpr(stmt.data.@"if".@"test");
+        try g.addTri(.branch, condition, true_block.id, false_block.id, stmt.loc);
+        g.switchBasicBlock(true_block);
+        try g.genStmt(stmt.data.@"if".consequent);
+        try g.addUn(.jmp, end_block.id, stmt.loc);
+        current = stmt.data.@"if".alternate;
+        g.switchBasicBlock(false_block);
+    }
+
+    if (current) |stmt| {
+        try g.genStmt(stmt);
+        try g.addUn(.jmp, end_block.id, stmt.loc);
+    } else {
+        try g.addUn(.jmp, end_block.id, node.loc);
+    }
+
+    g.switchBasicBlock(end_block);
 }
 
 fn genLetDecl(g: *Generator, node: *const Ast.Node) GenError!void {

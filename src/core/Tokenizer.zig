@@ -62,6 +62,8 @@ pub const Token = struct {
         keyword_false,
         keyword_none,
         keyword_let,
+        keyword_if,
+        keyword_else,
 
         eof,
     };
@@ -72,6 +74,8 @@ pub const Token = struct {
         .{ "false", .keyword_false },
         .{ "none", .keyword_none },
         .{ "let", .keyword_let },
+        .{ "if", .keyword_if },
+        .{ "else", .keyword_else },
     });
 
     pub fn getKeyword(bytes: []const u8) ?Tag {

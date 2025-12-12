@@ -14,6 +14,7 @@ pub const Node = struct {
     pub const Tag = enum {
         root,
         block,
+        if_stmt,
         let_decl,
         return_stmt,
         expr_stmt,
@@ -59,6 +60,11 @@ pub const Node = struct {
         bool: bool,
         none: void,
         string: []const u8,
+        @"if": struct {
+            @"test": *Node,
+            consequent: *Node,
+            alternate: ?*Node,
+        },
         let: struct {
             name: []const u8,
             expr: ?*Node,
@@ -161,5 +167,17 @@ pub fn makeLetDecl(ast: *Ast, loc: Token.Loc, name: []const u8, expr: ?*Node) !*
 pub fn makeBlockStmt(ast: *Ast, loc: Token.Loc, list: []*const Node) !*Node {
     var node = try makeNode(ast, .block, loc);
     node.data = .{ .list = list };
+    return node;
+}
+
+pub fn makeIfStmt(ast: *Ast, loc: Token.Loc, @"test": *Node, consequent: *Node, alternate: ?*Node) !*Node {
+    var node = try makeNode(ast, .if_stmt, loc);
+    node.data = .{
+        .@"if" = .{
+            .@"test" = @"test",
+            .consequent = consequent,
+            .alternate = alternate,
+        },
+    };
     return node;
 }
