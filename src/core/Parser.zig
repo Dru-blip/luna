@@ -74,6 +74,7 @@ fn parseStmt(p: *Parser) ParserError!*Node {
     const token = p.peek();
     switch (token.tag) {
         .keyword_let => return p.parseLetDecl(),
+        .l_brace => return try p.parseBlockStmt(),
         .keyword_return => return p.parseReturnStmt(),
         else => {
             const expr = try p.parseExpr(0);
@@ -88,6 +89,18 @@ fn parseLetDecl(p: *Parser) ParserError!*Node {
     _ = try p.expectToken(.equal);
     const expr = try p.parseExpr(0);
     return p.ast.makeLetDecl(token.loc.merge(&expr.loc), p.source[name.loc.start..name.loc.end], expr);
+}
+
+fn parseBlockStmt(p: *Parser) ParserError!*Node {
+    const l_brace = try p.expectToken(.l_brace);
+    var list: std.ArrayList(*const Node) = .empty;
+    while (p.peek().tag != .r_brace) {
+        const stmt = try p.parseStmt();
+        try list.append(p.ast.arena.allocator(), stmt);
+    }
+
+    const r_brace = try p.expectToken(.r_brace);
+    return p.ast.makeBlockStmt(l_brace.loc.merge(&r_brace.loc), try list.toOwnedSlice(p.ast.arena.allocator()));
 }
 
 fn parseReturnStmt(p: *Parser) ParserError!*Node {

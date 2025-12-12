@@ -53,7 +53,7 @@ pub const Node = struct {
             lhs: *Node,
             rhs: *Node,
         },
-        list: []*Node,
+        list: []*const Node,
         opt: ?*Node,
         int: i64,
         bool: bool,
@@ -100,71 +100,66 @@ pub fn parse(source: [:0]const u8, gpa: std.mem.Allocator) !Ast {
     return try parser.parse();
 }
 
-pub fn makeNode(ast: *Ast, tag: Node.Tag) !*Node {
-    var node = try ast.arena.allocator().create(Node);
-    node.tag = tag;
+fn makeNode(ast: *Ast, tag: Node.Tag, loc: Token.Loc) !*Node {
+    const node = try ast.arena.allocator().create(Node);
+    node.* = .{
+        .tag = tag,
+        .loc = loc,
+        .data = undefined,
+    };
     return node;
 }
 
 pub fn makeExprStmt(ast: *Ast, expr: *Node) !*Node {
-    var node = try ast.arena.allocator().create(Node);
-    node.tag = .expr_stmt;
+    var node = try makeNode(ast, .expr_stmt, expr.loc);
     node.data = .{ .un = expr };
     return node;
 }
 
 pub fn makeIntLiteral(ast: *Ast, loc: Token.Loc, value: i64) !*Node {
-    var node = try ast.arena.allocator().create(Node);
-    node.tag = .int_literal;
-    node.loc = loc;
+    var node = try makeNode(ast, .int_literal, loc);
     node.data = .{ .int = value };
     return node;
 }
 
 pub fn makeIdentifier(ast: *Ast, loc: Token.Loc, name: []const u8) !*Node {
-    var node = try ast.arena.allocator().create(Node);
-    node.tag = .identifier;
-    node.loc = loc;
+    var node = try makeNode(ast, .identifier, loc);
     node.data = .{ .string = name };
     return node;
 }
 
 pub fn makeBoolLiteral(ast: *Ast, loc: Token.Loc, value: bool) !*Node {
-    var node = try ast.arena.allocator().create(Node);
-    node.tag = .bool_literal;
-    node.loc = loc;
+    var node = try makeNode(ast, .bool_literal, loc);
     node.data = .{ .bool = value };
     return node;
 }
 
 pub fn makeNoneLiteral(ast: *Ast, loc: Token.Loc) !*Node {
-    var node = try ast.arena.allocator().create(Node);
-    node.tag = .none_literal;
-    node.loc = loc;
+    var node = try makeNode(ast, .none_literal, loc);
     node.data = .{ .none = {} };
     return node;
 }
 
 pub fn makeBinOp(ast: *Ast, tag: Node.Tag, loc: Token.Loc, lhs: *Node, rhs: *Node) !*Node {
-    var node = try ast.arena.allocator().create(Node);
-    node.tag = tag;
-    node.loc = loc;
+    var node = try makeNode(ast, tag, loc);
     node.data = .{ .bin = .{ .lhs = lhs, .rhs = rhs } };
     return node;
 }
 
 pub fn makeReturnStmt(ast: *Ast, loc: Token.Loc, expr: *Node) !*Node {
-    var node = try ast.arena.allocator().create(Node);
-    node.tag = .return_stmt;
-    node.loc = loc;
+    var node = try makeNode(ast, .return_stmt, loc);
     node.data = .{ .opt = expr };
     return node;
 }
 
 pub fn makeLetDecl(ast: *Ast, loc: Token.Loc, name: []const u8, expr: ?*Node) !*Node {
-    var node = try ast.arena.allocator().create(Node);
-    node.tag = .let_decl;
-    node.loc = loc;
+    var node = try makeNode(ast, .let_decl, loc);
     node.data = .{ .let = .{ .name = name, .expr = expr } };
+    return node;
+}
+
+pub fn makeBlockStmt(ast: *Ast, loc: Token.Loc, list: []*const Node) !*Node {
+    var node = try makeNode(ast, .block, loc);
+    node.data = .{ .list = list };
     return node;
 }

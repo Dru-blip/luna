@@ -130,11 +130,21 @@ fn beginScope(g: *Generator) void {
 }
 
 fn endScope(g: *Generator) void {
+    var length = g.local_variables.items.len;
+    while (length > 0) {
+        const local = g.local_variables.items[length - 1];
+        if (local.scope_depth == g.scope_depth) {
+            _ = g.local_variables.pop();
+            length -= 1;
+        }
+        break;
+    }
     g.scope_depth -= 1;
 }
 
 fn declareVariable(g: *Generator, name: []const u8, variable: *Variable) !void {
-    for (g.local_variables.items.len..0) |i| {
+    var i: usize = g.local_variables.items.len;
+    while (i > 0) : (i -= 1) {
         const local = g.local_variables.items[i - 1];
         if (std.mem.eql(u8, local.name, name)) {
             variable.* = local;
@@ -166,7 +176,8 @@ fn declareVariable(g: *Generator, name: []const u8, variable: *Variable) !void {
 }
 
 fn findVariable(g: *Generator, name: []const u8, result: *Variable) bool {
-    for (g.local_variables.items.len..0) |i| {
+    var i: usize = g.local_variables.items.len;
+    while (i > 0) : (i -= 1) {
         const local = g.local_variables.items[i - 1];
         if (std.mem.eql(u8, local.name, name)) {
             result.* = local;
@@ -228,6 +239,9 @@ fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
         .let_decl => {
             try g.genLetDecl(node);
         },
+        .block => {
+            try g.genBlockStmt(node);
+        },
         .return_stmt => {
             const val = try g.genExpr(node.data.opt.?);
             try g.addUn(.ret, val, node.loc);
@@ -259,6 +273,14 @@ fn genLetDecl(g: *Generator, node: *const Ast.Node) GenError!void {
         variable.allocated_reg_slot,
         node.loc,
     );
+}
+
+fn genBlockStmt(g: *Generator, node: *const Ast.Node) GenError!void {
+    g.beginScope();
+    for (node.data.list) |stmt| {
+        try g.genStmt(stmt);
+    }
+    g.endScope();
 }
 
 fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
@@ -431,6 +453,12 @@ fn linearizeBasicBlocks(g: *Generator, executable: *Executable) !void {
         try spans.appendSlice(g.gpa, block.spans.items);
     }
 
+    // TODO: find a better way to do this.
+    // patch jump instructions
+    //
+    // instead of doing a full loop on the instructions
+    // its better to store the jump instructions inside a seperate array (like a
+    // patch buffer) and patch those to avoid unnecessary iterations.
     for (0..total_instructions) |i| {
         const instr = &instructions.items[i];
         switch (instr.op) {

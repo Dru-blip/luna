@@ -10,7 +10,7 @@ pub const Token = struct {
         line: u32,
         col: u32,
 
-        pub fn merge(self: Loc, other: *Loc) Loc {
+        pub fn merge(self: Loc, other: *const Loc) Loc {
             return .{
                 .start = self.start,
                 .end = other.end,
