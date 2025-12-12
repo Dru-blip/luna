@@ -58,6 +58,7 @@ pub fn deinit(vm: *Vm) void {
 
 pub fn runExecutable(vm: *Vm, executable: *Executable) !Value {
     var record = try ActivationRecord.init(executable, vm.gpa);
+    vm.globals.fast_slots = try vm.gpa.alloc(Value, executable.global_variable_count);
     defer record.deinit(vm.gpa);
     return vm.runRecord(&record, false);
 }
@@ -65,7 +66,7 @@ pub fn runExecutable(vm: *Vm, executable: *Executable) !Value {
 pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) !Value {
     _ = as_callback;
     var registers = record.registers;
-    _ = vm.globals;
+    var globals = vm.globals;
     const instructions = record.executable.instructions;
     const constants = record.executable.constants;
     var instruction: *Inst = undefined;
@@ -81,12 +82,26 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) !Value {
             },
             .load_true => {
                 registers[data.un] = Value.bool(true);
+                continue :start;
             },
             .load_false => {
                 registers[data.un] = Value.bool(false);
+                continue :start;
             },
             .load_none => {
                 registers[data.un] = Value.none();
+                continue :start;
+            },
+            .store_global_by_index => {
+                globals.fast_slots[data.bin.rhs] = registers[data.bin.lhs];
+                continue :start;
+            },
+            .load_global_by_index => {
+                registers[data.bin.rhs] = globals.fast_slots[data.bin.lhs];
+                continue :start;
+            },
+            .load_global_by_name => {
+                continue :start;
             },
             .mov => {
                 registers[data.bin.rhs] = registers[data.bin.lhs];

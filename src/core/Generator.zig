@@ -4,25 +4,44 @@ const Ast = @import("Ast.zig");
 const Span = @import("Tokenizer.zig").Token.Loc;
 const Value = @import("Value.zig");
 const Gc = @import("Gc.zig");
+const String = @import("../runtime/String.zig");
+const StringInterner = @import("../runtime/StringInterner.zig");
 
 const Inst = bytecode.Inst;
-
 const Constants = bytecode.Constants;
 const Executable = bytecode.Executable;
 const Instructions = bytecode.Instructions;
+
 const Generator = @This();
 
 pub const GenError = error{} || std.mem.Allocator.Error;
+
+const Variables = std.ArrayList(Variable);
+const Identifiers = std.ArrayList(*String);
 
 arena: std.heap.ArenaAllocator,
 blocks: std.ArrayList(*BasicBlock),
 gpa: std.mem.Allocator,
 current_block: *BasicBlock = undefined,
-constants: Constants,
 register_count: u32,
 free_registers: std.ArrayList(u32),
 ast: Ast,
 gc: *Gc,
+scope_depth: u32 = 0,
+constants: Constants,
+local_variables: Variables = .empty,
+global_variables: Variables = .empty,
+identifiers: Identifiers = .empty,
+string_interner: *StringInterner,
+
+const Scope = enum { global, local };
+
+const Variable = struct {
+    name: []const u8,
+    scope_depth: u32,
+    scope: Scope,
+    allocated_reg_slot: u32,
+};
 
 pub const BasicBlock = struct {
     pub const Spans = std.ArrayList(Span);
@@ -33,7 +52,7 @@ pub const BasicBlock = struct {
     start_offset: u32, //used when linearizing the blocks
 };
 
-pub fn init(gpa: std.mem.Allocator, ast: Ast, gc: *Gc) !Generator {
+pub fn init(gpa: std.mem.Allocator, ast: Ast, gc: *Gc, string_interner: *StringInterner) !Generator {
     var generator = Generator{
         .arena = std.heap.ArenaAllocator.init(gpa),
         .blocks = .empty,
@@ -43,6 +62,7 @@ pub fn init(gpa: std.mem.Allocator, ast: Ast, gc: *Gc) !Generator {
         .register_count = 0,
         .free_registers = .empty,
         .gc = gc,
+        .string_interner = string_interner,
     };
 
     const block = try generator.makeBasicBlock();
@@ -54,12 +74,16 @@ pub fn init(gpa: std.mem.Allocator, ast: Ast, gc: *Gc) !Generator {
 pub fn deinit(g: *Generator) void {
     g.constants.deinit(g.gpa);
     g.free_registers.deinit(g.gpa);
+    g.global_variables.deinit(g.gpa);
+    g.local_variables.deinit(g.gpa);
+    g.identifiers.deinit(g.gpa);
     g.blocks.deinit(g.gpa);
     g.arena.deinit();
 }
 
 pub fn generate(g: *Generator) !*Executable {
     try g.genNodes(g.ast.nodes);
+    try g.addInst(.hlt, .{ .none = {} }, .{ .start = 0, .col = 1, .end = 0, .line = 1 });
     return try g.finalize();
 }
 
@@ -68,8 +92,8 @@ pub fn finalize(g: *Generator) !*Executable {
     executable.constants = try g.constants.toOwnedSlice(g.gpa);
 
     executable.max_register_count = g.register_count;
+    executable.global_variable_count = @intCast(g.global_variables.items.len);
     try g.linearizeBasicBlocks(executable);
-
     return executable;
 }
 
@@ -101,9 +125,74 @@ fn freeRegister(g: *Generator, reg: u32) !void {
     try g.free_registers.append(g.gpa, reg);
 }
 
+fn beginScope(g: *Generator) void {
+    g.scope_depth += 1;
+}
+
+fn endScope(g: *Generator) void {
+    g.scope_depth -= 1;
+}
+
+fn declareVariable(g: *Generator, name: []const u8, variable: *Variable) !void {
+    for (g.local_variables.items.len..0) |i| {
+        const local = g.local_variables.items[i - 1];
+        if (std.mem.eql(u8, local.name, name)) {
+            variable.* = local;
+            return;
+        }
+    }
+
+    for (g.global_variables.items) |global| {
+        if (std.mem.eql(u8, global.name, name)) {
+            variable.* = global;
+            return;
+        }
+    }
+
+    const scope: Scope = if (g.scope_depth > 0) .local else .global;
+    const slot: u32 = if (scope == .local) g.allocRegister() else @intCast(g.global_variables.items.len);
+    variable.* = .{
+        .name = name,
+        .scope = scope,
+        .scope_depth = g.scope_depth,
+        .allocated_reg_slot = slot,
+    };
+
+    if (scope == .global) {
+        try g.global_variables.append(g.gpa, variable.*);
+    } else {
+        try g.local_variables.append(g.gpa, variable.*);
+    }
+}
+
+fn findVariable(g: *Generator, name: []const u8, result: *Variable) bool {
+    for (g.local_variables.items.len..0) |i| {
+        const local = g.local_variables.items[i - 1];
+        if (std.mem.eql(u8, local.name, name)) {
+            result.* = local;
+            return true;
+        }
+    }
+
+    for (g.global_variables.items) |global| {
+        if (std.mem.eql(u8, global.name, name)) {
+            result.* = global;
+            return true;
+        }
+    }
+    return false;
+}
+
 fn addConstant(g: *Generator, value: Value) !u32 {
     const index = g.constants.items.len;
     try g.constants.append(g.gpa, value);
+    return @intCast(index);
+}
+
+fn addIdentifier(g: *Generator, name: []const u8) !u32 {
+    const index = g.identifiers.items.len;
+    const identifier = try g.string_interner.intern(name);
+    try g.identifiers.append(g.gpa, identifier);
     return @intCast(index);
 }
 
@@ -134,8 +223,11 @@ fn genNodes(g: *Generator, nodes: Ast.Nodes) GenError!void {
     }
 }
 
-fn genStmt(g: *Generator, node: *Ast.Node) GenError!void {
+fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
     switch (node.tag) {
+        .let_decl => {
+            try g.genLetDecl(node);
+        },
         .return_stmt => {
             const val = try g.genExpr(node.data.opt.?);
             try g.addUn(.ret, val, node.loc);
@@ -150,7 +242,26 @@ fn genStmt(g: *Generator, node: *Ast.Node) GenError!void {
     }
 }
 
-fn genExpr(g: *Generator, node: *Ast.Node) GenError!u32 {
+fn genLetDecl(g: *Generator, node: *const Ast.Node) GenError!void {
+    var initializer: u32 = undefined;
+    if (node.data.let.expr) |expr| {
+        initializer = try g.genExpr(expr);
+    } else {
+        initializer = g.allocRegister();
+        try g.addUn(.load_none, initializer, node.loc);
+    }
+    var variable: Variable = undefined;
+    try g.declareVariable(node.data.let.name, &variable);
+
+    try g.addBin(
+        if (variable.scope == .global) .store_global_by_index else .mov,
+        initializer,
+        variable.allocated_reg_slot,
+        node.loc,
+    );
+}
+
+fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
     switch (node.tag) {
         .int_literal => {
             const reg = g.allocRegister();
@@ -167,6 +278,23 @@ fn genExpr(g: *Generator, node: *Ast.Node) GenError!u32 {
             const reg = g.allocRegister();
             try g.addUn(.load_none, reg, node.loc);
             return reg;
+        },
+        .identifier => {
+            var variable: Variable = undefined;
+            var dst: u32 = undefined;
+            if (g.findVariable(node.data.string, &variable)) {
+                if (variable.scope == .local) {
+                    return variable.allocated_reg_slot;
+                }
+                dst = g.allocRegister();
+                try g.addBin(.load_global_by_index, variable.allocated_reg_slot, dst, node.loc);
+                return dst;
+            }
+
+            dst = g.allocRegister();
+            const identifier_index = try g.addIdentifier(node.data.string);
+            try g.addBin(.load_global_by_index, identifier_index, dst, node.loc);
+            return dst;
         },
         .add => {
             return try g.genBinOp(.add, node);
@@ -213,7 +341,7 @@ fn genExpr(g: *Generator, node: *Ast.Node) GenError!u32 {
     }
 }
 
-inline fn genBinOp(g: *Generator, op: Inst.Op, node: *Ast.Node) GenError!u32 {
+inline fn genBinOp(g: *Generator, op: Inst.Op, node: *const Ast.Node) GenError!u32 {
     const lhs = try g.genExpr(node.data.bin.lhs);
     const rhs = try g.genExpr(node.data.bin.rhs);
 

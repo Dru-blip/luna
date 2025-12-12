@@ -43,7 +43,7 @@ pub fn runFile(i: *Interpreter, path: []const u8) !Value {
     var ast = try Ast.parse(buffer[0..file_stats.size :0], i.gc.gpa);
     defer ast.deinit();
 
-    var generator = try Generator.init(i.gc.gpa, ast, &i.gc);
+    var generator = try Generator.init(i.gc.gpa, ast, &i.gc, &i.string_interner);
     const executable = try generator.generate();
 
     const result = try i.vm.runExecutable(executable);

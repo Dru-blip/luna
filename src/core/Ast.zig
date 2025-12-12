@@ -14,6 +14,7 @@ pub const Node = struct {
     pub const Tag = enum {
         root,
         block,
+        let_decl,
         return_stmt,
         expr_stmt,
 
@@ -40,6 +41,7 @@ pub const Node = struct {
         div_assign,
         mod_assign,
 
+        identifier,
         int_literal,
         bool_literal,
         none_literal,
@@ -56,6 +58,11 @@ pub const Node = struct {
         int: i64,
         bool: bool,
         none: void,
+        string: []const u8,
+        let: struct {
+            name: []const u8,
+            expr: ?*Node,
+        },
     };
 };
 
@@ -114,6 +121,14 @@ pub fn makeIntLiteral(ast: *Ast, loc: Token.Loc, value: i64) !*Node {
     return node;
 }
 
+pub fn makeIdentifier(ast: *Ast, loc: Token.Loc, name: []const u8) !*Node {
+    var node = try ast.arena.allocator().create(Node);
+    node.tag = .identifier;
+    node.loc = loc;
+    node.data = .{ .string = name };
+    return node;
+}
+
 pub fn makeBoolLiteral(ast: *Ast, loc: Token.Loc, value: bool) !*Node {
     var node = try ast.arena.allocator().create(Node);
     node.tag = .bool_literal;
@@ -143,5 +158,13 @@ pub fn makeReturnStmt(ast: *Ast, loc: Token.Loc, expr: *Node) !*Node {
     node.tag = .return_stmt;
     node.loc = loc;
     node.data = .{ .opt = expr };
+    return node;
+}
+
+pub fn makeLetDecl(ast: *Ast, loc: Token.Loc, name: []const u8, expr: ?*Node) !*Node {
+    var node = try ast.arena.allocator().create(Node);
+    node.tag = .let_decl;
+    node.loc = loc;
+    node.data = .{ .let = .{ .name = name, .expr = expr } };
     return node;
 }

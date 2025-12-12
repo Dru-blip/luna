@@ -73,6 +73,7 @@ pub fn parse(p: *Parser) ParserError!Ast {
 fn parseStmt(p: *Parser) ParserError!*Node {
     const token = p.peek();
     switch (token.tag) {
+        .keyword_let => return p.parseLetDecl(),
         .keyword_return => return p.parseReturnStmt(),
         else => {
             const expr = try p.parseExpr(0);
@@ -81,8 +82,17 @@ fn parseStmt(p: *Parser) ParserError!*Node {
     }
 }
 
+fn parseLetDecl(p: *Parser) ParserError!*Node {
+    const token = try p.expectToken(.keyword_let);
+    const name = try p.expectToken(.identifier);
+    _ = try p.expectToken(.equal);
+    const expr = try p.parseExpr(0);
+    return p.ast.makeLetDecl(token.loc.merge(&expr.loc), p.source[name.loc.start..name.loc.end], expr);
+}
+
 fn parseReturnStmt(p: *Parser) ParserError!*Node {
     const token = try p.expectToken(.keyword_return);
+    //TODO: check for empty return statement
     const expr = try p.parseExpr(0);
     return p.ast.makeReturnStmt(token.loc.merge(&expr.loc), expr);
 }
@@ -141,6 +151,11 @@ fn parsePrimaryExpr(p: *Parser) ParserError!*Node {
             p.advance();
             const value = try std.fmt.parseInt(i64, p.source[token.loc.start..token.loc.end], 10);
             return try p.ast.makeIntLiteral(token.loc, value);
+        },
+        .identifier => {
+            p.advance();
+            const name = p.source[token.loc.start..token.loc.end];
+            return try p.ast.makeIdentifier(token.loc, name);
         },
         .keyword_none => {
             p.advance();

@@ -32,6 +32,9 @@ pub const Inst = struct {
         branch,
         jmp,
 
+        store_global_by_index,
+        load_global_by_index,
+        load_global_by_name,
         ret,
     };
 
@@ -58,6 +61,7 @@ pub const Executable = struct {
     spans: []Span,
     constants: Constants.Slice,
     max_register_count: u32,
+    global_variable_count: u32,
 
     pub fn new(gc: *Gc) !*Executable {
         const obj: *Executable = try gc.alloc(Executable);

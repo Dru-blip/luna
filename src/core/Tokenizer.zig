@@ -61,6 +61,7 @@ pub const Token = struct {
         keyword_true,
         keyword_false,
         keyword_none,
+        keyword_let,
 
         eof,
     };
@@ -70,6 +71,7 @@ pub const Token = struct {
         .{ "true", .keyword_true },
         .{ "false", .keyword_false },
         .{ "none", .keyword_none },
+        .{ "let", .keyword_let },
     });
 
     pub fn getKeyword(bytes: []const u8) ?Tag {
@@ -151,6 +153,7 @@ pub fn next(self: *Tokenizer) Token {
             },
             ' ', '\t', '\r' => {
                 self.advance();
+                result.loc.start = self.index;
                 continue :state .start;
             },
             '\n' => {
@@ -200,90 +203,112 @@ pub fn next(self: *Tokenizer) Token {
         .plus => {
             self.advance();
             switch (self.buffer[self.index]) {
-                '=' => result.tag = .plus_equal,
+                '=' => {
+                    result.tag = .plus_equal;
+                    self.advance();
+                },
                 else => result.tag = .plus,
             }
-            self.advance();
         },
         .minus => {
             self.advance();
             switch (self.buffer[self.index]) {
-                '=' => result.tag = .minus_equal,
+                '=' => {
+                    result.tag = .minus_equal;
+                    self.advance();
+                },
                 else => result.tag = .minus,
             }
-            self.advance();
         },
         .asterisk => {
             self.advance();
             switch (self.buffer[self.index]) {
-                '=' => result.tag = .asterisk_equal,
+                '=' => {
+                    result.tag = .asterisk_equal;
+                    self.advance();
+                },
                 else => result.tag = .asterisk,
             }
-            self.advance();
         },
         .slash => {
             self.advance();
             switch (self.buffer[self.index]) {
-                '=' => result.tag = .slash_equal,
+                '=' => {
+                    result.tag = .slash_equal;
+                    self.advance();
+                },
                 else => result.tag = .slash,
             }
-            self.advance();
         },
         .modulus => {
             self.advance();
             switch (self.buffer[self.index]) {
-                '=' => result.tag = .modulus_equal,
+                '=' => {
+                    result.tag = .modulus_equal;
+                    self.advance();
+                },
                 else => result.tag = .modulus,
             }
-            self.advance();
         },
         .less => {
             self.advance();
             switch (self.buffer[self.index]) {
-                '=' => result.tag = .angle_bracket_left_equal,
+                '=' => {
+                    result.tag = .angle_bracket_left_equal;
+                    self.advance();
+                },
                 else => result.tag = .angle_bracket_left,
             }
-            self.advance();
         },
         .greater => {
             self.advance();
             switch (self.buffer[self.index]) {
-                '=' => result.tag = .angle_bracket_right_equal,
+                '=' => {
+                    result.tag = .angle_bracket_right_equal;
+                    self.advance();
+                },
                 else => result.tag = .angle_bracket_right,
             }
-            self.advance();
         },
         .equal => {
             self.advance();
             switch (self.buffer[self.index]) {
-                '=' => result.tag = .equal_equal,
+                '=' => {
+                    result.tag = .equal_equal;
+                    self.advance();
+                },
                 else => result.tag = .equal,
             }
-            self.advance();
         },
         .bang => {
             self.advance();
             switch (self.buffer[self.index]) {
-                '=' => result.tag = .bang_equal,
+                '=' => {
+                    result.tag = .bang_equal;
+                    self.advance();
+                },
                 else => result.tag = .bang,
             }
-            self.advance();
         },
         .ampersand => {
             self.advance();
             switch (self.buffer[self.index]) {
-                '&' => result.tag = .ampersand_ampersand,
+                '&' => {
+                    result.tag = .ampersand_ampersand;
+                    self.advance();
+                },
                 else => result.tag = .ampersand,
             }
-            self.advance();
         },
         .pipe => {
             self.advance();
             switch (self.buffer[self.index]) {
-                '|' => result.tag = .pipe_pipe,
+                '|' => {
+                    result.tag = .pipe_pipe;
+                    self.advance();
+                },
                 else => result.tag = .pipe,
             }
-            self.advance();
         },
         .identifier => {
             self.advance();

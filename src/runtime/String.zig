@@ -16,7 +16,7 @@ const Storage = union(enum) {
     heap: []const u8,
 };
 
-const type_descriptor = Object.TypeDescriptor{
+pub const type_descriptor = Object.TypeDescriptor{
     .name = "String",
     .visit = visit,
     .finalize = finalize,
@@ -39,7 +39,7 @@ pub fn new(gc: *Gc, bytes: []const u8) !*String {
 }
 
 pub inline fn asSlice(self: *const String) []const u8 {
-    return switch (self.storage.*) {
+    return switch (self.storage) {
         .@"inline" => |buf| buf[0..self.length],
         .heap => |buf| buf,
     };
@@ -54,7 +54,7 @@ pub fn eql(a: *const String, b: *const String) bool {
 fn finalize(self: *anyopaque, gc: *Gc) void {
     const str: *String = @ptrCast(@alignCast(self));
 
-    switch (str.storage.*) {
+    switch (str.storage) {
         .heap => |slice| gc.gpa.free(slice),
         else => {},
     }
