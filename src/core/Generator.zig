@@ -335,6 +335,25 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
         .@"or" => {
             return try g.genLogicalOp(.@"or", node);
         },
+        .assign => {
+            const value = try g.genExpr(node.data.bin.rhs);
+            const name = node.data.bin.lhs.data.string;
+
+            var variable: Variable = undefined;
+            if (g.findVariable(name, &variable)) {
+                try g.addBin(
+                    if (variable.scope == .global) .store_global_by_index else .mov,
+                    value,
+                    variable.allocated_reg_slot,
+                    node.loc,
+                );
+            } else {
+                const identifier_index = try g.addIdentifier(name);
+                try g.addBin(.store_global_by_name, value, identifier_index, node.loc);
+            }
+
+            return value;
+        },
         else => {
             unreachable;
         },

@@ -103,6 +103,9 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) !Value {
             .load_global_by_name => {
                 continue :start;
             },
+            .store_global_by_name => {
+                continue :start;
+            },
             .mov => {
                 registers[data.bin.rhs] = registers[data.bin.lhs];
                 continue :start;

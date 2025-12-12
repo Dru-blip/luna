@@ -12,20 +12,20 @@ const luna = @import("luna");
 const Interpreter = @This();
 
 gc: Gc,
-string_interner: StringInterner,
+string_interner: StringInterner = undefined,
 vm: *Vm = undefined,
 // running_module: *Module,
 
 pub fn init(gpa: std.mem.Allocator) !*Interpreter {
-    var gc = Gc.init(gpa);
+    const gc = Gc.init(gpa);
     var interpreter = try gpa.create(Interpreter);
 
     interpreter.* = .{
         .gc = gc,
-        .string_interner = StringInterner.init(&gc),
     };
 
     interpreter.vm = try Vm.init(gpa, interpreter);
+    interpreter.string_interner = StringInterner.init(&interpreter.gc);
 
     return interpreter;
 }
@@ -45,6 +45,7 @@ pub fn runFile(i: *Interpreter, path: []const u8) !Value {
 
     var generator = try Generator.init(i.gc.gpa, ast, &i.gc, &i.string_interner);
     const executable = try generator.generate();
+    try executable.print();
 
     const result = try i.vm.runExecutable(executable);
     std.debug.print("result: {d}\n", .{result.data.int});

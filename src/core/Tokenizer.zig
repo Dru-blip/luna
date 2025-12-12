@@ -195,6 +195,7 @@ pub fn next(self: *Tokenizer) Token {
                 continue :state .int;
             },
             'a'...'z', 'A'...'Z', '_' => {
+                result.loc.start = self.index;
                 result.tag = .identifier;
                 continue :state .identifier;
             },

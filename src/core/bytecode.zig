@@ -34,6 +34,7 @@ pub const Inst = struct {
 
         store_global_by_index,
         load_global_by_index,
+        store_global_by_name,
         load_global_by_name,
         ret,
     };

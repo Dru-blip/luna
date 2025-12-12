@@ -29,6 +29,7 @@ pub fn new(gc: *Gc, bytes: []const u8) !*String {
     s.hash = std.hash.Wyhash.hash(0, bytes);
 
     if (bytes.len <= max_small_string_len) {
+        s.storage = .{ .@"inline" = undefined };
         @memcpy(s.storage.@"inline"[0..bytes.len], bytes);
     } else {
         const buf = try gc.gpa.alloc(u8, bytes.len);
