@@ -18,10 +18,12 @@ pub const GenError = error{} || std.mem.Allocator.Error;
 
 const Variables = std.ArrayList(Variable);
 const Identifiers = std.ArrayList(*String);
+const LoopStack = std.ArrayList(LoopInfo);
 
 arena: std.heap.ArenaAllocator,
 blocks: std.ArrayList(*BasicBlock),
 gpa: std.mem.Allocator,
+string_interner: *StringInterner,
 current_block: *BasicBlock = undefined,
 register_count: u32,
 free_registers: std.ArrayList(u32),
@@ -32,7 +34,7 @@ constants: Constants,
 local_variables: Variables = .empty,
 global_variables: Variables = .empty,
 identifiers: Identifiers = .empty,
-string_interner: *StringInterner,
+loop_stack: LoopStack = .empty,
 
 const Scope = enum { global, local };
 
@@ -41,6 +43,11 @@ const Variable = struct {
     scope_depth: u32,
     scope: Scope,
     allocated_reg_slot: u32,
+};
+
+const LoopInfo = struct {
+    start_block: u32,
+    end_block: u32,
 };
 
 pub const BasicBlock = struct {
@@ -239,6 +246,15 @@ fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
         .let_decl => {
             try g.genLetDecl(node);
         },
+        .loop_stmt => {
+            try g.genLoopStmt(node);
+        },
+        .break_stmt => {
+            try g.genBreakStmt(node);
+        },
+        .continue_stmt => {
+            try g.genContinueStmt(node);
+        },
         .if_stmt => {
             try g.genIfStmt(node);
         },
@@ -257,6 +273,31 @@ fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
             unreachable;
         },
     }
+}
+
+fn genLoopStmt(g: *Generator, node: *const Ast.Node) GenError!void {
+    const start_block = try g.makeBasicBlock();
+    const end_block = try g.makeBasicBlock();
+    const loop_info: LoopInfo = .{
+        .start_block = start_block.id,
+        .end_block = end_block.id,
+    };
+    try g.loop_stack.append(g.gpa, loop_info);
+    g.switchBasicBlock(start_block);
+    try g.genStmt(node.data.un);
+    try g.addUn(.jmp, start_block.id, node.loc);
+    _ = g.loop_stack.pop();
+    g.switchBasicBlock(end_block);
+}
+
+fn genBreakStmt(g: *Generator, node: *const Ast.Node) GenError!void {
+    const loop_info = g.loop_stack.getLast();
+    try g.addUn(.jmp, loop_info.end_block, node.loc);
+}
+
+fn genContinueStmt(g: *Generator, node: *const Ast.Node) GenError!void {
+    const loop_info = g.loop_stack.getLast();
+    try g.addUn(.jmp, loop_info.start_block, node.loc);
 }
 
 fn genIfStmt(g: *Generator, node: *const Ast.Node) GenError!void {

@@ -15,9 +15,12 @@ pub const Node = struct {
         root,
         block,
         if_stmt,
-        let_decl,
+        loop_stmt,
+        break_stmt,
+        continue_stmt,
         return_stmt,
         expr_stmt,
+        let_decl,
 
         add,
         sub,
@@ -179,5 +182,23 @@ pub fn makeIfStmt(ast: *Ast, loc: Token.Loc, @"test": *Node, consequent: *Node, 
             .alternate = alternate,
         },
     };
+    return node;
+}
+
+pub fn makeLoopStmt(ast: *Ast, loc: Token.Loc, body: *Node) !*Node {
+    var node = try makeNode(ast, .loop_stmt, loc);
+    node.data = .{ .un = body };
+    return node;
+}
+
+pub fn makeBreakStmt(ast: *Ast, loc: Token.Loc) !*Node {
+    var node = try makeNode(ast, .break_stmt, loc);
+    node.data = .{ .none = {} };
+    return node;
+}
+
+pub fn makeContinueStmt(ast: *Ast, loc: Token.Loc) !*Node {
+    var node = try makeNode(ast, .continue_stmt, loc);
+    node.data = .{ .none = {} };
     return node;
 }

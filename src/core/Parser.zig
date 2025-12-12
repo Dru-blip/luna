@@ -77,6 +77,9 @@ fn parseStmt(p: *Parser) ParserError!*Node {
         .l_brace => return try p.parseBlockStmt(),
         .keyword_if => return try p.parseIfStmt(),
         .keyword_return => return p.parseReturnStmt(),
+        .keyword_loop => return p.parseLoopStmt(),
+        .keyword_break => return p.parseBreakStmt(),
+        .keyword_continue => return p.parseContinueStmt(),
         else => {
             const expr = try p.parseExpr(0);
             return p.ast.makeExprStmt(expr);
@@ -90,6 +93,22 @@ fn parseLetDecl(p: *Parser) ParserError!*Node {
     _ = try p.expectToken(.equal);
     const expr = try p.parseExpr(0);
     return p.ast.makeLetDecl(token.loc.merge(&expr.loc), p.source[name.loc.start..name.loc.end], expr);
+}
+
+fn parseLoopStmt(p: *Parser) ParserError!*Node {
+    const token = try p.expectToken(.keyword_loop);
+    const body = try p.parseBlockStmt();
+    return p.ast.makeLoopStmt(token.loc.merge(&body.loc), body);
+}
+
+fn parseBreakStmt(p: *Parser) ParserError!*Node {
+    const token = try p.expectToken(.keyword_break);
+    return p.ast.makeBreakStmt(token.loc);
+}
+
+fn parseContinueStmt(p: *Parser) ParserError!*Node {
+    const token = try p.expectToken(.keyword_continue);
+    return p.ast.makeContinueStmt(token.loc);
 }
 
 fn parseIfStmt(p: *Parser) ParserError!*Node {
