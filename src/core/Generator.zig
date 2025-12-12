@@ -246,6 +246,9 @@ fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
         .let_decl => {
             try g.genLetDecl(node);
         },
+        .for_stmt => {
+            try g.genForStmt(node);
+        },
         .while_stmt => {
             try g.genWhileStmt(node);
         },
@@ -276,6 +279,43 @@ fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
             unreachable;
         },
     }
+}
+
+fn genForStmt(g: *Generator, node: *const Ast.Node) GenError!void {
+    const init_block = try g.makeBasicBlock();
+    const test_block = try g.makeBasicBlock();
+    const body_block = try g.makeBasicBlock();
+    const update_block = try g.makeBasicBlock();
+    const end_block = try g.makeBasicBlock();
+
+    const loop_info: LoopInfo = .{
+        .start_block = update_block.id,
+        .end_block = end_block.id,
+    };
+    try g.loop_stack.append(g.gpa, loop_info);
+    try g.addUn(.jmp, init_block.id, node.loc);
+
+    g.beginScope();
+
+    g.switchBasicBlock(init_block);
+    //TODO: raise error if init is not a let decl.
+    try g.genStmt(node.data.@"for".init);
+    try g.addUn(.jmp, test_block.id, node.data.@"for".init.loc);
+
+    g.switchBasicBlock(test_block);
+    try g.addTri(.branch, try g.genExpr(node.data.@"for".@"test"), body_block.id, end_block.id, node.data.@"for".@"test".loc);
+
+    g.switchBasicBlock(body_block);
+    try g.genStmt(node.data.@"for".body);
+    try g.addUn(.jmp, update_block.id, node.loc);
+
+    g.switchBasicBlock(update_block);
+    _ = try g.genExpr(node.data.@"for".update);
+    try g.addUn(.jmp, test_block.id, node.loc);
+
+    g.endScope();
+    _ = g.loop_stack.pop();
+    g.switchBasicBlock(end_block);
 }
 
 fn genWhileStmt(g: *Generator, node: *const Ast.Node) GenError!void {
@@ -313,11 +353,13 @@ fn genLoopStmt(g: *Generator, node: *const Ast.Node) GenError!void {
 }
 
 fn genBreakStmt(g: *Generator, node: *const Ast.Node) GenError!void {
+    //TODO: raise error if outside of loop
     const loop_info = g.loop_stack.getLast();
     try g.addUn(.jmp, loop_info.end_block, node.loc);
 }
 
 fn genContinueStmt(g: *Generator, node: *const Ast.Node) GenError!void {
+    //TODO: raise error if outside of loop
     const loop_info = g.loop_stack.getLast();
     try g.addUn(.jmp, loop_info.start_block, node.loc);
 }

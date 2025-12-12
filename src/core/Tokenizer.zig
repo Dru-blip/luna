@@ -55,6 +55,8 @@ pub const Token = struct {
         l_brace,
         r_brace,
 
+        semicolon,
+
         int,
         identifier,
         keyword_return,
@@ -66,6 +68,7 @@ pub const Token = struct {
         keyword_else,
         keyword_loop,
         keyword_while,
+        keyword_for,
         keyword_break,
         keyword_continue,
 
@@ -84,6 +87,7 @@ pub const Token = struct {
         .{ "break", .keyword_break },
         .{ "continue", .keyword_continue },
         .{ "while", .keyword_while },
+        .{ "for", .keyword_for },
     });
 
     pub fn getKeyword(bytes: []const u8) ?Tag {
@@ -189,6 +193,10 @@ pub fn next(self: *Tokenizer) Token {
             '}' => {
                 self.advance();
                 result.tag = .r_brace;
+            },
+            ';' => {
+                self.advance();
+                result.tag = .semicolon;
             },
             '+' => continue :state .plus,
             '-' => continue :state .minus,

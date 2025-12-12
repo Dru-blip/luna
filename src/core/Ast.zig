@@ -17,6 +17,7 @@ pub const Node = struct {
         if_stmt,
         loop_stmt,
         while_stmt,
+        for_stmt,
         break_stmt,
         continue_stmt,
         return_stmt,
@@ -71,6 +72,12 @@ pub const Node = struct {
         },
         @"while": struct {
             @"test": *Node,
+            body: *Node,
+        },
+        @"for": struct {
+            init: *Node,
+            @"test": *Node,
+            update: *Node,
             body: *Node,
         },
         let: struct {
@@ -213,6 +220,19 @@ pub fn makeWhileStmt(ast: *Ast, loc: Token.Loc, @"test": *Node, body: *Node) !*N
     node.data = .{
         .@"while" = .{
             .@"test" = @"test",
+            .body = body,
+        },
+    };
+    return node;
+}
+
+pub fn makeForStmt(ast: *Ast, loc: Token.Loc, initializer: *Node, @"test": *Node, update: *Node, body: *Node) !*Node {
+    var node = try makeNode(ast, .for_stmt, loc);
+    node.data = .{
+        .@"for" = .{
+            .init = initializer,
+            .@"test" = @"test",
+            .update = update,
             .body = body,
         },
     };
