@@ -43,21 +43,6 @@ fn recordError(p: *Parser, location: Token.Loc, comptime format: []const u8, arg
     });
 }
 
-// static void extract_source_line_info(struct lu_istate* state,
-//                                      struct span* loc,
-//                                      size_t* line_start_offset,
-//                                      size_t* line_length) {
-//     int64_t line_start = loc->start, line_end = loc->end;
-//     const char* source = state->running_module->program.source;
-//     size_t source_length = state->running_module->program.source_length;
-//     while (line_start > 0 && source[line_start - 1] != '\n')
-//         line_start--;
-//     while (line_end < source_length && source[line_end] != '\n')
-//         line_end++;
-//     *line_length = line_end - line_start;
-//     *line_start_offset = line_start;
-// }
-
 fn extract_source_line(
     source: []const u8,
     loc: *const Token.Loc,

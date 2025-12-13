@@ -17,8 +17,8 @@ vm: *Vm = undefined,
 // running_module: *Module,
 
 pub fn init(gpa: std.mem.Allocator) !*Interpreter {
-    const gc = Gc.init(gpa);
     var interpreter = try gpa.create(Interpreter);
+    const gc = Gc.init(gpa, interpreter);
 
     interpreter.* = .{
         .gc = gc,
@@ -51,6 +51,8 @@ pub fn runFile(i: *Interpreter, path: []const u8) !Value {
 
     const result = try i.vm.runExecutable(executable);
     std.debug.print("result: {d}\n", .{result.data.int});
+
+    try i.gc.collectGarbage();
 
     return Value.none();
 }

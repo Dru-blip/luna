@@ -1,6 +1,7 @@
 const std = @import("std");
 const Gc = @import("../core/Gc.zig");
 const Object = @import("Object.zig");
+const ObjectSet = @import("ObjectSet.zig");
 
 const String = @This();
 
@@ -52,8 +53,8 @@ pub fn eql(a: *const String, b: *const String) bool {
     return std.mem.eql(u8, a.asSlice(), b.asSlice());
 }
 
-fn finalize(self: *anyopaque, gc: *Gc) void {
-    const str: *String = @ptrCast(@alignCast(self));
+fn finalize(self: *Object, gc: *Gc) void {
+    const str: *String = self.as(String);
 
     switch (str.storage) {
         .heap => |slice| gc.gpa.free(slice),
@@ -61,4 +62,6 @@ fn finalize(self: *anyopaque, gc: *Gc) void {
     }
 }
 
-fn visit(_: *anyopaque, _: *Gc) void {}
+fn visit(self: *Object, live_objects: *ObjectSet) std.mem.Allocator.Error!void {
+    try Object.Base.visit(self, live_objects);
+}

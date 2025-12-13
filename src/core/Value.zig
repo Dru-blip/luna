@@ -91,7 +91,11 @@ pub inline fn toObject(value: Value) *Object {
     return value.data.object;
 }
 
-pub fn toPropertyKey(value: Value) ?PropertyKey {
+pub inline fn asObject(value: Value) ?*Object {
+    return if (value.type == .object) value.data.object else null;
+}
+
+pub inline fn toPropertyKey(value: Value) ?PropertyKey {
     //TODO: raise error if value is not an integer or string
     switch (value.type) {
         .int => PropertyKey.fromInt(value.data.int),

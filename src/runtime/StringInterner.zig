@@ -31,3 +31,7 @@ pub fn intern(interner: *StringInterner, bytes: []const u8) !*String {
 
     return string;
 }
+
+pub fn iterator(interner: *StringInterner) std.StringHashMap(*String).ValueIterator {
+    return interner.strings.valueIterator();
+}

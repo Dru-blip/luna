@@ -450,7 +450,7 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
 
             dst = g.allocRegister();
             const identifier_index = try g.addIdentifier(node.data.string);
-            try g.addBin(.load_global_by_index, identifier_index, dst, node.loc);
+            try g.addBin(.load_global_by_name, identifier_index, dst, node.loc);
             return dst;
         },
         .add => {

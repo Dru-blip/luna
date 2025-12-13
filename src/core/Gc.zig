@@ -2,6 +2,8 @@ const std = @import("std");
 const Value = @import("../core/Value.zig");
 const PropertyMap = @import("../runtime/property_map.zig").PropertyMap;
 const Object = @import("../runtime/Object.zig");
+const ObjectSet = @import("../runtime/ObjectSet.zig");
+const Interpreter = @import("../runtime/Interpreter.zig");
 
 const Gc = @This();
 
@@ -31,6 +33,12 @@ const Block = struct {
         return null;
     }
 
+    pub inline fn deallocateCell(blk: *Block, c: *Cell, cell_index: usize) void {
+        blk.bitmap.unset(cell_index);
+        c.next = blk.free_list;
+        blk.free_list = c;
+    }
+
     pub inline fn indexOf(blk: *Block, value: *Cell) usize {
         //does not check whether the value is within the block's range
         return (@intFromPtr(value) - @intFromPtr(blk.data.ptr)) / blk.cell_size;
@@ -38,14 +46,18 @@ const Block = struct {
 };
 
 arena: std.heap.ArenaAllocator,
-blocks: std.ArrayList(*Block),
+blocks: std.ArrayList(*Block) = .empty,
 gpa: std.mem.Allocator,
+interpreter: *Interpreter,
+bytes_allocated_since_last_gc: u64 = 0,
 
-pub fn init(allocator: std.mem.Allocator) Gc {
+const gc_threshold = 4 * 1024 * 1024;
+
+pub fn init(allocator: std.mem.Allocator, interpreter: *Interpreter) Gc {
     return Gc{
         .arena = std.heap.ArenaAllocator.init(allocator),
         .gpa = allocator,
-        .blocks = .empty,
+        .interpreter = interpreter,
     };
 }
 
@@ -63,22 +75,28 @@ inline fn allocImpl(
     gc: *Gc,
     comptime T: anytype,
 ) !*T {
-    //TODO: should check alignment,
-    // if requires should align
+    //TODO: check alignment , align if needed
     const obj_size = @sizeOf(T);
     const header_size = @sizeOf(Object);
     const cell_size = header_size + obj_size;
 
+    if (gc.bytes_allocated_since_last_gc + cell_size > gc_threshold) {
+        try gc.collectGarbage();
+        gc.bytes_allocated_since_last_gc = 0;
+    }
+
     const block = gc.findSuitableBlock(cell_size) orelse try gc.createBlock(cell_size);
 
     const cell = block.allocateCell() orelse return std.mem.Allocator.Error.OutOfMemory;
+
+    gc.bytes_allocated_since_last_gc += cell_size;
 
     const obj_base = @intFromPtr(cell);
     const header: *Object = @ptrFromInt(obj_base);
     const obj_ptr: *T = @ptrFromInt(obj_base + header_size);
 
     if (!@hasDecl(T, "type_descriptor")) {
-        @compileError("type_descriptor field must be present");
+        @compileError("type_descriptor  must be present");
     }
 
     header.type_descriptor = &T.type_descriptor;
@@ -128,6 +146,75 @@ inline fn findSuitableBlock(gc: *Gc, cell_size: u32) ?*Block {
         }
     }
     return null;
+}
+
+pub fn collectGarbage(gc: *Gc) !void {
+    var roots = ObjectSet.init(gc.gpa);
+    var live_objects = ObjectSet.init(gc.gpa);
+
+    try gc.collectRoots(&roots);
+    try gc.collectLiveObjects(&roots, &live_objects);
+
+    gc.clearMarkBits();
+    gc.markLiveObjects(&live_objects);
+    gc.sweepDeadObjects();
+}
+
+fn collectRoots(gc: *Gc, roots: *ObjectSet) !void {
+    for (gc.interpreter.vm.records.items) |*record| {
+        for (record.registers) |val| {
+            if (val.asObject()) |obj| {
+                try roots.add(obj);
+            }
+        }
+    }
+
+    var string_iter = gc.interpreter.string_interner.iterator();
+    while (string_iter.next()) |string| {
+        try roots.add(Object.from(string.*));
+    }
+}
+
+fn collectLiveObjects(_: *Gc, roots: *ObjectSet, live_objects: *ObjectSet) !void {
+    var iter = roots.iterator();
+    while (iter.next()) |s| {
+        const obj = s.*;
+        try obj.type_descriptor.visit(obj, live_objects);
+    }
+}
+
+fn clearMarkBits(gc: *Gc) void {
+    for (gc.blocks.items) |blk| {
+        for (0..blk.cell_count) |i| {
+            const cell = blk.cell(i);
+            const index = blk.indexOf(cell);
+            if (blk.bitmap.isSet(index)) {
+                const obj: *Object = @ptrCast(cell);
+                obj.marked = false;
+            }
+        }
+    }
+}
+
+fn markLiveObjects(_: *Gc, live_objects: *ObjectSet) void {
+    var iter = live_objects.iterator();
+    while (iter.next()) |s| {
+        const obj = s.*;
+        obj.marked = true;
+    }
+}
+
+fn sweepDeadObjects(gc: *Gc) void {
+    for (gc.blocks.items) |blk| {
+        for (0..blk.cell_count) |i| {
+            const cell = blk.cell(i);
+            const index = blk.indexOf(cell);
+            const obj: *Object = @ptrCast(cell);
+            if (blk.bitmap.isSet(index) and !obj.marked) {
+                blk.deallocateCell(cell, index);
+            }
+        }
+    }
 }
 
 pub fn collect(gc: *Gc) void {

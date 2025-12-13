@@ -10,10 +10,20 @@ pub const PropertyKey = union(enum) {
     pub fn fromInt(value: i64) PropertyKey {
         return .{ .int = value };
     }
+
+    pub fn isString(self: *PropertyKey) bool {
+        return switch (self.*) {
+            .string => true,
+            .int => false,
+        };
+    }
 };
 
 pub const PropertyMap = struct {
     const Storage = std.HashMap(PropertyKey, Value, PropertyContext, std.hash_map.default_max_load_percentage);
+    pub const Iterator = Storage.Iterator;
+    pub const KeyIterator = Storage.KeyIterator;
+    pub const ValueIterator = Storage.ValueIterator;
 
     gpa: std.mem.Allocator,
     storage: Storage,
@@ -23,6 +33,22 @@ pub const PropertyMap = struct {
             .gpa = gpa,
             .storage = Storage.init(gpa),
         };
+    }
+
+    pub fn deinit(self: *PropertyMap) void {
+        self.storage.deinit();
+    }
+
+    pub fn iterator(self: *PropertyMap) Iterator {
+        return self.storage.iterator();
+    }
+
+    pub fn keyIterator(self: *PropertyMap) KeyIterator {
+        return self.storage.keyIterator();
+    }
+
+    pub fn valueIterator(self: *PropertyMap) ValueIterator {
+        return self.storage.valueIterator();
     }
 
     const PropertyContext = struct {

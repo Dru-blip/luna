@@ -3,6 +3,7 @@ const Span = @import("Tokenizer.zig").Token.Loc;
 const Value = @import("Value.zig");
 
 const Object = @import("../runtime/Object.zig");
+const ObjectSet = @import("../runtime/ObjectSet.zig");
 const Gc = @import("Gc.zig");
 
 pub const Inst = struct {
@@ -75,16 +76,22 @@ pub const Executable = struct {
         .finalize = finalize,
     };
 
-    fn finalize(self: *anyopaque, gc: *Gc) void {
-        const executable: *Executable = @ptrCast(@alignCast(self));
+    fn finalize(self: *Object, gc: *Gc) void {
+        const executable: *Executable = self.as(Executable);
         gc.gpa.free(executable.constants);
         gc.gpa.free(executable.spans);
         gc.gpa.free(executable.instructions);
     }
 
-    fn visit(self: *anyopaque, gc: *Gc) void {
-        _ = self;
-        _ = gc;
+    fn visit(self: *Object, live_objects: *ObjectSet) !void {
+        try Object.Base.visit(self, live_objects);
+        const executable: *Executable = self.as(Executable);
+        for (executable.constants) |constant| {
+            if (constant.isObject()) {
+                const object = constant.toObject();
+                try object.type_descriptor.visit(object, live_objects);
+            }
+        }
     }
 
     pub fn print(self: *const Executable) !void {
