@@ -93,13 +93,15 @@ nodes: Nodes,
 arena: std.heap.ArenaAllocator,
 gpa: std.mem.Allocator,
 source: [:0]const u8,
+filepath: []const u8,
 
-pub fn init(gpa: std.mem.Allocator, source: [:0]const u8) Ast {
+pub fn init(gpa: std.mem.Allocator, source: [:0]const u8, filepath: []const u8) Ast {
     return .{
         .arena = std.heap.ArenaAllocator.init(gpa),
         .nodes = .empty,
         .gpa = gpa,
         .source = source,
+        .filepath = filepath,
     };
 }
 
@@ -114,9 +116,9 @@ pub fn deinit(ast: *Ast) void {
     ast.nodes.deinit(ast.gpa);
 }
 
-pub fn parse(source: [:0]const u8, gpa: std.mem.Allocator) !Ast {
+pub fn parse(filepath: []const u8, source: [:0]const u8, gpa: std.mem.Allocator) !Ast {
     const tokens = try Tokenizer.tokenize(source, gpa);
-    var parser = Parser.init(gpa, source, tokens);
+    var parser = Parser.init(gpa, source, tokens, filepath);
 
     return try parser.parse();
 }

@@ -91,13 +91,15 @@ pub fn deinit(g: *Generator) void {
 pub fn generate(g: *Generator) !*Executable {
     try g.genNodes(g.ast.nodes);
     try g.addInst(.hlt, .{ .none = {} }, .{ .start = 0, .col = 1, .end = 0, .line = 1 });
-    return try g.finalize();
+    var exe = try g.finalize();
+    exe.name = try String.new(g.gc, "<module>");
+    return exe;
 }
 
 pub fn finalize(g: *Generator) !*Executable {
     var executable: *Executable = try Executable.new(g.gc);
     executable.constants = try g.constants.toOwnedSlice(g.gpa);
-
+    executable.filepath = g.ast.filepath;
     executable.max_register_count = g.register_count;
     executable.global_variable_count = @intCast(g.global_variables.items.len);
     try g.linearizeBasicBlocks(executable);

@@ -7,6 +7,11 @@ const Interpreter = @import("../runtime/Interpreter.zig");
 
 const Gc = @This();
 
+const AllocationStrategy = enum {
+    best_fit,
+    first_fit,
+};
+
 const Block = struct {
     const DefaultSize = 1024 * 16; //16 KB
 
@@ -51,7 +56,7 @@ gpa: std.mem.Allocator,
 interpreter: *Interpreter,
 bytes_allocated_since_last_gc: u64 = 0,
 
-const gc_threshold = 4 * 1024 * 1024;
+const gc_threshold = 4 * 1024 * 1024; // 4 MB
 
 pub fn init(allocator: std.mem.Allocator, interpreter: *Interpreter) Gc {
     return Gc{
@@ -85,7 +90,7 @@ inline fn allocImpl(
         gc.bytes_allocated_since_last_gc = 0;
     }
 
-    const block = gc.findSuitableBlock(cell_size) orelse try gc.createBlock(cell_size);
+    const block = gc.findSuitableBlock(.first_fit, cell_size) orelse try gc.createBlock(cell_size);
 
     const cell = block.allocateCell() orelse return std.mem.Allocator.Error.OutOfMemory;
 
@@ -139,13 +144,18 @@ fn createBlock(gc: *Gc, cell_size: u32) !*Block {
     return block;
 }
 
-inline fn findSuitableBlock(gc: *Gc, cell_size: u32) ?*Block {
-    for (gc.blocks.items) |blk| {
-        if (blk.cell_size >= cell_size) {
-            return blk;
-        }
+inline fn findSuitableBlock(gc: *Gc, comptime strategy: AllocationStrategy, cell_size: u32) ?*Block {
+    switch (strategy) {
+        .first_fit => {
+            for (gc.blocks.items) |blk| {
+                if (blk.cell_size >= cell_size) {
+                    return blk;
+                }
+            }
+            return null;
+        },
+        .best_fit => unreachable,
     }
-    return null;
 }
 
 pub fn collectGarbage(gc: *Gc) !void {

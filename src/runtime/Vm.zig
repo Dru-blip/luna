@@ -4,6 +4,9 @@ const Object = @import("Object.zig");
 const Interpreter = @import("Interpreter.zig");
 const Executable = @import("../core/bytecode.zig").Executable;
 const Inst = @import("../core/bytecode.zig").Inst;
+const Error = Interpreter.Error;
+const Exception = @import("Exception.zig");
+const Gc = @import("../core/Gc.zig");
 
 const Vm = @This();
 
@@ -40,12 +43,14 @@ rp: usize = 0,
 interpreter: *Interpreter,
 globals: Globals = undefined,
 gpa: std.mem.Allocator,
+gc: *Gc,
 
 pub fn init(gpa: std.mem.Allocator, interpreter: *Interpreter) !*Vm {
     const vm = try gpa.create(Vm);
     vm.* = .{
         .interpreter = interpreter,
         .gpa = gpa,
+        .gc = &interpreter.gc,
     };
     return vm;
 }
@@ -56,14 +61,14 @@ pub fn deinit(vm: *Vm) void {
     vm.gpa.destroy(vm);
 }
 
-pub fn runExecutable(vm: *Vm, executable: *Executable) !Value {
+pub fn runExecutable(vm: *Vm, executable: *Executable) Error!Value {
     var record = try ActivationRecord.init(executable, vm.gpa);
     vm.globals.fast_slots = try vm.gpa.alloc(Value, executable.global_variable_count);
     defer record.deinit(vm.gpa);
     return vm.runRecord(&record, false);
 }
 
-pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) !Value {
+pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Value {
     _ = as_callback;
     var registers = record.registers;
     var globals = vm.globals;
@@ -115,6 +120,7 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) !Value {
                 const rhs = registers[data.tri.op2];
                 if (lhs.type != rhs.type) {
                     //TODO: throw error for type mismatch
+                    return vm.raiseException(.type_error, "TypeMismatch", .{});
                 }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.int(lhs.toInt() + rhs.toInt());
@@ -260,4 +266,9 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) !Value {
     }
 
     return Value.none();
+}
+
+pub fn raiseException(vm: *Vm, tag: Exception.Tag, comptime fmt: []const u8, args: anytype) Error!Value {
+    vm.interpreter.exception = try Exception.withMessage(vm, tag, fmt, args);
+    return Error.ExceptionThrown;
 }

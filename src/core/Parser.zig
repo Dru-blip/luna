@@ -19,19 +19,21 @@ const Error = struct {
 };
 
 source: [:0]const u8,
+filepath: []const u8,
 tok_i: usize,
 ast: Ast,
 tokens: Tokens,
 gpa: std.mem.Allocator,
 errors: std.ArrayList(Error) = .empty,
 
-pub fn init(gpa: std.mem.Allocator, source: [:0]const u8, tokens: Tokens) Parser {
+pub fn init(gpa: std.mem.Allocator, source: [:0]const u8, tokens: Tokens, filepath: []const u8) Parser {
     return .{
         .source = source,
         .tok_i = 0,
-        .ast = Ast.init(gpa, source),
+        .ast = Ast.init(gpa, source, filepath),
         .gpa = gpa,
         .tokens = tokens,
+        .filepath = filepath,
     };
 }
 
@@ -140,8 +142,8 @@ fn parseStmt(p: *Parser) ParserError!*Node {
     const token = p.peek();
     switch (token.tag) {
         .keyword_let => return p.parseLetDecl(),
-        .l_brace => return try p.parseBlockStmt(),
-        .keyword_if => return try p.parseIfStmt(),
+        .l_brace => return p.parseBlockStmt(),
+        .keyword_if => return p.parseIfStmt(),
         .keyword_return => return p.parseReturnStmt(),
         .keyword_loop => return p.parseLoopStmt(),
         .keyword_break => return p.parseBreakStmt(),

@@ -5,6 +5,7 @@ const Value = @import("Value.zig");
 const Object = @import("../runtime/Object.zig");
 const ObjectSet = @import("../runtime/ObjectSet.zig");
 const Gc = @import("Gc.zig");
+const String = @import("../runtime/String.zig");
 
 pub const Inst = struct {
     op: Op,
@@ -64,6 +65,8 @@ pub const Executable = struct {
     constants: Constants.Slice,
     max_register_count: u32,
     global_variable_count: u32,
+    name: *String,
+    filepath: []const u8,
 
     pub fn new(gc: *Gc) !*Executable {
         const obj: *Executable = try gc.alloc(Executable);

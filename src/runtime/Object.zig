@@ -5,7 +5,7 @@ const Object = @This();
 const ObjectSet = @import("ObjectSet.zig");
 
 marked: bool = false,
-ptr: *anyopaque,
+ptr: *anyopaque, // do i really need this ?
 type_descriptor: *const TypeDescriptor,
 property_map: PropertyMap,
 prototype: ?*Object,
@@ -25,21 +25,13 @@ pub inline fn from(ptr: *anyopaque) *Object {
     return @ptrFromInt(obj_base - @sizeOf(Object));
 }
 
-pub inline fn getPropertyKeyIterator(obj: *Object) PropertyMap.KeyIterator {
-    return obj.property_map.keyIterator();
-}
-
-pub inline fn getPropertyValueIterator(obj: *Object) PropertyMap.ValueIterator {
-    return obj.property_map.valueIterator();
-}
-
 pub inline fn getPropertyIterator(obj: *Object) PropertyMap.Iterator {
     return obj.property_map.iterator();
 }
 
 pub const Base = struct {
     pub fn visit(self: *Object, live_objects: *ObjectSet) !void {
-        //TODO: use a queue instead of recursion.
+        //TODO: find a way to avoid recursion if possible
         try live_objects.add(self);
         var iterator = self.getPropertyIterator();
         while (iterator.next()) |entry| {
@@ -48,6 +40,9 @@ pub const Base = struct {
                 const object = value.toObject();
                 try object.type_descriptor.visit(object, live_objects);
             }
+
+            //TODO: visit property key if it is a string
+            // even though property key string is interned
         }
     }
 

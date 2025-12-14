@@ -2,18 +2,20 @@ const std = @import("std");
 const Gc = @import("../core/Gc.zig");
 const Value = @import("../core/Value.zig");
 const Ast = @import("../core/Ast.zig");
-
 const StringInterner = @import("StringInterner.zig");
 const Vm = @import("Vm.zig");
 const Generator = @import("../core/Generator.zig");
-
-const luna = @import("luna");
+const Exception = @import("Exception.zig");
 
 const Interpreter = @This();
+
+pub const Error = error{ExceptionThrown} || std.mem.Allocator.Error;
 
 gc: Gc,
 string_interner: StringInterner = undefined,
 vm: *Vm = undefined,
+exception: ?*Exception = null,
+
 // running_module: *Module,
 
 pub fn init(gpa: std.mem.Allocator) !*Interpreter {
@@ -40,7 +42,7 @@ pub fn runFile(i: *Interpreter, path: []const u8) !Value {
     _ = try file.readAll(buffer);
     buffer[file_stats.size] = 0;
 
-    var ast = Ast.parse(buffer[0..file_stats.size :0], i.gc.gpa) catch {
+    var ast = Ast.parse(path, buffer[0..file_stats.size :0], i.gc.gpa) catch {
         return Value.none();
     };
     defer ast.deinit();
@@ -49,10 +51,17 @@ pub fn runFile(i: *Interpreter, path: []const u8) !Value {
     const executable = try generator.generate();
     try executable.print();
 
-    const result = try i.vm.runExecutable(executable);
-    std.debug.print("result: {d}\n", .{result.data.int});
+    const result = i.vm.runExecutable(executable) catch |err| {
+        switch (err) {
+            error.OutOfMemory => {
+                return Value.none();
+            },
+            error.ExceptionThrown => {
+                std.debug.print("{s}\n", .{i.exception.?.message.asSlice()});
+                return Value.none();
+            },
+        }
+    };
 
-    try i.gc.collectGarbage();
-
-    return Value.none();
+    return result;
 }

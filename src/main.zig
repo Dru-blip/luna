@@ -15,7 +15,6 @@ pub fn main() !void {
     defer std.process.argsFree(allocator, args);
 
     var interpreter = try Interpreter.init(allocator);
-
     _ = try interpreter.runFile(args[1]);
     //TODO: free memory
 }
