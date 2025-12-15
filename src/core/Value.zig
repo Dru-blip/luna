@@ -110,3 +110,13 @@ pub inline fn isFalsy(v: Value) bool {
 pub inline fn isTruthy(v: Value) bool {
     return !isFalsy(v);
 }
+
+pub inline fn getTypeString(v: Value) []const u8 {
+    return switch (v.type) {
+        .int => "int",
+        .bool => "bool",
+        .object => "object",
+        .none => "none",
+        .undefined => "undefined",
+    };
+}

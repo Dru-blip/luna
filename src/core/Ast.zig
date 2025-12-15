@@ -111,7 +111,6 @@ pub fn deinit(ast: *Ast) void {
             else => {},
         }
     }
-
     ast.arena.deinit();
     ast.nodes.deinit(ast.gpa);
 }

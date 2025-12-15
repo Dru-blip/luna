@@ -57,7 +57,7 @@ pub fn runFile(i: *Interpreter, path: []const u8) !Value {
                 return Value.none();
             },
             error.ExceptionThrown => {
-                std.debug.print("{s}\n", .{i.exception.?.message.asSlice()});
+                std.debug.print("{s}\n", .{try i.exception.?.traceString(i.gc.gpa)});
                 return Value.none();
             },
         }

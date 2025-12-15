@@ -62,10 +62,11 @@ pub fn deinit(vm: *Vm) void {
 }
 
 pub fn runExecutable(vm: *Vm, executable: *Executable) Error!Value {
-    var record = try ActivationRecord.init(executable, vm.gpa);
+    const record = try ActivationRecord.init(executable, vm.gpa);
     vm.globals.fast_slots = try vm.gpa.alloc(Value, executable.global_variable_count);
-    defer record.deinit(vm.gpa);
-    return vm.runRecord(&record, false);
+    try vm.records.append(vm.gpa, record);
+    // defer record.deinit(vm.gpa);
+    return try vm.runRecord(&vm.records.items[vm.records.items.len - 1], false);
 }
 
 pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Value {
@@ -119,8 +120,7 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Va
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
                 if (lhs.type != rhs.type) {
-                    //TODO: throw error for type mismatch
-                    return vm.raiseException(.type_error, "TypeMismatch", .{});
+                    return vm.raiseTypeException("+", lhs, rhs);
                 }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.int(lhs.toInt() + rhs.toInt());
@@ -131,7 +131,7 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Va
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
                 if (lhs.type != rhs.type) {
-                    //TODO: throw error for type mismatch
+                    return vm.raiseTypeException("-", lhs, rhs);
                 }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.int(lhs.toInt() - rhs.toInt());
@@ -142,7 +142,7 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Va
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
                 if (lhs.type != rhs.type) {
-                    //TODO: throw error for type mismatch
+                    return vm.raiseTypeException("*", lhs, rhs);
                 }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.int(lhs.toInt() * rhs.toInt());
@@ -153,7 +153,7 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Va
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
                 if (lhs.type != rhs.type) {
-                    //TODO: throw error for type mismatch
+                    return vm.raiseTypeException("/", lhs, rhs);
                 }
                 if (lhs.isInt() and rhs.isInt()) {
                     if (rhs.toInt() == 0) {
@@ -167,7 +167,7 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Va
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
                 if (lhs.type != rhs.type) {
-                    //TODO: throw error for type mismatch
+                    return vm.raiseTypeException("%", lhs, rhs);
                 }
                 if (lhs.isInt() and rhs.isInt()) {
                     if (rhs.toInt() == 0) {
@@ -181,7 +181,7 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Va
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
                 if (lhs.type != rhs.type) {
-                    //TODO: throw error for type mismatch
+                    return vm.raiseTypeException("<", lhs, rhs);
                 }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.bool(lhs.toInt() < rhs.toInt());
@@ -192,7 +192,7 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Va
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
                 if (lhs.type != rhs.type) {
-                    //TODO: throw error for type mismatch
+                    return vm.raiseTypeException("<=", lhs, rhs);
                 }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.bool(lhs.toInt() <= rhs.toInt());
@@ -203,7 +203,7 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Va
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
                 if (lhs.type != rhs.type) {
-                    //TODO: throw error for type mismatch
+                    return vm.raiseTypeException(">", lhs, rhs);
                 }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.bool(lhs.toInt() > rhs.toInt());
@@ -214,7 +214,7 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Va
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
                 if (lhs.type != rhs.type) {
-                    //TODO: throw error for type mismatch
+                    return vm.raiseTypeException(">=", lhs, rhs);
                 }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.bool(lhs.toInt() >= rhs.toInt());
@@ -225,7 +225,7 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Va
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
                 if (lhs.type != rhs.type) {
-                    //TODO: throw error for type mismatch
+                    return vm.raiseTypeException("==", lhs, rhs);
                 }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.bool(lhs.toInt() == rhs.toInt());
@@ -236,7 +236,7 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Va
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
                 if (lhs.type != rhs.type) {
-                    //TODO: throw error for type mismatch
+                    return vm.raiseTypeException("!=", lhs, rhs);
                 }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.bool(lhs.toInt() != rhs.toInt());
@@ -268,7 +268,11 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Va
     return Value.none();
 }
 
-pub fn raiseException(vm: *Vm, tag: Exception.Tag, comptime fmt: []const u8, args: anytype) Error!Value {
+pub inline fn raiseException(vm: *Vm, tag: Exception.Tag, comptime fmt: []const u8, args: anytype) Error!Value {
     vm.interpreter.exception = try Exception.withMessage(vm, tag, fmt, args);
     return Error.ExceptionThrown;
+}
+
+pub fn raiseTypeException(vm: *Vm, comptime op: []const u8, lhs: Value, rhs: Value) Error!Value {
+    return vm.raiseException(.type_error, "invalid operand types for operation (\"{s}\"): {s} and {s}", .{ op, lhs.getTypeString(), rhs.getTypeString() });
 }

@@ -292,7 +292,6 @@ fn parsePrimaryExpr(p: *Parser) ParserError!*Node {
         .identifier => {
             p.advance();
             const name = p.source[token.loc.start..token.loc.end];
-            // std.mem.trim(u8, name, "\t\r\n ")
             return try p.ast.makeIdentifier(token.loc, name);
         },
         .keyword_none => {
