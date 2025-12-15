@@ -23,6 +23,7 @@ pub const Node = struct {
         return_stmt,
         expr_stmt,
         let_decl,
+        function_decl,
 
         add,
         sub,
@@ -83,6 +84,11 @@ pub const Node = struct {
         let: struct {
             name: []const u8,
             expr: ?*Node,
+        },
+        fndecl: struct {
+            name: []const u8,
+            params: [][]const u8,
+            body: *Node,
         },
     };
 };
@@ -234,6 +240,18 @@ pub fn makeForStmt(ast: *Ast, loc: Token.Loc, initializer: *Node, @"test": *Node
             .init = initializer,
             .@"test" = @"test",
             .update = update,
+            .body = body,
+        },
+    };
+    return node;
+}
+
+pub fn makeFunctionDecl(ast: *Ast, loc: Token.Loc, name: []const u8, params: [][]const u8, body: *Node) !*Node {
+    var node = try makeNode(ast, .function_decl, loc);
+    node.data = .{
+        .fndecl = .{
+            .name = name,
+            .params = params,
             .body = body,
         },
     };

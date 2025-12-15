@@ -5,3 +5,5 @@ builddir
 
 .vscode
 .zed
+
+.clangd

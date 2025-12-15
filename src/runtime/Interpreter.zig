@@ -49,7 +49,6 @@ pub fn runFile(i: *Interpreter, path: []const u8) !Value {
 
     var generator = try Generator.init(i.gc.gpa, ast, &i.gc, &i.string_interner);
     const executable = try generator.generate();
-    try executable.print();
 
     const result = i.vm.runExecutable(executable) catch |err| {
         switch (err) {

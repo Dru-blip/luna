@@ -59,6 +59,15 @@ pub inline fn @"undefined"() Value {
     };
 }
 
+pub inline fn object(obj: *Object) Value {
+    return .{
+        .type = .object,
+        .data = .{
+            .object = obj,
+        },
+    };
+}
+
 pub inline fn isInt(value: Value) bool {
     return value.type == .int;
 }

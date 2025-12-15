@@ -128,6 +128,7 @@ pub fn traceString(exception: *Exception, gpa: std.mem.Allocator) ![]const u8 {
 fn finalize(self: *Object, gc: *Gc) void {
     const err: *Exception = self.as(Exception);
     err.traceback.deinit(gc.gpa);
+    Object.Base.finalize(self, gc);
 }
 
 fn visit(self: *Object, live_objects: *ObjectSet) !void {

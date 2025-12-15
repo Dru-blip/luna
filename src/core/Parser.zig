@@ -141,6 +141,7 @@ pub fn parse(p: *Parser) ParserError!Ast {
 fn parseStmt(p: *Parser) ParserError!*Node {
     const token = p.peek();
     switch (token.tag) {
+        .keyword_fn => return p.parseFunctionDecl(),
         .keyword_let => return p.parseLetDecl(),
         .l_brace => return p.parseBlockStmt(),
         .keyword_if => return p.parseIfStmt(),
@@ -155,6 +156,29 @@ fn parseStmt(p: *Parser) ParserError!*Node {
             return p.ast.makeExprStmt(expr);
         },
     }
+}
+
+fn parseFunctionDecl(p: *Parser) ParserError!*Node {
+    const token = try p.expectToken(.keyword_fn);
+    const name = try p.expectToken(.identifier);
+    const params = try p.parseFunctionParams();
+    const body = try p.parseStmt();
+    return p.ast.makeFunctionDecl(token.loc.merge(&body.loc), p.source[name.loc.start..name.loc.end], params, body);
+}
+
+fn parseFunctionParams(p: *Parser) ![][]const u8 {
+    _ = try p.expectToken(.l_paren);
+    var params: std.ArrayList([]const u8) = .empty;
+    while (p.peek().tag != .r_paren) {
+        const name = try p.expectToken(.identifier);
+        try params.append(p.ast.arena.allocator(), p.source[name.loc.start..name.loc.end]);
+        if (p.peek().tag == .comma) {
+            p.advance();
+        }
+    }
+    _ = try p.expectToken(.r_paren);
+
+    return params.toOwnedSlice(p.ast.arena.allocator());
 }
 
 fn parseLetDecl(p: *Parser) ParserError!*Node {

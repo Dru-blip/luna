@@ -38,7 +38,11 @@ pub const Inst = struct {
         load_global_by_index,
         store_global_by_name,
         load_global_by_name,
+
+        build_function,
+
         ret,
+        ret_none,
     };
 
     pub const Data = union {
@@ -84,6 +88,7 @@ pub const Executable = struct {
         gc.gpa.free(executable.constants);
         gc.gpa.free(executable.spans);
         gc.gpa.free(executable.instructions);
+        Object.Base.finalize(self, gc);
     }
 
     fn visit(self: *Object, live_objects: *ObjectSet) !void {

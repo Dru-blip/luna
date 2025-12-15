@@ -3,6 +3,7 @@ const Value = @import("../core/Value.zig");
 const Object = @import("Object.zig");
 const Interpreter = @import("Interpreter.zig");
 const Executable = @import("../core/bytecode.zig").Executable;
+const Function = @import("Function.zig");
 const Inst = @import("../core/bytecode.zig").Inst;
 const Error = Interpreter.Error;
 const Exception = @import("Exception.zig");
@@ -243,6 +244,11 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Va
                 }
                 continue :start;
             },
+            .build_function => {
+                const func = try Function.withExecutable(vm.gc, constants[data.bin.lhs].toObject().as(Executable));
+                registers[data.bin.rhs] = Value.object(Object.from(func));
+                continue :start;
+            },
             .jmp => {
                 record.ip = data.un;
                 continue :start;
@@ -258,6 +264,9 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Va
             .ret => {
                 //TODO: destroy activation record,
                 return registers[data.un];
+            },
+            .ret_none => {
+                return Value.none();
             },
             .hlt => {
                 return Value.none();

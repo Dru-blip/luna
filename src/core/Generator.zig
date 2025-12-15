@@ -5,6 +5,7 @@ const Span = @import("Tokenizer.zig").Token.Loc;
 const Value = @import("Value.zig");
 const Gc = @import("Gc.zig");
 const String = @import("../runtime/String.zig");
+const Object = @import("../runtime/Object.zig");
 const StringInterner = @import("../runtime/StringInterner.zig");
 
 const Inst = bytecode.Inst;
@@ -81,7 +82,7 @@ pub fn init(gpa: std.mem.Allocator, ast: Ast, gc: *Gc, string_interner: *StringI
 pub fn deinit(g: *Generator) void {
     g.constants.deinit(g.gpa);
     g.free_registers.deinit(g.gpa);
-    g.global_variables.deinit(g.gpa);
+    // g.global_variables.deinit(g.gpa);
     g.local_variables.deinit(g.gpa);
     g.identifiers.deinit(g.gpa);
     g.blocks.deinit(g.gpa);
@@ -245,6 +246,9 @@ fn genNodes(g: *Generator, nodes: Ast.Nodes) GenError!void {
 
 fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
     switch (node.tag) {
+        .function_decl => {
+            try g.genFuncDecl(node);
+        },
         .let_decl => {
             try g.genLetDecl(node);
         },
@@ -281,6 +285,53 @@ fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
             unreachable;
         },
     }
+}
+
+// static void declare_param(struct generator* generator, const char* name, uint32_t name_length) {
+//     struct variable var;
+//     var.scope = SCOPE_PARAM;
+//     var.scope_depth = generator->scope_depth;
+//     var.name = name;
+//     var.name_length = name_length;
+//     var.allocated_reg = generator_allocate_register(generator);
+//     generator->local_variable_count++;
+//     arrput(generator->local_variables, var);
+// }
+
+fn declare_param(g: *Generator, name: []const u8) !void {
+    const va = Variable{
+        .scope = .local,
+        .scope_depth = g.scope_depth,
+        .name = name,
+        .allocated_reg_slot = g.allocRegister(),
+    };
+    try g.local_variables.append(g.gpa, va);
+}
+
+fn genFuncDecl(g: *Generator, node: *const Ast.Node) GenError!void {
+    const name = try g.string_interner.intern(node.data.fndecl.name);
+    var variable: Variable = undefined;
+    try g.declareVariable(node.data.fndecl.name, &variable);
+
+    var func_gen = try Generator.init(g.gpa, g.ast, g.gc, g.string_interner);
+    defer func_gen.deinit();
+    func_gen.global_variables = g.global_variables;
+    func_gen.scope_depth = 1;
+    for (node.data.fndecl.params) |param| {
+        try g.declare_param(param);
+    }
+    try func_gen.genStmt(node.data.fndecl.body);
+
+    //TODO: we dont need a register for the return value but we allocated it anyways
+    // have to remove it.
+    try func_gen.addUn(.ret_none, func_gen.allocRegister(), node.loc);
+    var executable = try func_gen.finalize();
+    executable.name = name;
+
+    const executable_index = try g.addConstant(Value.object(Object.from(executable)));
+    const function_index = g.allocRegister();
+    try g.addBin(.build_function, executable_index, function_index, node.loc);
+    try g.addBin(if (variable.scope == .global) .store_global_by_index else .mov, function_index, variable.allocated_reg_slot, node.loc);
 }
 
 fn genForStmt(g: *Generator, node: *const Ast.Node) GenError!void {

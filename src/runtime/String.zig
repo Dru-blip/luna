@@ -60,6 +60,7 @@ fn finalize(self: *Object, gc: *Gc) void {
         .heap => |slice| gc.gpa.free(slice),
         else => {},
     }
+    Object.Base.finalize(self, gc);
 }
 
 fn visit(self: *Object, live_objects: *ObjectSet) std.mem.Allocator.Error!void {
