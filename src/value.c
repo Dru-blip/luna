@@ -13,6 +13,7 @@
 #include "arena.h"
 #include "ast.h"
 #include "bytecode/interpreter.h"
+#include "bytecode/ir.h"
 #include "bytecode/vm.h"
 #include "heap.h"
 #include "stb_ds.h"
@@ -55,28 +56,26 @@ static void lu_object_finalize(struct lu_object* self) {
 }
 
 static void lu_object_visit(struct lu_object* self, struct lu_objectset* set) {
-    struct worklist worklist;
-    worklist.head = worklist.tail = nullptr;
-    worklist_enqueue(&worklist, self);
+    lu_objectset_add(set, self);
+
     struct property_map_iter iter;
+    property_map_iter_new(&self->properties);
     struct property_map_entry* entry;
-    while (worklist.head) {
-        struct lu_object* curr = worklist_dequeue(&worklist);
-        lu_objectset_add(set, curr);
-        iter = property_map_iter_new(&curr->properties);
-        while ((entry = property_map_iter_next(&iter)) != nullptr) {
-            worklist_enqueue(&worklist, lu_cast(struct lu_object, entry->key));
-            if (lu_is_object(entry->value)) {
-                worklist_enqueue(&worklist, lu_as_object(entry->value));
-            }
+    while ((entry = property_map_iter_next(&iter)) != nullptr) {
+        entry->key->vtable->visit(entry->key, set);
+        if (lu_is_object(entry->value)) {
+            struct lu_object* obj = lu_as_object(entry->value);
+            obj->vtable->visit(obj, set);
         }
     }
 }
 
 static void lu_function_visit(struct lu_object* self, struct lu_objectset* set) {
-    lu_objectset_add(set, lu_cast(struct lu_function, self)->name);
-    lu_objectset_add(set, lu_cast(struct lu_function, self)->executable);
     lu_object_visit(self, set);
+    struct lu_string* str = lu_cast(struct lu_function, self)->name;
+    struct executable* exec = lu_cast(struct lu_function, self)->executable;
+    str->vtable->visit(str, set);
+    exec->vtable->visit(exec, set);
 }
 
 static void lu_string_finalize(struct lu_object* self) {
@@ -100,22 +99,24 @@ static void lu_array_finalize(struct lu_object* self) {
 }
 
 static void lu_array_visit(struct lu_object* self, struct lu_objectset* set) {
+    lu_object_visit(self, set);
     struct lu_array* array = lu_cast(struct lu_array, self);
     for (size_t i = 0; i < array->size; i++) {
         if (lu_is_object(array->elements[i])) {
-            lu_objectset_add(set, lu_as_object(array->elements[i]));
+            struct lu_object* elem = lu_as_object(array->elements[i]);
+            elem->vtable->visit(elem, set);
         }
     }
-    lu_object_visit(self, set);
 }
 
 static void lu_module_visit(struct lu_object* self, struct lu_objectset* set) {
-    struct lu_module* module = lu_cast(struct lu_module, self);
-    lu_objectset_add(set, module->name);
-    if (lu_is_object(module->exported)) {
-        lu_objectset_add(set, lu_as_object(module->exported));
-    }
     lu_object_visit(self, set);
+    struct lu_module* module = lu_cast(struct lu_module, self);
+
+    module->name->vtable->visit(module->name, set);
+    if (lu_is_object(module->exported)) {
+        module->exported.object->vtable->visit(module->exported.object, set);
+    }
 }
 
 static void lu_module_finalize(struct lu_object* self) {
@@ -132,10 +133,15 @@ static void lu_module_finalize(struct lu_object* self) {
 }
 
 static void lu_bound_function_visit(struct lu_object* self, struct lu_objectset* set) {
-    struct lu_bound_function* func = lu_cast(struct lu_bound_function, self);
-    lu_objectset_add(set, func->self);
-    lu_objectset_add(set, func->func);
     lu_object_visit(self, set);
+
+    struct lu_bound_function* bound_func = lu_cast(struct lu_bound_function, self);
+    if (bound_func->self) {
+        bound_func->self->vtable->visit(bound_func->self, set);
+    }
+    if (bound_func->func) {
+        bound_func->func->vtable->visit(bound_func->func, set);
+    }
 }
 
 // Object V-Tables

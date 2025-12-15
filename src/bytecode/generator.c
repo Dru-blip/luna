@@ -21,14 +21,15 @@ static void executable_finalize(struct lu_object* obj) {
 }
 
 static void executable_visit(struct lu_object* obj, struct lu_objectset* set) {
+    lu_object_get_default_vtable()->visit(obj, set);
+
     struct executable* exe = lu_cast(struct executable, obj);
     for (size_t i = 0; i < exe->constants_size; i++) {
         if (lu_is_object(exe->constants[i])) {
-            lu_objectset_add(set, exe->constants[i].object);
+            struct lu_object* obj = exe->constants[i].object;
+            obj->vtable->visit(obj, set);
         }
     }
-
-    lu_object_get_default_vtable()->visit(obj, set);
 }
 
 static struct lu_object_vtable lu_executable_vtable = {
