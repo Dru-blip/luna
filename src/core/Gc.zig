@@ -221,20 +221,8 @@ fn sweepDeadObjects(gc: *Gc) void {
             const index = blk.indexOf(cell);
             const obj: *Object = @ptrCast(cell);
             if (blk.bitmap.isSet(index) and !obj.marked) {
+                obj.type_descriptor.finalize(obj, gc);
                 blk.deallocateCell(cell, index);
-            }
-        }
-    }
-}
-
-pub fn collect(gc: *Gc) void {
-    for (gc.blocks.items) |blk| {
-        for (0..blk.cell_count) |i| {
-            const cell = blk.cell(i);
-            const index = blk.indexOf(cell);
-            if (blk.bitmap.isSet(index)) {
-                const obj: *Object = @ptrCast(cell);
-                obj.type_descriptor.finalize(obj.ptr, gc);
             }
         }
     }
