@@ -258,10 +258,16 @@ fn parseReturnStmt(p: *Parser) ParserError!*Node {
     return p.ast.makeReturnStmt(token.loc.merge(&expr.loc), expr);
 }
 
+const OperPos = enum {
+    infix,
+    postfix,
+};
+
 const OperInfo = struct {
     lbp: i8,
     rbp: i8,
     tag: Node.Tag,
+    pos: OperPos = .infix,
 };
 
 const operTable = std.enums.directEnumArrayDefault(Token.Tag, OperInfo, .{ .lbp = -1, .rbp = -1, .tag = Node.Tag.root }, 0, .{
@@ -288,6 +294,8 @@ const operTable = std.enums.directEnumArrayDefault(Token.Tag, OperInfo, .{ .lbp 
     .asterisk = .{ .lbp = 70, .rbp = 71, .tag = .mul },
     .slash = .{ .lbp = 70, .rbp = 71, .tag = .div },
     .modulus = .{ .lbp = 70, .rbp = 71, .tag = .mod },
+
+    .l_paren = .{ .lbp = 99, .rbp = 100, .tag = .call, .pos = .postfix },
 });
 
 fn parseExpr(p: *Parser, min_prec: i8) ParserError!*Node {
@@ -299,10 +307,30 @@ fn parseExpr(p: *Parser, min_prec: i8) ParserError!*Node {
             break;
         }
         _ = p.nextToken();
+        if (info.pos == .postfix) {
+            lhs = try parsePostfixExpr(p, lhs, info.tag);
+            continue;
+        }
         const rhs = try p.parseExpr(info.rbp);
         lhs = try p.ast.makeBinOp(info.tag, lhs.loc.merge(&rhs.loc), lhs, rhs);
     }
     return lhs;
+}
+
+fn parsePostfixExpr(p: *Parser, lhs: *Node, tag: Node.Tag) ParserError!*Node {
+    if (tag == .call) {
+        var args: std.ArrayList(*Node) = .empty;
+        while (p.peek().tag != .r_paren) {
+            const arg = try p.parseExpr(0);
+            if (p.peek().tag == .comma) {
+                _ = p.nextToken();
+            }
+            try args.append(p.ast.arena.allocator(), arg);
+        }
+        const rparen = try p.expectToken(.r_paren);
+        return p.ast.makeCall(lhs.loc.merge(&rparen.loc), lhs, try args.toOwnedSlice(p.ast.arena.allocator()));
+    }
+    return ParserError.SyntaxError;
 }
 
 fn parsePrimaryExpr(p: *Parser) ParserError!*Node {

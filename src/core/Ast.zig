@@ -48,6 +48,8 @@ pub const Node = struct {
         div_assign,
         mod_assign,
 
+        call,
+
         identifier,
         int_literal,
         bool_literal,
@@ -66,6 +68,10 @@ pub const Node = struct {
         bool: bool,
         none: void,
         string: []const u8,
+        call: struct {
+            callee: *Node,
+            args: []*Node,
+        },
         @"if": struct {
             @"test": *Node,
             consequent: *Node,
@@ -253,6 +259,17 @@ pub fn makeFunctionDecl(ast: *Ast, loc: Token.Loc, name: []const u8, params: [][
             .name = name,
             .params = params,
             .body = body,
+        },
+    };
+    return node;
+}
+
+pub fn makeCall(ast: *Ast, loc: Token.Loc, callee: *Node, args: []*Node) !*Node {
+    var node = try makeNode(ast, .call, loc);
+    node.data = .{
+        .call = .{
+            .callee = callee,
+            .args = args,
         },
     };
     return node;
