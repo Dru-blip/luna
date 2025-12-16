@@ -1,3 +1,5 @@
+//TODO: should implement a fixed register pool allocation
+//
 const std = @import("std");
 const bytecode = @import("bytecode.zig");
 const Ast = @import("Ast.zig");

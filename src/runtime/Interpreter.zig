@@ -9,7 +9,7 @@ const Exception = @import("Exception.zig");
 
 const Interpreter = @This();
 
-pub const Error = error{ExceptionThrown} || std.mem.Allocator.Error;
+pub const Error = error{ ExceptionThrown, RegisterPoolExhausted } || std.mem.Allocator.Error;
 
 gc: Gc,
 string_interner: StringInterner = undefined,
@@ -54,6 +54,9 @@ pub fn runFile(i: *Interpreter, path: []const u8) !Value {
     const result = i.vm.runExecutable(executable) catch |err| {
         switch (err) {
             error.OutOfMemory => {
+                return Value.none();
+            },
+            error.RegisterPoolExhausted => {
                 return Value.none();
             },
             error.ExceptionThrown => {

@@ -20,25 +20,61 @@ const Globals = struct {
     }
 };
 
+const RegisterPool = struct {
+    buffer: []Value,
+    used: usize = 0,
+
+    pub fn init(gpa: std.mem.Allocator, capacity: usize) !RegisterPool {
+        return .{
+            .buffer = try gpa.alloc(Value, capacity),
+        };
+    }
+
+    pub fn deinit(self: *RegisterPool, gpa: std.mem.Allocator) void {
+        gpa.free(self.buffer);
+    }
+
+    pub fn allocate(self: *RegisterPool, count: usize) ![]Value {
+        const start = self.used;
+        const end = start + count;
+        if (end > self.buffer.len) {
+            return Error.RegisterPoolExhausted;
+        }
+        self.used = end;
+        return self.buffer[start..end];
+    }
+
+    pub fn deallocate(self: *RegisterPool, count: usize) void {
+        std.debug.assert(self.used >= count);
+        self.used -= count;
+    }
+
+    pub fn reset(self: *RegisterPool) void {
+        self.used = 0;
+    }
+};
+
 const ActivationRecord = struct {
     executable: *Executable,
     registers: []Value,
     ip: usize = 0,
     caller_return_reg: u32 = undefined,
 
-    pub fn init(executable: *Executable, gpa: std.mem.Allocator) !ActivationRecord {
+    pub fn init(executable: *Executable, register_pool: *RegisterPool) !ActivationRecord {
+        const registers = try register_pool.allocate(executable.max_register_count);
         return .{
             .executable = executable,
-            .registers = try gpa.alloc(Value, executable.max_register_count),
+            .registers = registers,
         };
     }
 
-    pub fn deinit(self: *ActivationRecord, gpa: std.mem.Allocator) void {
-        gpa.free(self.registers);
+    pub fn deinit(self: *ActivationRecord, register_pool: *RegisterPool) void {
+        register_pool.deallocate(self.executable.max_register_count);
     }
 };
 
 const Records = std.ArrayList(ActivationRecord);
+const register_pool_size = 100_000;
 
 records: Records = .empty,
 rp: usize = 0,
@@ -46,13 +82,19 @@ interpreter: *Interpreter,
 globals: Globals = undefined,
 gpa: std.mem.Allocator,
 gc: *Gc,
+register_pool: RegisterPool,
 
 pub fn init(gpa: std.mem.Allocator, interpreter: *Interpreter) !*Vm {
     const vm = try gpa.create(Vm);
+
+    const register_pool = try RegisterPool.init(gpa, register_pool_size);
+
     vm.* = .{
         .interpreter = interpreter,
         .gpa = gpa,
         .gc = &interpreter.gc,
+        .records = try Records.initCapacity(gpa, 2048),
+        .register_pool = register_pool,
     };
     return vm;
 }
@@ -64,9 +106,9 @@ pub fn deinit(vm: *Vm) void {
 }
 
 pub fn runExecutable(vm: *Vm, executable: *Executable) Error!Value {
-    const record = try ActivationRecord.init(executable, vm.gpa);
+    const record = try ActivationRecord.init(executable, &vm.register_pool);
     vm.globals.fast_slots = try vm.gpa.alloc(Value, executable.global_variable_count);
-    try vm.records.append(vm.gpa, record);
+    vm.records.appendAssumeCapacity(record);
     return try vm.runRecord(&vm.records.items[vm.records.items.len - 1], false);
 }
 
@@ -74,7 +116,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
     _ = as_callback;
     var record = r;
     var registers = record.registers;
-    var globals = vm.globals;
+    var globals = &vm.globals;
     var instructions = record.executable.instructions;
     var constants = record.executable.constants;
     var instruction: Inst = undefined;
@@ -253,7 +295,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 }
                 const function: *Function = callee_obj.as(Function);
                 const parent_record = vm.records.getLast();
-                try vm.records.append(vm.gpa, try ActivationRecord.init(function.data.executable, vm.gpa));
+                vm.records.appendAssumeCapacity(try ActivationRecord.init(function.data.executable, &vm.register_pool));
                 record = &vm.records.items[vm.records.items.len - 1];
                 record.caller_return_reg = data.call.ret;
 
@@ -277,7 +319,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 instructions = record.executable.instructions;
                 constants = record.executable.constants;
                 record.registers[child_record.caller_return_reg] = child_record.registers[data.un];
-                child_record.deinit(vm.gpa);
+                child_record.deinit(&vm.register_pool);
                 continue :start;
             },
             .ret_none => {
