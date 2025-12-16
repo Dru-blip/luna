@@ -101,10 +101,7 @@ pub fn traceString(exception: *Exception, gpa: std.mem.Allocator) ![]const u8 {
     var writer = buffer.writer(gpa);
     try writer.print("Traceback (most recent call last):\n", .{});
 
-    var i: usize = exception.traceback.items.len;
-    while (i > 0) {
-        i -= 1;
-        const frame = &exception.traceback.items[i];
+    for (exception.traceback.items) |*frame| {
         var source: []const u8 = try source_cache.getOrLoad(frame.file_path);
         try writer.print("   at {s} ({s}:{d}:{d})\n", .{ frame.function_name.asSlice(), frame.file_path, frame.location.line, frame.location.col });
 

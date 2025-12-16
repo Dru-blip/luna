@@ -174,6 +174,8 @@ pub fn next(self: *Tokenizer) Token {
             ' ', '\t', '\r' => {
                 self.advance();
                 result.loc.start = self.index;
+                result.loc.col = self.col;
+                result.loc.line = self.line;
                 continue :state .start;
             },
             '\n' => {
@@ -219,11 +221,15 @@ pub fn next(self: *Tokenizer) Token {
             '|' => continue :state .pipe,
             '0'...'9' => {
                 result.loc.start = self.index;
+                result.loc.col = self.col;
+                result.loc.line = self.line;
                 result.tag = .int;
                 continue :state .int;
             },
             'a'...'z', 'A'...'Z', '_' => {
                 result.loc.start = self.index;
+                result.loc.col = self.col;
+                result.loc.line = self.line;
                 result.tag = .identifier;
                 continue :state .identifier;
             },

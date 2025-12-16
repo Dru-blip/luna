@@ -24,6 +24,7 @@ const ActivationRecord = struct {
     executable: *Executable,
     registers: []Value,
     ip: usize = 0,
+    caller_return_reg: u32 = undefined,
 
     pub fn init(executable: *Executable, gpa: std.mem.Allocator) !ActivationRecord {
         return .{
@@ -66,20 +67,20 @@ pub fn runExecutable(vm: *Vm, executable: *Executable) Error!Value {
     const record = try ActivationRecord.init(executable, vm.gpa);
     vm.globals.fast_slots = try vm.gpa.alloc(Value, executable.global_variable_count);
     try vm.records.append(vm.gpa, record);
-    // defer record.deinit(vm.gpa);
     return try vm.runRecord(&vm.records.items[vm.records.items.len - 1], false);
 }
 
-pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Value {
+pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
     _ = as_callback;
+    var record = r;
     var registers = record.registers;
     var globals = vm.globals;
-    const instructions = record.executable.instructions;
-    const constants = record.executable.constants;
-    var instruction: *Inst = undefined;
+    var instructions = record.executable.instructions;
+    var constants = record.executable.constants;
+    var instruction: Inst = undefined;
 
     start: while (true) {
-        instruction = &instructions[record.ip];
+        instruction = instructions[record.ip];
         const data = instruction.data;
         record.ip += 1;
         switch (instruction.op) {
@@ -120,129 +121,109 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Va
             .add => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.type != rhs.type) {
-                    return vm.raiseTypeException("+", lhs, rhs);
-                }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.int(lhs.toInt() + rhs.toInt());
+                    continue :start;
                 }
-                continue :start;
+
+                return vm.raiseTypeException("+", lhs, rhs);
             },
             .sub => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.type != rhs.type) {
-                    return vm.raiseTypeException("-", lhs, rhs);
-                }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.int(lhs.toInt() - rhs.toInt());
+                    continue :start;
                 }
-                continue :start;
+
+                return vm.raiseTypeException("-", lhs, rhs);
             },
             .mul => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.type != rhs.type) {
-                    return vm.raiseTypeException("*", lhs, rhs);
-                }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.int(lhs.toInt() * rhs.toInt());
+                    continue :start;
                 }
-                continue :start;
+                return vm.raiseTypeException("*", lhs, rhs);
             },
             .div => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.type != rhs.type) {
-                    return vm.raiseTypeException("/", lhs, rhs);
-                }
                 if (lhs.isInt() and rhs.isInt()) {
                     if (rhs.toInt() == 0) {
                         //TODO: throw error for division by zero
                     }
                     registers[data.tri.dst] = Value.int(@divFloor(lhs.toInt(), rhs.toInt()));
+                    continue :start;
                 }
-                continue :start;
+                return vm.raiseTypeException("/", lhs, rhs);
             },
             .mod => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.type != rhs.type) {
-                    return vm.raiseTypeException("%", lhs, rhs);
-                }
                 if (lhs.isInt() and rhs.isInt()) {
                     if (rhs.toInt() == 0) {
                         //TODO: throw error for division by zero
                     }
                     registers[data.tri.dst] = Value.int(@mod(lhs.toInt(), rhs.toInt()));
+                    continue :start;
                 }
-                continue :start;
+                return vm.raiseTypeException("%", lhs, rhs);
             },
             .test_lt => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.type != rhs.type) {
-                    return vm.raiseTypeException("<", lhs, rhs);
-                }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.bool(lhs.toInt() < rhs.toInt());
+                    continue :start;
                 }
-                continue :start;
+                return vm.raiseTypeException("<", lhs, rhs);
             },
             .test_le => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.type != rhs.type) {
-                    return vm.raiseTypeException("<=", lhs, rhs);
-                }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.bool(lhs.toInt() <= rhs.toInt());
+                    continue :start;
                 }
-                continue :start;
+                return vm.raiseTypeException("<=", lhs, rhs);
             },
             .test_gt => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.type != rhs.type) {
-                    return vm.raiseTypeException(">", lhs, rhs);
-                }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.bool(lhs.toInt() > rhs.toInt());
+                    continue :start;
                 }
-                continue :start;
+                return vm.raiseTypeException(">", lhs, rhs);
             },
             .test_ge => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.type != rhs.type) {
-                    return vm.raiseTypeException(">=", lhs, rhs);
-                }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.bool(lhs.toInt() >= rhs.toInt());
+                    continue :start;
                 }
-                continue :start;
+                return vm.raiseTypeException(">=", lhs, rhs);
             },
             .test_eq => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.type != rhs.type) {
-                    return vm.raiseTypeException("==", lhs, rhs);
-                }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.bool(lhs.toInt() == rhs.toInt());
+                    continue :start;
                 }
-                continue :start;
+                return vm.raiseTypeException("==", lhs, rhs);
             },
             .test_neq => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.type != rhs.type) {
-                    return vm.raiseTypeException("!=", lhs, rhs);
-                }
                 if (lhs.isInt() and rhs.isInt()) {
                     registers[data.tri.dst] = Value.bool(lhs.toInt() != rhs.toInt());
+                    continue :start;
                 }
-                continue :start;
+                return vm.raiseTypeException("!=", lhs, rhs);
             },
             .build_function => {
                 const func = try Function.withExecutable(vm.gc, constants[data.bin.lhs].toObject().as(Executable));
@@ -261,9 +242,43 @@ pub fn runRecord(vm: *Vm, record: *ActivationRecord, as_callback: bool) Error!Va
                 }
                 continue :start;
             },
+            .call => {
+                const callee = registers[data.call.callee];
+                if (!callee.isObject()) {
+                    return vm.raiseException(.type_error, "non callable value", .{});
+                }
+                const callee_obj = callee.toObject();
+                if (!callee_obj.isFunction()) {
+                    return vm.raiseException(.type_error, "non callable object", .{});
+                }
+                const function: *Function = callee_obj.as(Function);
+                const parent_record = vm.records.getLast();
+                try vm.records.append(vm.gpa, try ActivationRecord.init(function.data.executable, vm.gpa));
+                record = &vm.records.items[vm.records.items.len - 1];
+                record.caller_return_reg = data.call.ret;
+
+                for (data.call.args, 0..) |arg, i| {
+                    record.registers[i] = parent_record.registers[arg];
+                }
+
+                registers = record.registers;
+                instructions = record.executable.instructions;
+                constants = record.executable.constants;
+                continue :start;
+            },
             .ret => {
-                //TODO: destroy activation record,
-                return registers[data.un];
+                var child_record = vm.records.pop().?;
+                if (vm.records.items.len == 0) {
+                    return registers[data.un];
+                }
+                record = &vm.records.items[vm.records.items.len - 1];
+
+                registers = record.registers;
+                instructions = record.executable.instructions;
+                constants = record.executable.constants;
+                record.registers[child_record.caller_return_reg] = child_record.registers[data.un];
+                child_record.deinit(vm.gpa);
+                continue :start;
             },
             .ret_none => {
                 return Value.none();

@@ -2,6 +2,7 @@ const std = @import("std");
 const PropertyMap = @import("property_map.zig").PropertyMap;
 const Gc = @import("../core/Gc.zig");
 const Object = @This();
+const Function = @import("Function.zig");
 const ObjectSet = @import("ObjectSet.zig");
 
 marked: bool = false,
@@ -27,6 +28,10 @@ pub inline fn from(ptr: *anyopaque) *Object {
 
 pub inline fn getPropertyIterator(obj: *Object) PropertyMap.Iterator {
     return obj.property_map.iterator();
+}
+
+pub inline fn isFunction(obj: *Object) bool {
+    return obj.type_descriptor == &Function.type_descriptor;
 }
 
 pub const Base = struct {

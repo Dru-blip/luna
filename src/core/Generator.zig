@@ -122,9 +122,9 @@ fn switchBasicBlock(g: *Generator, block: *BasicBlock) void {
 }
 
 fn allocRegister(g: *Generator) u32 {
-    if (g.free_registers.pop()) |reg| {
-        return reg;
-    }
+    // if (g.free_registers.pop()) |reg| {
+    //     return reg;
+    // }
 
     const reg = g.register_count;
     g.register_count += 1;
@@ -318,7 +318,7 @@ fn genFuncDecl(g: *Generator, node: *const Ast.Node) GenError!void {
     func_gen.global_variables = g.global_variables;
     func_gen.scope_depth = 1;
     for (node.data.fndecl.params) |param| {
-        try g.declare_param(param);
+        try func_gen.declare_param(param);
     }
     try func_gen.genStmt(node.data.fndecl.body);
 
@@ -563,6 +563,22 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
             }
 
             return value;
+        },
+        .call => {
+            const callee = try g.genExpr(node.data.call.callee);
+            var args: std.ArrayList(u32) = .empty;
+            for (node.data.call.args) |arg| {
+                const arg_value = try g.genExpr(arg);
+                try args.append(g.gpa, arg_value);
+            }
+            const ret = g.allocRegister();
+            try g.addInst(.call, .{ .call = .{
+                .callee = callee,
+                .self = 0,
+                .ret = ret,
+                .args = try args.toOwnedSlice(g.gpa),
+            } }, node.loc);
+            return ret;
         },
         else => {
             unreachable;

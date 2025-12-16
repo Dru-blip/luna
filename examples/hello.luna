@@ -1,6 +1,21 @@
-fn add(a){
-    return a+none
+fn a(){
+    return none+1
 }
 
+fn b(){
+    return a()
+}
 
-add(4)
+fn c(){
+    return b()
+}
+
+fn d(){
+    return c()
+}
+
+fn e(){
+    return d()
+}
+
+return e()
