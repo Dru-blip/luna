@@ -45,6 +45,8 @@ pub const Inst = struct {
 
         object_create,
         object_set_property,
+        object_subscript,
+        object_get_property,
 
         ret, // uses un
         ret_none, // uses un
@@ -172,6 +174,8 @@ pub const Executable = struct {
                 },
                 .object_create => try stdout.print("ObjectCreate r{d}", .{inst.data.un}),
                 .object_set_property => try stdout.print("ObjectSetProperty r{d}={{r{d}:r{d}}}", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
+                .object_subscript => try stdout.print("ObjectSubscript r{d}=r{d}[r{d}]", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
+                .object_get_property => try stdout.print("ObjectGetProperty", .{}),
                 .ret => try stdout.print("Ret r{d}", .{inst.data.un}),
                 .ret_none => try stdout.print("RetNone", .{}),
             }

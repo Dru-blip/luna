@@ -3,6 +3,7 @@ const Value = @import("../core/Value.zig");
 const Object = @import("Object.zig");
 const Interpreter = @import("Interpreter.zig");
 const Executable = @import("../core/bytecode.zig").Executable;
+const String = @import("String.zig");
 const Function = @import("Function.zig");
 const Inst = @import("../core/bytecode.zig").Inst;
 const Error = Interpreter.Error;
@@ -286,6 +287,35 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     try obj.set(key.toPropertyKey().?, value);
                 }
                 continue :start;
+            },
+            .object_get_property => {
+                const obj_val = registers[data.tri.op1];
+                const key: *String = constants[data.tri.op2].toObject().as(String);
+
+                if (obj_val.asObject()) |object| {
+                    if (object.get(key.toPropertyKey())) |v| {
+                        registers[data.tri.dst] = v;
+                        continue :start;
+                    }
+                    return vm.raiseException(.property_error, "{s}", .{key.asSlice()});
+                }
+                return vm.raiseException(.type_error, "{s} is not subscriptable", .{obj_val.getTypeString()});
+            },
+            .object_subscript => {
+                const val = registers[data.tri.op1];
+                const property = registers[data.tri.op2];
+                if (val.asObject()) |obj| {
+                    //TODO: handle string property keys
+                    if (property.isInt() and property.toInt() >= 0) {
+                        if (obj.get(property.toPropertyKey().?)) |v| {
+                            registers[data.tri.dst] = v;
+                            continue :start;
+                        }
+                        return vm.raiseException(.property_error, "{d}", .{property.toInt()});
+                    }
+                    return vm.raiseException(.property_error, "invalid property key type: {s}", .{property.getTypeString()});
+                }
+                return vm.raiseException(.type_error, "{s} is not subscriptable", .{val.getTypeString()});
             },
             .jmp => {
                 record.ip = data.un;

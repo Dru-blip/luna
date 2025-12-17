@@ -41,6 +41,20 @@ pub inline fn @"bool"(value: bool) Value {
     };
 }
 
+pub const None: Value = .{
+    .type = .none,
+    .data = .{
+        .none = {},
+    },
+};
+
+pub const Undefined: Value = .{
+    .type = .undefined,
+    .data = .{
+        .undefined = {},
+    },
+};
+
 pub inline fn none() Value {
     return .{
         .type = .none,

@@ -11,10 +11,12 @@ const Exception = @This();
 pub const Tag = enum {
     type_error,
     reference_error,
+    property_error,
 
     pub fn toString(self: Tag) []const u8 {
         return switch (self) {
             .type_error => "TypeError",
+            .property_error => "PropertyError",
             .reference_error => "ReferenceError",
         };
     }
@@ -73,8 +75,8 @@ pub fn new(gc: *Gc) !*Exception {
 
 pub fn withMessage(vm: *Vm, tag: Tag, comptime fmt: []const u8, args: anytype) !*Exception {
     const ex: *Exception = try vm.gc.alloc(Exception);
-    const raw_msg = try std.fmt.allocPrint(vm.gc.gpa, fmt, args);
-    defer vm.gc.gpa.free(raw_msg);
+    const raw_msg = try std.fmt.allocPrint(vm.gpa, fmt, args);
+    defer vm.gpa.free(raw_msg);
     ex.* = .{
         .tag = tag,
         .message = try String.new(vm.gc, raw_msg),

@@ -601,6 +601,21 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
             }
             return object;
         },
+        .member_expr => {
+            const object = try g.genExpr(node.data.member.object);
+            const dst = g.allocRegister();
+            const ident = try g.string_interner.intern(node.data.member.property);
+            const key_index = try g.addConstant(Value.object(Object.from(ident)));
+            try g.addTri(.object_get_property, object, key_index, dst, node.loc);
+            return dst;
+        },
+        .computed_member_expr => {
+            const object = try g.genExpr(node.data.bin.lhs);
+            const index = try g.genExpr(node.data.bin.rhs);
+            const dst = g.allocRegister();
+            try g.addTri(.object_subscript, object, index, dst, node.loc);
+            return dst;
+        },
         else => {
             unreachable;
         },

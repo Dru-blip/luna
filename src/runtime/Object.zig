@@ -37,6 +37,10 @@ pub fn set(obj: *Object, key: PropertyKey, value: Value) !void {
     try obj.property_map.put(key, value);
 }
 
+pub fn get(obj: *Object, key: PropertyKey) ?Value {
+    return obj.property_map.get(key);
+}
+
 pub inline fn isFunction(obj: *Object) bool {
     return obj.type_descriptor == &Function.type_descriptor;
 }

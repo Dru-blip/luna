@@ -39,8 +39,12 @@ pub const PropertyMap = struct {
         self.storage.deinit();
     }
 
-    pub fn put(self: *PropertyMap, key: PropertyKey, value: Value) !void {
+    pub inline fn put(self: *PropertyMap, key: PropertyKey, value: Value) !void {
         try self.storage.put(key, value);
+    }
+
+    pub inline fn get(self: *PropertyMap, key: PropertyKey) ?Value {
+        return self.storage.get(key);
     }
 
     pub fn iterator(self: *PropertyMap) Iterator {

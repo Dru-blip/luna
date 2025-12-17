@@ -45,7 +45,7 @@ const Block = struct {
     }
 
     pub inline fn indexOf(blk: *Block, value: *Cell) usize {
-        //does not check whether the value is within the block's range
+        // assumes the cell is inside  block.
         return (@intFromPtr(value) - @intFromPtr(blk.data.ptr)) / blk.cell_size;
     }
 };

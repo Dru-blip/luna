@@ -347,7 +347,7 @@ fn parsePostfixExpr(p: *Parser, lhs: *Node, tag: Node.Tag) ParserError!*Node {
         .computed_member_expr => {
             const computed_property = try p.parseExpr(0);
             const rbracket = try p.expectToken(.r_bracket);
-            const node = try p.ast.makeNode(.member_expr, lhs.loc.merge(&rbracket.loc));
+            const node = try p.ast.makeNode(.computed_member_expr, lhs.loc.merge(&rbracket.loc));
             node.data = .{
                 .bin = .{
                     .lhs = lhs,

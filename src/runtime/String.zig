@@ -2,6 +2,7 @@ const std = @import("std");
 const Gc = @import("../core/Gc.zig");
 const Object = @import("Object.zig");
 const ObjectSet = @import("ObjectSet.zig");
+const PropertyKey = @import("property_map.zig").PropertyKey;
 
 const String = @This();
 
@@ -51,6 +52,10 @@ pub fn eql(a: *const String, b: *const String) bool {
     if (a == b) return true;
     if (a.length != b.length) return false;
     return std.mem.eql(u8, a.asSlice(), b.asSlice());
+}
+
+pub fn toPropertyKey(self: *String) PropertyKey {
+    return .{ .string = self };
 }
 
 fn finalize(self: *Object, gc: *Gc) void {
