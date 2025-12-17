@@ -88,9 +88,7 @@ register_pool: RegisterPool,
 
 pub fn init(gpa: std.mem.Allocator, interpreter: *Interpreter) !*Vm {
     const vm = try gpa.create(Vm);
-
     const register_pool = try RegisterPool.init(gpa, default_register_pool_size);
-
     vm.* = .{
         .interpreter = interpreter,
         .gpa = gpa,
@@ -284,6 +282,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const key = registers[data.tri.op1];
                 const value = registers[data.tri.op2];
                 if (val.asObject()) |obj| {
+                    //TODO: currently we assume any value is a valid property key
                     try obj.set(key.toPropertyKey().?, value);
                 }
                 continue :start;

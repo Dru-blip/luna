@@ -296,6 +296,8 @@ const operTable = std.enums.directEnumArrayDefault(Token.Tag, OperInfo, .{ .lbp 
     .modulus = .{ .lbp = 70, .rbp = 71, .tag = .mod },
 
     .l_paren = .{ .lbp = 99, .rbp = 100, .tag = .call, .pos = .postfix },
+    .dot = .{ .lbp = 99, .rbp = 100, .tag = .member_expr, .pos = .postfix },
+    .l_bracket = .{ .lbp = 99, .rbp = 100, .tag = .computed_member_expr, .pos = .postfix },
 });
 
 fn parseExpr(p: *Parser, min_prec: i8) ParserError!*Node {
@@ -318,19 +320,45 @@ fn parseExpr(p: *Parser, min_prec: i8) ParserError!*Node {
 }
 
 fn parsePostfixExpr(p: *Parser, lhs: *Node, tag: Node.Tag) ParserError!*Node {
-    if (tag == .call) {
-        var args: std.ArrayList(*Node) = .empty;
-        while (p.peek().tag != .r_paren) {
-            const arg = try p.parseExpr(0);
-            if (p.peek().tag == .comma) {
-                _ = p.nextToken();
+    switch (tag) {
+        .call => {
+            var args: std.ArrayList(*Node) = .empty;
+            while (p.peek().tag != .r_paren) {
+                const arg = try p.parseExpr(0);
+                if (p.peek().tag == .comma) {
+                    _ = p.nextToken();
+                }
+                try args.append(p.ast.arena.allocator(), arg);
             }
-            try args.append(p.ast.arena.allocator(), arg);
-        }
-        const rparen = try p.expectToken(.r_paren);
-        return p.ast.makeCall(lhs.loc.merge(&rparen.loc), lhs, try args.toOwnedSlice(p.ast.arena.allocator()));
+            const rparen = try p.expectToken(.r_paren);
+            return p.ast.makeCall(lhs.loc.merge(&rparen.loc), lhs, try args.toOwnedSlice(p.ast.arena.allocator()));
+        },
+        .member_expr => {
+            var property = try p.expectToken(.identifier);
+            const node = try p.ast.makeNode(.member_expr, lhs.loc.merge(&property.loc));
+            node.data = .{
+                .member = .{
+                    .object = lhs,
+                    .property = p.source[property.loc.start..property.loc.end],
+                },
+            };
+            return node;
+        },
+        .computed_member_expr => {
+            const computed_property = try p.parseExpr(0);
+            const rbracket = try p.expectToken(.r_bracket);
+            const node = try p.ast.makeNode(.member_expr, lhs.loc.merge(&rbracket.loc));
+            node.data = .{
+                .bin = .{
+                    .lhs = lhs,
+                    .rhs = computed_property,
+                },
+            };
+
+            return node;
+        },
+        else => unreachable,
     }
-    return ParserError.SyntaxError;
 }
 
 fn parsePrefixExpr(p: *Parser) ParserError!*Node {

@@ -52,6 +52,8 @@ pub const Node = struct {
 
         object_expr,
         object_property,
+        member_expr,
+        computed_member_expr,
 
         identifier,
         int_literal,
@@ -78,6 +80,10 @@ pub const Node = struct {
         property: struct {
             key: *Node,
             value: *Node,
+        },
+        member: struct {
+            object: *Node,
+            property: []const u8,
         },
         @"if": struct {
             @"test": *Node,
@@ -141,7 +147,7 @@ pub fn parse(filepath: []const u8, source: [:0]const u8, gpa: std.mem.Allocator)
     return try parser.parse();
 }
 
-fn makeNode(ast: *Ast, tag: Node.Tag, loc: Token.Loc) !*Node {
+pub fn makeNode(ast: *Ast, tag: Node.Tag, loc: Token.Loc) !*Node {
     const node = try ast.arena.allocator().create(Node);
     node.* = .{
         .tag = tag,

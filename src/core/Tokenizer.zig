@@ -54,10 +54,13 @@ pub const Token = struct {
         r_paren,
         l_brace,
         r_brace,
+        l_bracket,
+        r_bracket,
 
         semicolon,
         comma,
         colon,
+        dot,
 
         int,
         identifier,
@@ -201,6 +204,14 @@ pub fn next(self: *Tokenizer) Token {
                 self.advance();
                 result.tag = .r_brace;
             },
+            '[' => {
+                self.advance();
+                result.tag = .l_bracket;
+            },
+            ']' => {
+                self.advance();
+                result.tag = .r_bracket;
+            },
             ';' => {
                 self.advance();
                 result.tag = .semicolon;
@@ -212,6 +223,10 @@ pub fn next(self: *Tokenizer) Token {
             ':' => {
                 self.advance();
                 result.tag = .colon;
+            },
+            '.' => {
+                self.advance();
+                result.tag = .dot;
             },
             '+' => continue :state .plus,
             '-' => continue :state .minus,
