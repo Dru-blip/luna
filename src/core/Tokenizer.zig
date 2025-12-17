@@ -57,6 +57,7 @@ pub const Token = struct {
 
         semicolon,
         comma,
+        colon,
 
         int,
         identifier,
@@ -207,6 +208,10 @@ pub fn next(self: *Tokenizer) Token {
             ',' => {
                 self.advance();
                 result.tag = .comma;
+            },
+            ':' => {
+                self.advance();
+                result.tag = .colon;
             },
             '+' => continue :state .plus,
             '-' => continue :state .minus,

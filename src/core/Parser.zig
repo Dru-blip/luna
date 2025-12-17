@@ -299,7 +299,7 @@ const operTable = std.enums.directEnumArrayDefault(Token.Tag, OperInfo, .{ .lbp 
 });
 
 fn parseExpr(p: *Parser, min_prec: i8) ParserError!*Node {
-    var lhs = try p.parsePrimaryExpr();
+    var lhs = try p.parsePrefixExpr();
     while (true) {
         const tok_tag = p.tokenTag(p.tok_i);
         const info = operTable[@as(usize, @intCast(@intFromEnum(tok_tag)))];
@@ -331,6 +331,32 @@ fn parsePostfixExpr(p: *Parser, lhs: *Node, tag: Node.Tag) ParserError!*Node {
         return p.ast.makeCall(lhs.loc.merge(&rparen.loc), lhs, try args.toOwnedSlice(p.ast.arena.allocator()));
     }
     return ParserError.SyntaxError;
+}
+
+fn parsePrefixExpr(p: *Parser) ParserError!*Node {
+    const token = p.peek();
+    switch (token.tag) {
+        .l_brace => {
+            const lbrace = try p.expectToken(.l_brace);
+            var properties: std.ArrayList(*const Node) = .empty;
+            while (p.peek().tag != .r_brace) {
+                const tag = p.peek().tag;
+                if (tag != .identifier and tag != .int) {
+                    return ParserError.SyntaxError;
+                }
+                const key = try p.parseExpr(0);
+                _ = try p.expectToken(.colon);
+                const value = try p.parseExpr(0);
+                const property = try p.ast.makeProperty(key.loc.merge(&value.loc), key, value);
+                try properties.append(p.ast.arena.allocator(), property);
+            }
+            const rbrace = try p.expectToken(.r_brace);
+            return p.ast.makeObjectExpr(lbrace.loc.merge(&rbrace.loc), try properties.toOwnedSlice(p.ast.arena.allocator()));
+        },
+        else => {
+            return p.parsePrimaryExpr();
+        },
+    }
 }
 
 fn parsePrimaryExpr(p: *Parser) ParserError!*Node {

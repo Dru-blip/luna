@@ -74,7 +74,9 @@ const ActivationRecord = struct {
 };
 
 const Records = std.ArrayList(ActivationRecord);
-const register_pool_size = 100_000;
+
+const default_register_pool_size = 100_000;
+const default_record_capacity = 2048;
 
 records: Records = .empty,
 rp: usize = 0,
@@ -87,13 +89,13 @@ register_pool: RegisterPool,
 pub fn init(gpa: std.mem.Allocator, interpreter: *Interpreter) !*Vm {
     const vm = try gpa.create(Vm);
 
-    const register_pool = try RegisterPool.init(gpa, register_pool_size);
+    const register_pool = try RegisterPool.init(gpa, default_register_pool_size);
 
     vm.* = .{
         .interpreter = interpreter,
         .gpa = gpa,
         .gc = &interpreter.gc,
-        .records = try Records.initCapacity(gpa, 2048),
+        .records = try Records.initCapacity(gpa, default_record_capacity),
         .register_pool = register_pool,
     };
     return vm;

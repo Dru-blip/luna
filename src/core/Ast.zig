@@ -50,6 +50,9 @@ pub const Node = struct {
 
         call,
 
+        object_expr,
+        object_property,
+
         identifier,
         int_literal,
         bool_literal,
@@ -71,6 +74,10 @@ pub const Node = struct {
         call: struct {
             callee: *Node,
             args: []*Node,
+        },
+        property: struct {
+            key: *Node,
+            value: *Node,
         },
         @"if": struct {
             @"test": *Node,
@@ -271,6 +278,25 @@ pub fn makeCall(ast: *Ast, loc: Token.Loc, callee: *Node, args: []*Node) !*Node 
             .callee = callee,
             .args = args,
         },
+    };
+    return node;
+}
+
+pub fn makeProperty(ast: *Ast, loc: Token.Loc, key: *Node, value: *Node) !*Node {
+    var node = try makeNode(ast, .object_property, loc);
+    node.data = .{
+        .property = .{
+            .key = key,
+            .value = value,
+        },
+    };
+    return node;
+}
+
+pub fn makeObjectExpr(ast: *Ast, loc: Token.Loc, properties: []*const Node) !*Node {
+    var node = try makeNode(ast, .object_expr, loc);
+    node.data = .{
+        .list = properties,
     };
     return node;
 }
