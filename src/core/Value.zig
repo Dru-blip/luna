@@ -106,10 +106,10 @@ pub inline fn asObject(value: Value) ?*Object {
 
 pub inline fn toPropertyKey(value: Value) ?PropertyKey {
     //TODO: raise error if value is not an integer or string
-    switch (value.type) {
+    return switch (value.type) {
         .int => PropertyKey.fromInt(value.data.int),
         else => null,
-    }
+    };
 }
 
 pub inline fn isFalsy(v: Value) bool {

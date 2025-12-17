@@ -43,6 +43,9 @@ pub const Inst = struct {
 
         call, // uses call
 
+        object_create,
+        object_set_property,
+
         ret, // uses un
         ret_none, // uses un
     };
@@ -167,6 +170,8 @@ pub const Executable = struct {
                     }
                     try stdout.print(")", .{});
                 },
+                .object_create => try stdout.print("ObjectCreate r{d}", .{inst.data.un}),
+                .object_set_property => try stdout.print("ObjectSetProperty r{d}={{r{d}:r{d}}}", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
                 .ret => try stdout.print("Ret r{d}", .{inst.data.un}),
                 .ret_none => try stdout.print("RetNone", .{}),
             }

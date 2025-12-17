@@ -1,8 +1,11 @@
 const std = @import("std");
 const PropertyMap = @import("property_map.zig").PropertyMap;
+const PropertyKey = @import("property_map.zig").PropertyKey;
+
 const Gc = @import("../core/Gc.zig");
 const Object = @This();
 const Function = @import("Function.zig");
+const Value = @import("../core/Value.zig");
 const ObjectSet = @import("ObjectSet.zig");
 
 marked: bool = false,
@@ -30,11 +33,21 @@ pub inline fn getPropertyIterator(obj: *Object) PropertyMap.Iterator {
     return obj.property_map.iterator();
 }
 
+pub fn set(obj: *Object, key: PropertyKey, value: Value) !void {
+    try obj.property_map.put(key, value);
+}
+
 pub inline fn isFunction(obj: *Object) bool {
     return obj.type_descriptor == &Function.type_descriptor;
 }
 
 pub const Base = struct {
+    pub const type_descriptor: Object.TypeDescriptor = .{
+        .name = "Object",
+        .visit = visit,
+        .finalize = finalize,
+    };
+
     pub fn visit(self: *Object, live_objects: *ObjectSet) !void {
         //TODO: find a way to avoid recursion if possible
         try live_objects.add(self);
@@ -56,7 +69,7 @@ pub const Base = struct {
     }
 };
 
-pub fn new(gc: *Gc) *Object {
-    const base: *Base = gc.alloc(Base);
+pub fn new(gc: *Gc) !*Object {
+    const base: *Base = try gc.alloc(Base);
     return Object.from(base);
 }

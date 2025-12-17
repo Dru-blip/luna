@@ -39,6 +39,10 @@ pub const PropertyMap = struct {
         self.storage.deinit();
     }
 
+    pub fn put(self: *PropertyMap, key: PropertyKey, value: Value) !void {
+        try self.storage.put(key, value);
+    }
+
     pub fn iterator(self: *PropertyMap) Iterator {
         return self.storage.iterator();
     }
@@ -53,24 +57,24 @@ pub const PropertyMap = struct {
 
     const PropertyContext = struct {
         pub fn hash(_: @This(), prop: PropertyKey) u64 {
-            return switch (prop.*) {
-                .int => |i| i,
+            return switch (prop) {
+                .int => |i| @intCast(i),
                 .string => |s| s.hash,
             };
         }
         pub fn eql(_: @This(), a: PropertyKey, b: PropertyKey) bool {
-            return switch (a.*) {
+            return switch (a) {
                 .int => |i| {
-                    switch (b.*) {
+                    return switch (b) {
                         .int => |j| i == j,
                         .string => |_| false,
-                    }
+                    };
                 },
                 .string => |s| {
-                    switch (b.*) {
+                    return switch (b) {
                         .int => |_| false,
                         .string => |t| s.eql(t),
-                    }
+                    };
                 },
             };
         }

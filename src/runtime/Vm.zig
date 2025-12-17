@@ -274,6 +274,20 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 registers[data.bin.rhs] = Value.object(Object.from(func));
                 continue :start;
             },
+            .object_create => {
+                const obj = try Object.new(vm.gc);
+                registers[data.un] = Value.object(obj);
+                continue :start;
+            },
+            .object_set_property => {
+                const val = registers[data.tri.dst];
+                const key = registers[data.tri.op1];
+                const value = registers[data.tri.op2];
+                if (val.asObject()) |obj| {
+                    try obj.set(key.toPropertyKey().?, value);
+                }
+                continue :start;
+            },
             .jmp => {
                 record.ip = data.un;
                 continue :start;

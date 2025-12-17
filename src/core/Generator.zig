@@ -582,6 +582,25 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
             } }, node.loc);
             return ret;
         },
+        .object_expr => {
+            const object = g.allocRegister();
+            try g.addUn(.object_create, object, node.loc);
+            for (node.data.list) |property| {
+                const key = switch (property.data.property.key.tag) {
+                    .identifier => 1,
+                    .int_literal => blk: {
+                        break :blk try g.genExpr(property.data.property.key);
+                    },
+                    else => blk: {
+                        break :blk 2;
+                        //TODO: raise exeception
+                    },
+                };
+                const value = try g.genExpr(property.data.property.value);
+                try g.addTri(.object_set_property, key, value, object, property.loc);
+            }
+            return object;
+        },
         else => {
             unreachable;
         },
