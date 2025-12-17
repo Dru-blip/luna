@@ -587,7 +587,13 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
             try g.addUn(.object_create, object, node.loc);
             for (node.data.list) |property| {
                 const key = switch (property.data.property.key.tag) {
-                    .identifier => 1,
+                    .identifier => blk: {
+                        const key_string = try g.string_interner.intern(property.data.property.key.data.string);
+                        const key_index = try g.addConstant(Value.object(Object.from(key_string)));
+                        const reg = g.allocRegister();
+                        try g.addBin(.load_const, key_index, reg, node.loc);
+                        break :blk reg;
+                    },
                     .int_literal => blk: {
                         break :blk try g.genExpr(property.data.property.key);
                     },

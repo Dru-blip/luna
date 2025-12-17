@@ -11,6 +11,10 @@ pub const PropertyKey = union(enum) {
         return .{ .int = value };
     }
 
+    pub fn fromString(value: *String) PropertyKey {
+        return .{ .string = value };
+    }
+
     pub fn isString(self: *PropertyKey) bool {
         return switch (self.*) {
             .string => true,

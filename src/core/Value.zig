@@ -1,6 +1,7 @@
 const std = @import("std");
 const Object = @import("../runtime/Object.zig");
 const PropertyKey = @import("../runtime/property_map.zig").PropertyKey;
+const String = @import("../runtime/String.zig");
 
 const Value = @This();
 
@@ -122,6 +123,10 @@ pub inline fn toPropertyKey(value: Value) ?PropertyKey {
     //TODO: raise error if value is not an integer or string
     return switch (value.type) {
         .int => PropertyKey.fromInt(value.data.int),
+        .object => {
+            const string: *String = value.toObject().as(String);
+            return PropertyKey.fromString(string);
+        },
         else => null,
     };
 }
