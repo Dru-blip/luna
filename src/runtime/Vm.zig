@@ -119,6 +119,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
     var registers = record.registers;
     var globals = &vm.globals;
     var instructions = record.executable.instructions;
+    var identifiers = record.executable.identifiers;
     var constants = record.executable.constants;
     var instruction: Inst = undefined;
 
@@ -129,6 +130,10 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
         switch (instruction.op) {
             .load_const => {
                 registers[data.bin.rhs] = constants[data.bin.lhs];
+                continue :start;
+            },
+            .load_ident => {
+                registers[data.bin.rhs] = identifiers[data.bin.lhs];
                 continue :start;
             },
             .load_true => {
@@ -301,13 +306,12 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 }
                 return vm.raiseException(.type_error, "{s} is not subscriptable", .{obj_val.getTypeString()});
             },
-            .object_subscript => {
+            .object_subscript_get => {
                 const val = registers[data.tri.op1];
                 const property = registers[data.tri.op2];
                 if (val.asObject()) |obj| {
-                    //TODO: handle string property keys
-                    if (property.isInt() and property.toInt() >= 0) {
-                        if (obj.get(property.toPropertyKey().?)) |v| {
+                    if (property.toPropertyKey()) |key| {
+                        if (obj.get(key)) |v| {
                             registers[data.tri.dst] = v;
                             continue :start;
                         }
@@ -316,6 +320,19 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     return vm.raiseException(.property_error, "invalid property key type: {s}", .{property.getTypeString()});
                 }
                 return vm.raiseException(.type_error, "{s} is not subscriptable", .{val.getTypeString()});
+            },
+            .object_subscript_set => {
+                const value = registers[data.tri.dst];
+                const obj = registers[data.tri.op1];
+                const index = registers[data.tri.op2];
+                if (obj.asObject()) |o| {
+                    if (index.toPropertyKey()) |key| {
+                        try o.set(key, value);
+                        continue :start;
+                    }
+                    return vm.raiseException(.property_error, "invalid property key type: {s}", .{index.getTypeString()});
+                }
+                return vm.raiseException(.type_error, "{s} is not subscriptable", .{obj.getTypeString()});
             },
             .jmp => {
                 record.ip = data.un;
@@ -351,6 +368,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 registers = record.registers;
                 instructions = record.executable.instructions;
                 constants = record.executable.constants;
+                identifiers = record.executable.identifiers;
                 continue :start;
             },
             .ret => {
@@ -363,6 +381,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 registers = record.registers;
                 instructions = record.executable.instructions;
                 constants = record.executable.constants;
+                identifiers = record.executable.identifiers;
                 record.registers[child_record.caller_return_reg] = child_record.registers[data.un];
                 child_record.deinit(&vm.register_pool);
                 continue :start;

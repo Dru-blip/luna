@@ -20,7 +20,7 @@ const Generator = @This();
 pub const GenError = error{} || std.mem.Allocator.Error;
 
 const Variables = std.ArrayList(Variable);
-const Identifiers = std.ArrayList(*String);
+const Identifiers = std.ArrayList(Value);
 const LoopStack = std.ArrayList(LoopInfo);
 
 arena: std.heap.ArenaAllocator,
@@ -102,6 +102,7 @@ pub fn generate(g: *Generator) !*Executable {
 pub fn finalize(g: *Generator) !*Executable {
     var executable: *Executable = try Executable.new(g.gc);
     executable.constants = try g.constants.toOwnedSlice(g.gpa);
+    executable.identifiers = try g.identifiers.toOwnedSlice(g.gpa);
     executable.filepath = g.ast.filepath;
     executable.max_register_count = g.register_count;
     executable.global_variable_count = @intCast(g.global_variables.items.len);
@@ -215,7 +216,7 @@ fn addConstant(g: *Generator, value: Value) !u32 {
 fn addIdentifier(g: *Generator, name: []const u8) !u32 {
     const index = g.identifiers.items.len;
     const identifier = try g.string_interner.intern(name);
-    try g.identifiers.append(g.gpa, identifier);
+    try g.identifiers.append(g.gpa, Value.object(Object.from(identifier)));
     return @intCast(index);
 }
 
@@ -549,19 +550,19 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
         },
         .assign => {
             const value = try g.genExpr(node.data.bin.rhs);
-            const name = node.data.bin.lhs.data.string;
-
-            var variable: Variable = undefined;
-            if (g.findVariable(name, &variable)) {
-                try g.addBin(
-                    if (variable.scope == .global) .store_global_by_index else .mov,
-                    value,
-                    variable.allocated_reg_slot,
-                    node.loc,
-                );
-            } else {
-                const identifier_index = try g.addIdentifier(name);
-                try g.addBin(.store_global_by_name, value, identifier_index, node.loc);
+            switch (node.data.bin.lhs.tag) {
+                .member_expr => {
+                    try g.genAssignMember(node.data.bin.lhs, value);
+                },
+                .computed_member_expr => {
+                    try g.genAssignComputedMember(node.data.bin.lhs, value);
+                },
+                .identifier => {
+                    try g.genAssignSimple(node, value);
+                },
+                else => {
+                    //TODO:  generate Error for invalid assignment
+                },
             }
 
             return value;
@@ -617,15 +618,60 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
         },
         .computed_member_expr => {
             const object = try g.genExpr(node.data.bin.lhs);
-            const index = try g.genExpr(node.data.bin.rhs);
+
+            const index = if (node.data.bin.rhs.tag == .identifier) blk: {
+                const property_ident_index = try g.addIdentifier(node.data.bin.rhs.data.string);
+                const ident_reg = g.allocRegister();
+                try g.addBin(.load_ident, property_ident_index, ident_reg, node.loc);
+                break :blk ident_reg;
+            } else try g.genExpr(node.data.bin.rhs);
+
             const dst = g.allocRegister();
-            try g.addTri(.object_subscript, object, index, dst, node.loc);
+            try g.addTri(.object_subscript_get, object, index, dst, node.loc);
             return dst;
         },
         else => {
             unreachable;
         },
     }
+}
+
+inline fn genAssignSimple(g: *Generator, node: *const Ast.Node, value: u32) GenError!void {
+    const name = node.data.bin.lhs.data.string;
+
+    var variable: Variable = undefined;
+    if (g.findVariable(name, &variable)) {
+        try g.addBin(
+            if (variable.scope == .global) .store_global_by_index else .mov,
+            value,
+            variable.allocated_reg_slot,
+            node.loc,
+        );
+    } else {
+        const identifier_index = try g.addIdentifier(name);
+        try g.addBin(.store_global_by_name, value, identifier_index, node.loc);
+    }
+}
+
+inline fn genAssignMember(g: *Generator, node: *const Ast.Node, value: u32) GenError!void {
+    const obj = try g.genExpr(node.data.member.object);
+    const property_ident_index = try g.addIdentifier(node.data.member.property);
+    const ident_reg = g.allocRegister();
+    try g.addBin(.load_ident, property_ident_index, ident_reg, node.loc);
+    try g.addTri(.object_set_property, ident_reg, value, obj, node.loc);
+}
+
+inline fn genAssignComputedMember(g: *Generator, node: *const Ast.Node, value: u32) GenError!void {
+    const obj = try g.genExpr(node.data.bin.lhs);
+
+    const computed_index = if (node.data.bin.rhs.tag == .identifier) blk: {
+        const property_ident_index = try g.addIdentifier(node.data.bin.rhs.data.string);
+        const ident_reg = g.allocRegister();
+        try g.addBin(.load_ident, property_ident_index, ident_reg, node.loc);
+        break :blk ident_reg;
+    } else try g.genExpr(node.data.bin.rhs);
+
+    try g.addTri(.object_subscript_set, obj, computed_index, value, node.loc);
 }
 
 inline fn genBinOp(g: *Generator, op: Inst.Op, node: *const Ast.Node) GenError!u32 {

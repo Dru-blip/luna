@@ -5,6 +5,7 @@ const PropertyKey = @import("property_map.zig").PropertyKey;
 const Gc = @import("../core/Gc.zig");
 const Object = @This();
 const Function = @import("Function.zig");
+const String = @import("String.zig");
 const Value = @import("../core/Value.zig");
 const ObjectSet = @import("ObjectSet.zig");
 
@@ -43,6 +44,13 @@ pub fn get(obj: *Object, key: PropertyKey) ?Value {
 
 pub inline fn isFunction(obj: *Object) bool {
     return obj.type_descriptor == &Function.type_descriptor;
+}
+
+pub inline fn asString(obj: *Object) ?*String {
+    if (obj.type_descriptor == &String.type_descriptor) {
+        return obj.as(String);
+    }
+    return null;
 }
 
 pub const Base = struct {

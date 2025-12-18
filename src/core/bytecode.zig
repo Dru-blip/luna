@@ -17,6 +17,7 @@ pub const Inst = struct {
         load_true, // uses un
         load_false, // uses un
         load_none, // uses un
+        load_ident, // uses un
         add, // uses tri
         sub, // uses tri
         mul, // uses tri
@@ -45,7 +46,8 @@ pub const Inst = struct {
 
         object_create,
         object_set_property,
-        object_subscript,
+        object_subscript_get,
+        object_subscript_set,
         object_get_property,
 
         ret, // uses un
@@ -79,6 +81,7 @@ pub const Constants = std.ArrayList(Value);
 pub const Executable = struct {
     instructions: []Inst,
     spans: []Span,
+    identifiers: []Value,
     constants: Constants.Slice,
     max_register_count: u32,
     global_variable_count: u32,
@@ -145,6 +148,7 @@ pub const Executable = struct {
                 .load_true => try stdout.print("LoadTrue r{d}", .{inst.data.un}),
                 .load_false => try stdout.print("LoadFalse r{d}", .{inst.data.un}),
                 .load_none => try stdout.print("LoadNone r{d}", .{inst.data.un}),
+                .load_ident => try stdout.print("LoadIdent r{d} [ident {d}]", .{ inst.data.bin.rhs, inst.data.bin.lhs }),
                 .add => try stdout.print("Add r{d} <- r{d} , r{d}", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
                 .sub => try stdout.print("Sub r{d} <- r{d} , r{d}", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
                 .mul => try stdout.print("Mul r{d} <- r{d} , r{d}", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
@@ -174,7 +178,8 @@ pub const Executable = struct {
                 },
                 .object_create => try stdout.print("ObjectCreate r{d}", .{inst.data.un}),
                 .object_set_property => try stdout.print("ObjectSetProperty r{d}={{r{d}:r{d}}}", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
-                .object_subscript => try stdout.print("ObjectSubscript r{d}=r{d}[r{d}]", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
+                .object_subscript_get => try stdout.print("ObjectSubscriptGet r{d}=r{d}[r{d}]", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
+                .object_subscript_set => try stdout.print("ObjectSubscriptSet r{d}[r{d}]=r{d}", .{ inst.data.tri.op1, inst.data.tri.op2, inst.data.tri.dst }),
                 .object_get_property => try stdout.print("ObjectGetProperty", .{}),
                 .ret => try stdout.print("Ret r{d}", .{inst.data.un}),
                 .ret_none => try stdout.print("RetNone", .{}),

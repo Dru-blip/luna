@@ -124,8 +124,11 @@ pub inline fn toPropertyKey(value: Value) ?PropertyKey {
     return switch (value.type) {
         .int => PropertyKey.fromInt(value.data.int),
         .object => {
-            const string: *String = value.toObject().as(String);
-            return PropertyKey.fromString(string);
+            const obj = value.toObject();
+            if (obj.asString()) |string| {
+                return PropertyKey.fromString(string);
+            }
+            return null;
         },
         else => null,
     };
