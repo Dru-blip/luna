@@ -89,8 +89,8 @@ pub const Executable = struct {
     filepath: []const u8,
 
     pub fn new(gc: *Gc) !*Executable {
-        const obj: *Executable = try gc.alloc(Executable);
-        return obj;
+        const obj = try gc.alloc(Executable);
+        return obj.as(Executable);
     }
 
     pub const type_descriptor = Object.TypeDescriptor{

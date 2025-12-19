@@ -25,7 +25,8 @@ pub fn intern(interner: *StringInterner, bytes: []const u8) !*String {
         return existing;
     }
 
-    var string = try String.new(interner.gc, bytes);
+    var obj = try String.new(interner.gc, bytes);
+    var string: *String = obj.as(String);
     string.interned = true;
     try interner.strings.put(bytes, string);
 

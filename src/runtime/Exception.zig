@@ -74,12 +74,14 @@ pub fn new(gc: *Gc) !*Exception {
 }
 
 pub fn withMessage(vm: *Vm, tag: Tag, comptime fmt: []const u8, args: anytype) !*Exception {
-    const ex: *Exception = try vm.gc.alloc(Exception);
+    const obj = try vm.gc.alloc(Exception);
+    const ex: *Exception = obj.as(Exception);
     const raw_msg = try std.fmt.allocPrint(vm.gpa, fmt, args);
     defer vm.gpa.free(raw_msg);
+    const message_obj = try String.new(vm.gc, raw_msg);
     ex.* = .{
         .tag = tag,
-        .message = try String.new(vm.gc, raw_msg),
+        .message = message_obj.as(String),
     };
     try ex.buildTraceback(vm);
     return ex;

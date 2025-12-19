@@ -24,8 +24,9 @@ pub const type_descriptor = Object.TypeDescriptor{
     .finalize = finalize,
 };
 
-pub fn new(gc: *Gc, bytes: []const u8) !*String {
-    var s: *String = try gc.alloc(String);
+pub fn new(gc: *Gc, bytes: []const u8) !*Object {
+    var obj = try gc.alloc(String);
+    var s: *String = obj.as(String);
 
     s.length = bytes.len;
     s.hash = std.hash.Wyhash.hash(0, bytes);
@@ -38,7 +39,7 @@ pub fn new(gc: *Gc, bytes: []const u8) !*String {
         @memcpy(buf, bytes);
         s.storage = .{ .heap = buf };
     }
-    return s;
+    return obj;
 }
 
 pub inline fn asSlice(self: *const String) []const u8 {

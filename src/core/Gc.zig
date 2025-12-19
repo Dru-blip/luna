@@ -79,7 +79,7 @@ pub fn deinit(gc: *Gc) void {
 inline fn allocImpl(
     gc: *Gc,
     comptime T: anytype,
-) !*T {
+) !*Object {
     //TODO: check alignment , align if needed
     const obj_size = @sizeOf(T);
     const header_size = @sizeOf(Object);
@@ -108,10 +108,10 @@ inline fn allocImpl(
     header.property_map = PropertyMap.init(gc.gpa);
     header.ptr = obj_ptr;
 
-    return @ptrCast(obj_ptr);
+    return header;
 }
 
-pub fn alloc(gc: *Gc, comptime T: anytype) !*T {
+pub fn alloc(gc: *Gc, comptime T: anytype) !*Object {
     return gc.allocImpl(T);
 }
 
@@ -171,6 +171,7 @@ pub fn collectGarbage(gc: *Gc) !void {
 }
 
 fn collectRoots(gc: *Gc, roots: *ObjectSet) !void {
+    try roots.add(gc.interpreter.builtins);
     for (gc.interpreter.vm.records.items) |*record| {
         for (record.registers) |val| {
             if (val.asObject()) |obj| {

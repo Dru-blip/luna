@@ -16,15 +16,16 @@ data: union(enum) {
     executable: *Executable,
 },
 
-pub fn withExecutable(gc: *Gc, executable: *Executable) !*Function {
-    const func: *Function = try gc.alloc(Function);
-    func.* = .{
+pub fn withExecutable(gc: *Gc, executable: *Executable) !*Object {
+    const obj = try gc.alloc(Function);
+    const function = obj.as(Function);
+    function.* = .{
         .param_count = 0,
         .data = .{
             .executable = executable,
         },
     };
-    return func;
+    return obj;
 }
 
 pub const type_descriptor: Object.TypeDescriptor = .{

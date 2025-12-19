@@ -157,7 +157,13 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 continue :start;
             },
             .load_global_by_name => {
-                continue :start;
+                const name: *String = identifiers[data.bin.lhs].toObject().as(String);
+                if (vm.interpreter.builtins.get(name.toPropertyKey())) |obj| {
+                    registers[data.bin.rhs] = obj;
+                    continue :start;
+                }
+
+                return vm.raiseException(.reference_error, "undeclared identifier '{s}'", .{name.asSlice()});
             },
             .store_global_by_name => {
                 continue :start;
@@ -275,7 +281,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             },
             .build_function => {
                 const func = try Function.withExecutable(vm.gc, constants[data.bin.lhs].toObject().as(Executable));
-                registers[data.bin.rhs] = Value.object(Object.from(func));
+                registers[data.bin.rhs] = Value.object(func);
                 continue :start;
             },
             .object_create => {
@@ -355,6 +361,16 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 if (!callee_obj.isFunction()) {
                     return vm.raiseException(.type_error, "non callable object", .{});
                 }
+
+                if (callee_obj.asNativeFunction()) |native_function| {
+                    const args = try vm.gpa.alloc(Value, data.call.args.len);
+                    defer vm.gpa.free(args);
+                    for (data.call.args, 0..) |arg, i| {
+                        args[i] = record.registers[arg];
+                    }
+                    _ = native_function.function(vm, Object.from(native_function), args);
+                    continue :start;
+                }
                 const function: *Function = callee_obj.as(Function);
                 const parent_record = vm.records.getLast();
                 vm.records.appendAssumeCapacity(try ActivationRecord.init(function.data.executable, &vm.register_pool));
@@ -387,15 +403,15 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 continue :start;
             },
             .ret_none => {
-                return Value.none();
+                return Value.None;
             },
             .hlt => {
-                return Value.none();
+                return Value.None;
             },
         }
     }
 
-    return Value.none();
+    return Value.None;
 }
 
 pub inline fn raiseException(vm: *Vm, tag: Exception.Tag, comptime fmt: []const u8, args: anytype) Error!Value {

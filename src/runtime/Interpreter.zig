@@ -6,6 +6,8 @@ const StringInterner = @import("StringInterner.zig");
 const Vm = @import("Vm.zig");
 const Generator = @import("../core/Generator.zig");
 const Exception = @import("Exception.zig");
+const Object = @import("Object.zig");
+const GlobalObject = @import("GlobalObject.zig");
 
 const Interpreter = @This();
 
@@ -15,6 +17,7 @@ gc: Gc,
 string_interner: StringInterner = undefined,
 vm: *Vm = undefined,
 exception: ?*Exception = null,
+builtins: *Object = undefined,
 
 // running_module: *Module,
 
@@ -28,6 +31,7 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
 
     interpreter.vm = try Vm.init(gpa, interpreter);
     interpreter.string_interner = StringInterner.init(&interpreter.gc);
+    interpreter.builtins = try GlobalObject.new(&interpreter.gc);
 
     return interpreter;
 }

@@ -5,9 +5,11 @@ const PropertyKey = @import("property_map.zig").PropertyKey;
 const Gc = @import("../core/Gc.zig");
 const Object = @This();
 const Function = @import("Function.zig");
+const NativeFunction = @import("NativeFunction.zig");
 const String = @import("String.zig");
 const Value = @import("../core/Value.zig");
 const ObjectSet = @import("ObjectSet.zig");
+const Interpreter = @import("Interpreter.zig");
 
 marked: bool = false,
 ptr: *anyopaque, // do i really need this ?
@@ -43,7 +45,7 @@ pub fn get(obj: *Object, key: PropertyKey) ?Value {
 }
 
 pub inline fn isFunction(obj: *Object) bool {
-    return obj.type_descriptor == &Function.type_descriptor;
+    return obj.type_descriptor == &Function.type_descriptor or obj.type_descriptor == &NativeFunction.type_descriptor;
 }
 
 pub inline fn asString(obj: *Object) ?*String {
@@ -51,6 +53,20 @@ pub inline fn asString(obj: *Object) ?*String {
         return obj.as(String);
     }
     return null;
+}
+
+pub inline fn asFunction(obj: *Object) ?*Function {
+    return if (obj.type_descriptor == &Function.type_descriptor) obj.as(Function) else null;
+}
+
+pub inline fn asNativeFunction(obj: *Object) ?*NativeFunction {
+    return if (obj.type_descriptor == &NativeFunction.type_descriptor) obj.as(NativeFunction) else null;
+}
+
+pub inline fn defineNativeFunction(obj: *Object, interpreter: *Interpreter, name: []const u8, func: NativeFunction.Function, arity: u8, isVariadic: bool) !void {
+    const function_name = try interpreter.string_interner.intern(name);
+    const function = try NativeFunction.new(&interpreter.gc, func, arity, isVariadic);
+    try obj.set(function_name.toPropertyKey(), Value.object(function));
 }
 
 pub const Base = struct {
@@ -70,9 +86,7 @@ pub const Base = struct {
                 const object = value.toObject();
                 try object.type_descriptor.visit(object, live_objects);
             }
-
             //TODO: visit property key if it is a string
-            // even though property key string is interned
         }
     }
 
@@ -82,6 +96,5 @@ pub const Base = struct {
 };
 
 pub fn new(gc: *Gc) !*Object {
-    const base: *Base = try gc.alloc(Base);
-    return Object.from(base);
+    return try gc.alloc(Base);
 }
