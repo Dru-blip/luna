@@ -12,11 +12,13 @@ pub const Tag = enum {
     type_error,
     reference_error,
     property_error,
+    zero_division_error,
 
     pub fn toString(self: Tag) []const u8 {
         return switch (self) {
             .type_error => "TypeError",
             .property_error => "PropertyError",
+            .zero_division_error => "ZeroDivisionError",
             .reference_error => "ReferenceError",
         };
     }
@@ -101,6 +103,7 @@ pub fn buildTraceback(exception: *Exception, vm: *Vm) !void {
 
 pub fn traceString(exception: *Exception, gpa: std.mem.Allocator) ![]const u8 {
     var source_cache = SourceCache.init(gpa);
+    defer source_cache.deinit();
     var buffer: std.ArrayList(u8) = .empty;
     var writer = buffer.writer(gpa);
     try writer.print("Traceback (most recent call last):\n", .{});
@@ -111,7 +114,7 @@ pub fn traceString(exception: *Exception, gpa: std.mem.Allocator) ![]const u8 {
 
         var line_start_offset: usize = 0;
         var line_length: usize = 0;
-        extract_source_line(source, &frame.location, &line_start_offset, &line_length);
+        extractSourceLine(source, &frame.location, &line_start_offset, &line_length);
         try writer.print("\t{s}\n\t", .{source[line_start_offset .. line_start_offset + line_length]});
         for (0..(frame.location.start - line_start_offset)) |_| {
             try writer.print(" ", .{});
@@ -149,7 +152,7 @@ fn readFile(path: []const u8, gpa: std.mem.Allocator) ![]const u8 {
     return buffer;
 }
 
-fn extract_source_line(
+fn extractSourceLine(
     source: []const u8,
     loc: *const Loc,
     line_start_offset: *usize,

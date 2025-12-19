@@ -57,6 +57,7 @@ pub const Node = struct {
 
         identifier,
         int_literal,
+        float_literal,
         bool_literal,
         none_literal,
     };
@@ -70,6 +71,7 @@ pub const Node = struct {
         list: []*const Node,
         opt: ?*Node,
         int: i64,
+        float: f64,
         bool: bool,
         none: void,
         string: []const u8,
@@ -166,6 +168,12 @@ pub fn makeExprStmt(ast: *Ast, expr: *Node) !*Node {
 pub fn makeIntLiteral(ast: *Ast, loc: Token.Loc, value: i64) !*Node {
     var node = try makeNode(ast, .int_literal, loc);
     node.data = .{ .int = value };
+    return node;
+}
+
+pub fn makeFloatLiteral(ast: *Ast, loc: Token.Loc, value: f64) !*Node {
+    var node = try makeNode(ast, .float_literal, loc);
+    node.data = .{ .float = value };
     return node;
 }
 

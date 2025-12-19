@@ -71,19 +71,10 @@ pub const PropertyMap = struct {
             };
         }
         pub fn eql(_: @This(), a: PropertyKey, b: PropertyKey) bool {
+            if (std.meta.activeTag(a) != std.meta.activeTag(b)) return false;
             return switch (a) {
-                .int => |i| {
-                    return switch (b) {
-                        .int => |j| i == j,
-                        .string => |_| false,
-                    };
-                },
-                .string => |s| {
-                    return switch (b) {
-                        .int => |_| false,
-                        .string => |t| s.eql(t),
-                    };
-                },
+                .int => |i| i == b.int,
+                .string => |s| s.eql(b.string),
             };
         }
     };

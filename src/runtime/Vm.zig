@@ -137,15 +137,15 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 continue :start;
             },
             .load_true => {
-                registers[data.un] = Value.bool(true);
+                registers[data.un] = Value.True;
                 continue :start;
             },
             .load_false => {
-                registers[data.un] = Value.bool(false);
+                registers[data.un] = Value.False;
                 continue :start;
             },
             .load_none => {
-                registers[data.un] = Value.none();
+                registers[data.un] = Value.None;
                 continue :start;
             },
             .store_global_by_index => {
@@ -175,8 +175,16 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             .add => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.isInt() and rhs.isInt()) {
-                    registers[data.tri.dst] = Value.int(lhs.toInt() + rhs.toInt());
+
+                // Bool and Int
+                if (lhs.isInteger() and rhs.isInteger()) {
+                    registers[data.tri.dst] = Value.int(lhs.asInt() + rhs.asInt());
+                    continue :start;
+                }
+
+                // Float
+                if (lhs.isNumeric() and rhs.isNumeric()) {
+                    registers[data.tri.dst] = Value.float(lhs.asFloat() + rhs.asFloat());
                     continue :start;
                 }
 
@@ -185,8 +193,14 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             .sub => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.isInt() and rhs.isInt()) {
-                    registers[data.tri.dst] = Value.int(lhs.toInt() - rhs.toInt());
+
+                if (lhs.isInteger() and rhs.isInteger()) {
+                    registers[data.tri.dst] = Value.int(lhs.asInt() - rhs.asInt());
+                    continue :start;
+                }
+
+                if (lhs.isNumeric() and rhs.isNumeric()) {
+                    registers[data.tri.dst] = Value.float(lhs.asFloat() - rhs.asFloat());
                     continue :start;
                 }
 
@@ -195,59 +209,114 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             .mul => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.isInt() and rhs.isInt()) {
-                    registers[data.tri.dst] = Value.int(lhs.toInt() * rhs.toInt());
+
+                if (lhs.isInteger() and rhs.isInteger()) {
+                    registers[data.tri.dst] = Value.int(lhs.asInt() * rhs.asInt());
                     continue :start;
                 }
+
+                if (lhs.isNumeric() and rhs.isNumeric()) {
+                    registers[data.tri.dst] = Value.float(lhs.asFloat() * rhs.asFloat());
+                    continue :start;
+                }
+
                 return vm.raiseTypeException("*", lhs, rhs);
             },
             .div => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.isInt() and rhs.isInt()) {
-                    if (rhs.toInt() == 0) {
-                        //TODO: throw error for division by zero
+
+                if (lhs.isInteger() and rhs.isInteger()) {
+                    const lvalue = lhs.asInt();
+                    const rvalue = rhs.asInt();
+                    if (rvalue == 0) {
+                        return vm.raiseException(.zero_division_error, "division by zero", .{});
                     }
-                    registers[data.tri.dst] = Value.int(@divFloor(lhs.toInt(), rhs.toInt()));
+                    registers[data.tri.dst] = Value.int(@divFloor(lvalue, rvalue));
                     continue :start;
                 }
+
+                if (lhs.isNumeric() and rhs.isNumeric()) {
+                    const lvalue = lhs.asFloat();
+                    const rvalue = rhs.asFloat();
+                    if (rvalue == 0.0) {
+                        return vm.raiseException(.zero_division_error, "division by zero", .{});
+                    }
+                    registers[data.tri.dst] = Value.float(@divFloor(lvalue, rvalue));
+                    continue :start;
+                }
+
                 return vm.raiseTypeException("/", lhs, rhs);
             },
             .mod => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.isInt() and rhs.isInt()) {
-                    if (rhs.toInt() == 0) {
-                        //TODO: throw error for division by zero
+
+                if (lhs.isInteger() and rhs.isInteger()) {
+                    const lvalue = lhs.asInt();
+                    const rvalue = rhs.asInt();
+                    if (rvalue == 0) {
+                        return vm.raiseException(.zero_division_error, "modulo by zero", .{});
                     }
-                    registers[data.tri.dst] = Value.int(@mod(lhs.toInt(), rhs.toInt()));
+                    registers[data.tri.dst] = Value.int(@mod(lvalue, rvalue));
                     continue :start;
                 }
+
+                if (lhs.isNumeric() and rhs.isNumeric()) {
+                    const lvalue = lhs.asFloat();
+                    const rvalue = rhs.asFloat();
+                    if (rvalue == 0.0) {
+                        return vm.raiseException(.zero_division_error, "modulo by zero", .{});
+                    }
+                    registers[data.tri.dst] = Value.float(@mod(lvalue, rvalue));
+                    continue :start;
+                }
+
                 return vm.raiseTypeException("%", lhs, rhs);
             },
             .test_lt => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.isInt() and rhs.isInt()) {
-                    registers[data.tri.dst] = Value.bool(lhs.toInt() < rhs.toInt());
+
+                if (lhs.isInteger() and rhs.isInteger()) {
+                    registers[data.tri.dst] = Value.bool(lhs.asInt() < rhs.asInt());
                     continue :start;
                 }
+
+                if (lhs.isNumeric() and rhs.isNumeric()) {
+                    registers[data.tri.dst] = Value.bool(lhs.asFloat() < rhs.asFloat());
+                    continue :start;
+                }
+
                 return vm.raiseTypeException("<", lhs, rhs);
             },
             .test_le => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.isInt() and rhs.isInt()) {
-                    registers[data.tri.dst] = Value.bool(lhs.toInt() <= rhs.toInt());
+
+                if (lhs.isInteger() and rhs.isInteger()) {
+                    registers[data.tri.dst] = Value.bool(lhs.asInt() <= rhs.asInt());
                     continue :start;
                 }
+
+                if (lhs.isNumeric() and rhs.isNumeric()) {
+                    registers[data.tri.dst] = Value.bool(lhs.asFloat() <= rhs.asFloat());
+                    continue :start;
+                }
+
                 return vm.raiseTypeException("<=", lhs, rhs);
             },
             .test_gt => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.isInt() and rhs.isInt()) {
-                    registers[data.tri.dst] = Value.bool(lhs.toInt() > rhs.toInt());
+
+                if (lhs.isInteger() and rhs.isInteger()) {
+                    registers[data.tri.dst] = Value.bool(lhs.asInt() > rhs.asInt());
+                    continue :start;
+                }
+
+                if (lhs.isNumeric() and rhs.isNumeric()) {
+                    registers[data.tri.dst] = Value.bool(lhs.asFloat() > rhs.asFloat());
                     continue :start;
                 }
                 return vm.raiseTypeException(">", lhs, rhs);
@@ -255,29 +324,52 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             .test_ge => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.isInt() and rhs.isInt()) {
-                    registers[data.tri.dst] = Value.bool(lhs.toInt() >= rhs.toInt());
+
+                if (lhs.isInteger() and rhs.isInteger()) {
+                    registers[data.tri.dst] = Value.bool(lhs.asInt() >= rhs.asInt());
                     continue :start;
                 }
+
+                if (lhs.isNumeric() and rhs.isNumeric()) {
+                    registers[data.tri.dst] = Value.bool(lhs.asFloat() >= rhs.asFloat());
+                    continue :start;
+                }
+
                 return vm.raiseTypeException(">=", lhs, rhs);
             },
             .test_eq => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.isInt() and rhs.isInt()) {
-                    registers[data.tri.dst] = Value.bool(lhs.toInt() == rhs.toInt());
+
+                if (lhs.isInteger() and rhs.isInteger()) {
+                    registers[data.tri.dst] = Value.bool(lhs.asInt() == rhs.asInt());
                     continue :start;
                 }
-                return vm.raiseTypeException("==", lhs, rhs);
+
+                if (lhs.isNumeric() and rhs.isNumeric()) {
+                    registers[data.tri.dst] = Value.bool(lhs.asFloat() == rhs.asFloat());
+                    continue :start;
+                }
+
+                registers[data.tri.dst] = Value.bool(lhs.eql(rhs));
+                continue :start;
             },
             .test_neq => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-                if (lhs.isInt() and rhs.isInt()) {
-                    registers[data.tri.dst] = Value.bool(lhs.toInt() != rhs.toInt());
+
+                if (lhs.isInteger() and rhs.isInteger()) {
+                    registers[data.tri.dst] = Value.bool(lhs.asInt() != rhs.asInt());
                     continue :start;
                 }
-                return vm.raiseTypeException("!=", lhs, rhs);
+
+                if (lhs.isNumeric() and rhs.isNumeric()) {
+                    registers[data.tri.dst] = Value.bool(lhs.asFloat() != rhs.asFloat());
+                    continue :start;
+                }
+
+                registers[data.tri.dst] = Value.bool(!lhs.eql(rhs));
+                continue :start;
             },
             .build_function => {
                 const func = try Function.withExecutable(vm.gc, constants[data.bin.lhs].toObject().as(Executable));
@@ -372,13 +464,13 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     continue :start;
                 }
                 const function: *Function = callee_obj.as(Function);
-                const parent_record = vm.records.getLast();
+                const caller_record = vm.records.getLast();
                 vm.records.appendAssumeCapacity(try ActivationRecord.init(function.data.executable, &vm.register_pool));
                 record = &vm.records.items[vm.records.items.len - 1];
                 record.caller_return_reg = data.call.ret;
 
                 for (data.call.args, 0..) |arg, i| {
-                    record.registers[i] = parent_record.registers[arg];
+                    record.registers[i] = caller_record.registers[arg];
                 }
 
                 registers = record.registers;
@@ -388,7 +480,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 continue :start;
             },
             .ret => {
-                var child_record = vm.records.pop().?;
+                var callee = vm.records.pop().?;
                 if (vm.records.items.len == 0) {
                     return registers[data.un];
                 }
@@ -398,8 +490,8 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 instructions = record.executable.instructions;
                 constants = record.executable.constants;
                 identifiers = record.executable.identifiers;
-                record.registers[child_record.caller_return_reg] = child_record.registers[data.un];
-                child_record.deinit(&vm.register_pool);
+                record.registers[callee.caller_return_reg] = callee.registers[data.un];
+                callee.deinit(&vm.register_pool);
                 continue :start;
             },
             .ret_none => {
@@ -414,11 +506,11 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
     return Value.None;
 }
 
+pub fn raiseTypeException(vm: *Vm, comptime op: []const u8, lhs: Value, rhs: Value) Error!Value {
+    return vm.raiseException(.type_error, "invalid operand types for operation (\"{s}\"): {s} and {s}", .{ op, lhs.getTypeString(), rhs.getTypeString() });
+}
+
 pub inline fn raiseException(vm: *Vm, tag: Exception.Tag, comptime fmt: []const u8, args: anytype) Error!Value {
     vm.interpreter.exception = try Exception.withMessage(vm, tag, fmt, args);
     return Error.ExceptionThrown;
-}
-
-pub fn raiseTypeException(vm: *Vm, comptime op: []const u8, lhs: Value, rhs: Value) Error!Value {
-    return vm.raiseException(.type_error, "invalid operand types for operation (\"{s}\"): {s} and {s}", .{ op, lhs.getTypeString(), rhs.getTypeString() });
 }

@@ -10,6 +10,7 @@ data: Data,
 
 pub const Type = enum {
     int,
+    float,
     bool,
     none,
     undefined,
@@ -18,6 +19,7 @@ pub const Type = enum {
 
 pub const Data = union(Type) {
     int: i64,
+    float: f64,
     bool: bool,
     none: void,
     undefined: void,
@@ -33,13 +35,17 @@ pub inline fn int(value: i64) Value {
     };
 }
 
-pub inline fn @"bool"(value: bool) Value {
+pub inline fn float(value: f64) Value {
     return .{
-        .type = .bool,
+        .type = .float,
         .data = .{
-            .bool = value,
+            .float = value,
         },
     };
+}
+
+pub inline fn @"bool"(value: bool) Value {
+    return if (value) True else False;
 }
 
 pub const None: Value = .{
@@ -56,23 +62,19 @@ pub const Undefined: Value = .{
     },
 };
 
-pub inline fn none() Value {
-    return .{
-        .type = .none,
-        .data = .{
-            .none = {},
-        },
-    };
-}
+pub const True: Value = .{
+    .type = .bool,
+    .data = .{
+        .bool = true,
+    },
+};
 
-pub inline fn @"undefined"() Value {
-    return .{
-        .type = .undefined,
-        .data = .{
-            .undefined = {},
-        },
-    };
-}
+pub const False: Value = .{
+    .type = .bool,
+    .data = .{
+        .bool = false,
+    },
+};
 
 pub inline fn object(obj: *Object) Value {
     return .{
@@ -85,6 +87,10 @@ pub inline fn object(obj: *Object) Value {
 
 pub inline fn isInt(value: Value) bool {
     return value.type == .int;
+}
+
+pub inline fn isFloat(value: Value) bool {
+    return value.type == .float;
 }
 
 pub inline fn isBool(value: Value) bool {
@@ -119,8 +125,51 @@ pub inline fn asObject(value: Value) ?*Object {
     return if (value.type == .object) value.data.object else null;
 }
 
+pub inline fn asInt(value: Value) i64 {
+    return switch (value.type) {
+        .int => value.data.int,
+        .bool => @intFromBool(value.data.bool),
+        else => unreachable,
+    };
+}
+
+pub inline fn asFloat(value: Value) f64 {
+    return switch (value.type) {
+        .float => value.data.float,
+        .int => @as(f64, @floatFromInt(value.data.int)),
+        .bool => @as(f64, @floatFromInt(@intFromBool(value.data.bool))),
+        else => unreachable,
+    };
+}
+
+pub inline fn isFalsy(v: Value) bool {
+    return v.type == .none or (v.type == .bool and v.data.bool == false);
+}
+
+pub inline fn isTruthy(v: Value) bool {
+    return !isFalsy(v);
+}
+
+pub inline fn isInteger(value: Value) bool {
+    return value.type == .int or value.type == .bool;
+}
+
+pub inline fn isNumeric(value: Value) bool {
+    return value.type == .int or value.type == .float or value.type == .bool;
+}
+
+pub inline fn getTypeString(v: Value) []const u8 {
+    return switch (v.type) {
+        .int => "int",
+        .bool => "bool",
+        .float => "float",
+        .object => "object",
+        .none => "none",
+        .undefined => "undefined",
+    };
+}
+
 pub inline fn toPropertyKey(value: Value) ?PropertyKey {
-    //TODO: raise error if value is not an integer or string
     return switch (value.type) {
         .int => PropertyKey.fromInt(value.data.int),
         .object => {
@@ -134,20 +183,13 @@ pub inline fn toPropertyKey(value: Value) ?PropertyKey {
     };
 }
 
-pub inline fn isFalsy(v: Value) bool {
-    return v.type == .none or (v.type == .bool and v.data.bool == false);
-}
-
-pub inline fn isTruthy(v: Value) bool {
-    return !isFalsy(v);
-}
-
-pub inline fn getTypeString(v: Value) []const u8 {
-    return switch (v.type) {
-        .int => "int",
-        .bool => "bool",
-        .object => "object",
-        .none => "none",
-        .undefined => "undefined",
+pub fn eql(a: Value, b: Value) bool {
+    if (a.type != b.type) return false;
+    return switch (a.type) {
+        .int => a.data.int == b.data.int,
+        .float => a.data.float == b.data.float,
+        .bool => a.data.bool == b.data.bool,
+        .none, .undefined => true,
+        .object => a.data.object == b.data.object,
     };
 }

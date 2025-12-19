@@ -47,7 +47,7 @@ pub fn runFile(i: *Interpreter, path: []const u8) !Value {
     buffer[file_stats.size] = 0;
 
     var ast = Ast.parse(path, buffer[0..file_stats.size :0], i.gc.gpa) catch {
-        return Value.none();
+        return Value.None;
     };
     defer ast.deinit();
 
@@ -58,14 +58,14 @@ pub fn runFile(i: *Interpreter, path: []const u8) !Value {
     const result = i.vm.runExecutable(executable) catch |err| {
         switch (err) {
             error.OutOfMemory => {
-                return Value.none();
+                return Value.None;
             },
             error.RegisterPoolExhausted => {
-                return Value.none();
+                return Value.None;
             },
             error.ExceptionThrown => {
                 std.debug.print("{s}\n", .{try i.exception.?.traceString(i.gc.gpa)});
-                return Value.none();
+                return Value.None;
             },
         }
     };

@@ -63,6 +63,7 @@ pub const Token = struct {
         dot,
 
         int,
+        float,
         identifier,
         keyword_return,
         keyword_true,
@@ -133,6 +134,7 @@ const State = enum {
     slash,
     modulus,
     int,
+    float,
     equal,
     less,
     greater,
@@ -383,6 +385,17 @@ pub fn next(self: *Tokenizer) Token {
             self.advance();
             switch (self.buffer[self.index]) {
                 '0'...'9' => continue :state .int,
+                '.' => {
+                    result.tag = .float;
+                    continue :state .float;
+                },
+                else => {},
+            }
+        },
+        .float => {
+            self.advance();
+            switch (self.buffer[self.index]) {
+                '0'...'9' => continue :state .float,
                 else => {},
             }
         },

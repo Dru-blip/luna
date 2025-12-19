@@ -21,8 +21,11 @@ fn log(_: *Vm, _: *Object, args: []Value) Value {
             .int => {
                 std.debug.print("{d} ", .{arg.data.int});
             },
+            .float => {
+                std.debug.print("{any} ", .{arg.data.float});
+            },
             .bool => {
-                std.debug.print("{any} ", .{arg.data.bool});
+                std.debug.print("{s} ", .{if (arg.data.bool) "true" else "false"});
             },
             .none => {
                 std.debug.print("none", .{});
