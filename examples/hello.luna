@@ -1,1 +1,7 @@
-"hello"
+let a={
+    hello:fn(){
+        console.log(1)
+    }
+}
+
+a["hello"]()

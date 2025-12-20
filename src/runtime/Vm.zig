@@ -419,7 +419,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                             registers[data.tri.dst] = v;
                             continue :start;
                         }
-                        return vm.raiseException(.property_error, "{d}", .{property.toInt()});
+                        return vm.raiseException(.property_error, "{s}", .{property.getTypeString()});
                     }
                     return vm.raiseException(.property_error, "invalid property key type: {s}", .{property.getTypeString()});
                 }

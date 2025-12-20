@@ -412,7 +412,7 @@ fn parsePrimaryExpr(p: *Parser) ParserError!*Node {
         },
         .string => {
             p.advance();
-            const value = p.source[token.loc.start + 1 .. token.loc.end - 1];
+            const value = p.source[token.loc.start .. token.loc.end - 1];
             return try p.ast.makeStringLiteral(token.loc, value);
         },
         .identifier => {

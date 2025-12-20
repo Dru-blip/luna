@@ -579,6 +579,9 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
                 .member_expr => {
                     data.call.callee = try g.genMemberExpr(node.data.call.callee, &data.call.this);
                 },
+                .computed_member_expr => {
+                    data.call.callee = try g.genComputedMemberExpr(node.data.call.callee, &data.call.this);
+                },
                 else => unreachable,
             }
 
@@ -623,18 +626,7 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
             return try g.genMemberExpr(node, null);
         },
         .computed_member_expr => {
-            const object = try g.genExpr(node.data.bin.lhs);
-
-            const index = if (node.data.bin.rhs.tag == .identifier) blk: {
-                const property_ident_index = try g.addIdentifier(node.data.bin.rhs.data.string);
-                const ident_reg = g.allocRegister();
-                try g.addBin(.load_ident, property_ident_index, ident_reg, node.loc);
-                break :blk ident_reg;
-            } else try g.genExpr(node.data.bin.rhs);
-
-            const dst = g.allocRegister();
-            try g.addTri(.object_subscript_get, object, index, dst, node.loc);
-            return dst;
+            return try g.genComputedMemberExpr(node, null);
         },
         .function_expr => return try g.genFunctionExpr(node),
         else => {
@@ -678,6 +670,25 @@ inline fn genIdentifier(g: *Generator, node: *const Ast.Node) GenError!u32 {
     dst = g.allocRegister();
     const identifier_index = try g.addIdentifier(node.data.string);
     try g.addBin(.load_global_by_name, identifier_index, dst, node.loc);
+    return dst;
+}
+
+inline fn genComputedMemberExpr(g: *Generator, node: *const Ast.Node, this_reg: ?*u32) GenError!u32 {
+    const object = try g.genExpr(node.data.bin.lhs);
+
+    const index = if (node.data.bin.rhs.tag == .identifier) blk: {
+        const property_ident_index = try g.addIdentifier(node.data.bin.rhs.data.string);
+        const ident_reg = g.allocRegister();
+        try g.addBin(.load_ident, property_ident_index, ident_reg, node.loc);
+        break :blk ident_reg;
+    } else try g.genExpr(node.data.bin.rhs);
+
+    if (this_reg) |this| {
+        this.* = object;
+    }
+
+    const dst = g.allocRegister();
+    try g.addTri(.object_subscript_get, object, index, dst, node.loc);
     return dst;
 }
 
