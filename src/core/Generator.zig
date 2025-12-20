@@ -490,6 +490,12 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
             try g.addUn(.load_none, reg, node.loc);
             return reg;
         },
+        .string_literal => {
+            const reg = g.allocRegister();
+            const const_index = try g.addConstant(Value.object(try String.new(g.gc, node.data.string)));
+            try g.addBin(.load_const, const_index, reg, node.loc);
+            return reg;
+        },
         .identifier => {
             return try g.genIdentifier(node);
         },
@@ -647,8 +653,6 @@ inline fn genFunctionExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
     }
     try func_gen.genStmt(node.data.fndecl.body);
 
-    //TODO: we dont need a register for the return value but we allocated it anyways,
-    // have to remove it.
     try func_gen.addUn(.ret_none, func_gen.allocRegister(), node.loc);
     var executable = try func_gen.finalize();
     executable.name = try g.string_interner.intern("<anonymous>");

@@ -64,6 +64,7 @@ pub const Token = struct {
 
         int,
         float,
+        string,
         identifier,
         keyword_return,
         keyword_true,
@@ -137,6 +138,8 @@ const State = enum {
     modulus,
     int,
     float,
+    string,
+    string_escape,
     equal,
     less,
     greater,
@@ -256,6 +259,14 @@ pub fn next(self: *Tokenizer) Token {
                 result.loc.line = self.line;
                 result.tag = .identifier;
                 continue :state .identifier;
+            },
+            '"', '\'' => {
+                self.advance();
+                result.tag = .string;
+                result.loc.start = self.index;
+                result.loc.col = self.col;
+                result.loc.line = self.line;
+                continue :state .string;
             },
             else => continue :state .invalid,
         },
@@ -399,6 +410,36 @@ pub fn next(self: *Tokenizer) Token {
             switch (self.buffer[self.index]) {
                 '0'...'9' => continue :state .float,
                 else => {},
+            }
+        },
+        .string => {
+            self.advance();
+            switch (self.buffer[self.index]) {
+                0, '\n' => {
+                    result.tag = .invalid;
+                },
+                '"' => {
+                    self.advance();
+                    result.loc.end = self.index;
+                    return result;
+                },
+                '\\' => {
+                    continue :state .string_escape;
+                },
+                else => {
+                    continue :state .string;
+                },
+            }
+        },
+        .string_escape => {
+            switch (self.buffer[self.index]) {
+                '"', '\'', '\\', 'n', 't', 'r' => {
+                    self.advance();
+                    continue :state .string;
+                },
+                else => {
+                    result.tag = .invalid;
+                },
             }
         },
         .invalid => {

@@ -63,6 +63,7 @@ pub const Node = struct {
         float_literal,
         bool_literal,
         none_literal,
+        string_literal,
     };
 
     const Data = union {
@@ -177,6 +178,12 @@ pub fn makeIntLiteral(ast: *Ast, loc: Token.Loc, value: i64) !*Node {
 pub fn makeFloatLiteral(ast: *Ast, loc: Token.Loc, value: f64) !*Node {
     var node = try makeNode(ast, .float_literal, loc);
     node.data = .{ .float = value };
+    return node;
+}
+
+pub fn makeStringLiteral(ast: *Ast, loc: Token.Loc, value: []const u8) !*Node {
+    var node = try makeNode(ast, .string_literal, loc);
+    node.data = .{ .string = value };
     return node;
 }
 

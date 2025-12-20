@@ -410,6 +410,11 @@ fn parsePrimaryExpr(p: *Parser) ParserError!*Node {
             const value = try std.fmt.parseFloat(f64, p.source[token.loc.start..token.loc.end]);
             return try p.ast.makeFloatLiteral(token.loc, value);
         },
+        .string => {
+            p.advance();
+            const value = p.source[token.loc.start + 1 .. token.loc.end - 1];
+            return try p.ast.makeStringLiteral(token.loc, value);
+        },
         .identifier => {
             p.advance();
             const name = p.source[token.loc.start..token.loc.end];
