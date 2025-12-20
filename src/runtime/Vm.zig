@@ -456,27 +456,31 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     return vm.raiseException(.type_error, "non callable value", .{});
                 }
                 const callee_obj = callee.toObject();
+
                 if (!callee_obj.isFunction()) {
                     return vm.raiseException(.type_error, "non callable object", .{});
                 }
 
+                const this_value = registers[data.call.this];
                 if (callee_obj.asNativeFunction()) |native_function| {
                     const args = try vm.gpa.alloc(Value, data.call.args.len);
                     defer vm.gpa.free(args);
                     for (data.call.args, 0..) |arg, i| {
                         args[i] = record.registers[arg];
                     }
-                    _ = native_function.function(vm, Object.from(native_function), args);
+                    _ = native_function.function(vm, this_value.toObject(), args);
                     continue :start;
                 }
+
                 const function: *Function = callee_obj.as(Function);
                 const caller_record = vm.records.getLast();
                 vm.records.appendAssumeCapacity(try ActivationRecord.init(function.data.executable, &vm.register_pool));
                 record = &vm.records.items[vm.records.items.len - 1];
                 record.caller_return_reg = data.call.ret;
 
+                record.registers[0] = this_value;
                 for (data.call.args, 0..) |arg, i| {
-                    record.registers[i] = caller_record.registers[arg];
+                    record.registers[i + 1] = caller_record.registers[arg];
                 }
 
                 registers = record.registers;
@@ -501,7 +505,19 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 continue :start;
             },
             .ret_none => {
-                return Value.None;
+                var callee = vm.records.pop().?;
+                if (vm.records.items.len == 0) {
+                    return Value.None;
+                }
+                record = &vm.records.items[vm.records.items.len - 1];
+
+                registers = record.registers;
+                instructions = record.executable.instructions;
+                constants = record.executable.constants;
+                identifiers = record.executable.identifiers;
+                record.registers[callee.caller_return_reg] = Value.None;
+                callee.deinit(&vm.register_pool);
+                continue :start;
             },
             .hlt => {
                 return Value.None;

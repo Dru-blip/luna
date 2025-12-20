@@ -55,6 +55,8 @@ pub const Node = struct {
         member_expr,
         computed_member_expr,
 
+        this_expr,
+
         identifier,
         int_literal,
         float_literal,

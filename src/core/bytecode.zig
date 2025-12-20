@@ -69,7 +69,7 @@ pub const Inst = struct {
         },
         call: struct {
             callee: u32,
-            self: u32,
+            this: u32,
             ret: u32,
             args: []u32,
         },

@@ -465,6 +465,9 @@ fn genBlockStmt(g: *Generator, node: *const Ast.Node) GenError!void {
 
 fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
     switch (node.tag) {
+        .this_expr => {
+            return 0;
+        },
         .int_literal => {
             const reg = g.allocRegister();
             const const_index = try g.addConstant(Value.int(node.data.int));
@@ -488,21 +491,7 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
             return reg;
         },
         .identifier => {
-            var variable: Variable = undefined;
-            var dst: u32 = undefined;
-            if (g.findVariable(node.data.string, &variable)) {
-                if (variable.scope == .local) {
-                    return variable.allocated_reg_slot;
-                }
-                dst = g.allocRegister();
-                try g.addBin(.load_global_by_index, variable.allocated_reg_slot, dst, node.loc);
-                return dst;
-            }
-
-            dst = g.allocRegister();
-            const identifier_index = try g.addIdentifier(node.data.string);
-            try g.addBin(.load_global_by_name, identifier_index, dst, node.loc);
-            return dst;
+            return try g.genIdentifier(node);
         },
         .add => {
             return try g.genBinOp(.add, node);
@@ -568,20 +557,36 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
             return value;
         },
         .call => {
-            const callee = try g.genExpr(node.data.call.callee);
+            var data: Inst.Data = .{
+                .call = .{
+                    .args = undefined,
+                    .callee = 0,
+                    .this = 0,
+                    .ret = 0,
+                },
+            };
+            switch (node.data.call.callee.tag) {
+                .identifier => {
+                    data.call.callee = try g.genIdentifier(node.data.call.callee);
+                    data.call.this = data.call.callee;
+                },
+                .member_expr => {
+                    data.call.callee = try g.genMemberExpr(node.data.call.callee, &data.call.this);
+                },
+                else => unreachable,
+            }
+
             var args: std.ArrayList(u32) = .empty;
             for (node.data.call.args) |arg| {
                 const arg_value = try g.genExpr(arg);
                 try args.append(g.gpa, arg_value);
             }
-            const ret = g.allocRegister();
-            try g.addInst(.call, .{ .call = .{
-                .callee = callee,
-                .self = 0,
-                .ret = ret,
-                .args = try args.toOwnedSlice(g.gpa),
-            } }, node.loc);
-            return ret;
+
+            data.call.args = try args.toOwnedSlice(g.gpa);
+            data.call.ret = g.allocRegister();
+
+            try g.addInst(.call, data, node.loc);
+            return data.call.ret;
         },
         .object_expr => {
             const object = g.allocRegister();
@@ -609,12 +614,7 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
             return object;
         },
         .member_expr => {
-            const object = try g.genExpr(node.data.member.object);
-            const dst = g.allocRegister();
-            const ident = try g.string_interner.intern(node.data.member.property);
-            const key_index = try g.addConstant(Value.object(Object.from(ident)));
-            try g.addTri(.object_get_property, object, key_index, dst, node.loc);
-            return dst;
+            return try g.genMemberExpr(node, null);
         },
         .computed_member_expr => {
             const object = try g.genExpr(node.data.bin.lhs);
@@ -634,6 +634,36 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
             unreachable;
         },
     }
+}
+
+inline fn genIdentifier(g: *Generator, node: *const Ast.Node) GenError!u32 {
+    var variable: Variable = undefined;
+    var dst: u32 = undefined;
+    if (g.findVariable(node.data.string, &variable)) {
+        if (variable.scope == .local) {
+            return variable.allocated_reg_slot;
+        }
+        dst = g.allocRegister();
+        try g.addBin(.load_global_by_index, variable.allocated_reg_slot, dst, node.loc);
+        return dst;
+    }
+
+    dst = g.allocRegister();
+    const identifier_index = try g.addIdentifier(node.data.string);
+    try g.addBin(.load_global_by_name, identifier_index, dst, node.loc);
+    return dst;
+}
+
+inline fn genMemberExpr(g: *Generator, node: *const Ast.Node, this_reg: ?*u32) GenError!u32 {
+    const object = try g.genExpr(node.data.member.object);
+    const dst = g.allocRegister();
+    const ident = try g.string_interner.intern(node.data.member.property);
+    const key_index = try g.addConstant(Value.object(Object.from(ident)));
+    try g.addTri(.object_get_property, object, key_index, dst, node.loc);
+    if (this_reg) |this| {
+        this.* = object;
+    }
+    return dst;
 }
 
 inline fn genAssignSimple(g: *Generator, node: *const Ast.Node, value: u32) GenError!void {
