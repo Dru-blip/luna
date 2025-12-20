@@ -6,6 +6,7 @@ const Ast = @import("Ast.zig");
 const Span = @import("Tokenizer.zig").Token.Loc;
 const Value = @import("Value.zig");
 const Gc = @import("Gc.zig");
+const Exception = @import("../runtime/Exception.zig");
 const String = @import("../runtime/String.zig");
 const Object = @import("../runtime/Object.zig");
 const StringInterner = @import("../runtime/StringInterner.zig");
@@ -28,7 +29,7 @@ blocks: std.ArrayList(*BasicBlock),
 gpa: std.mem.Allocator,
 string_interner: *StringInterner,
 current_block: *BasicBlock = undefined,
-register_count: u32,
+register_count: u32 = 1,
 free_registers: std.ArrayList(u32),
 ast: Ast,
 gc: *Gc,
@@ -69,7 +70,6 @@ pub fn init(gpa: std.mem.Allocator, ast: Ast, gc: *Gc, string_interner: *StringI
         .constants = .empty,
         .gpa = gpa,
         .ast = ast,
-        .register_count = 0,
         .free_registers = .empty,
         .gc = gc,
         .string_interner = string_interner,
@@ -155,26 +155,26 @@ fn endScope(g: *Generator) void {
     g.scope_depth -= 1;
 }
 
-fn declareVariable(g: *Generator, name: []const u8, variable: *Variable) !void {
+fn declareVariable(g: *Generator, name: []const u8, out: *Variable) !void {
     var i: usize = g.local_variables.items.len;
     while (i > 0) : (i -= 1) {
         const local = g.local_variables.items[i - 1];
         if (std.mem.eql(u8, local.name, name)) {
-            variable.* = local;
+            out.* = local;
             return;
         }
     }
 
     for (g.global_variables.items) |global| {
         if (std.mem.eql(u8, global.name, name)) {
-            variable.* = global;
+            out.* = global;
             return;
         }
     }
 
     const scope: Scope = if (g.scope_depth > 0) .local else .global;
     const slot: u32 = if (scope == .local) g.allocRegister() else @intCast(g.global_variables.items.len);
-    variable.* = .{
+    out.* = .{
         .name = name,
         .scope = scope,
         .scope_depth = g.scope_depth,
@@ -182,9 +182,9 @@ fn declareVariable(g: *Generator, name: []const u8, variable: *Variable) !void {
     };
 
     if (scope == .global) {
-        try g.global_variables.append(g.gpa, variable.*);
+        try g.global_variables.append(g.gpa, out.*);
     } else {
-        try g.local_variables.append(g.gpa, variable.*);
+        try g.local_variables.append(g.gpa, out.*);
     }
 }
 
@@ -290,18 +290,7 @@ fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
     }
 }
 
-// static void declare_param(struct generator* generator, const char* name, uint32_t name_length) {
-//     struct variable var;
-//     var.scope = SCOPE_PARAM;
-//     var.scope_depth = generator->scope_depth;
-//     var.name = name;
-//     var.name_length = name_length;
-//     var.allocated_reg = generator_allocate_register(generator);
-//     generator->local_variable_count++;
-//     arrput(generator->local_variables, var);
-// }
-
-fn declare_param(g: *Generator, name: []const u8) !void {
+fn declareParam(g: *Generator, name: []const u8) !void {
     const va = Variable{
         .scope = .local,
         .scope_depth = g.scope_depth,
@@ -321,11 +310,11 @@ fn genFuncDecl(g: *Generator, node: *const Ast.Node) GenError!void {
     func_gen.global_variables = g.global_variables;
     func_gen.scope_depth = 1;
     for (node.data.fndecl.params) |param| {
-        try func_gen.declare_param(param);
+        try func_gen.declareParam(param);
     }
     try func_gen.genStmt(node.data.fndecl.body);
 
-    //TODO: we dont need a register for the return value but we allocated it anyways
+    //TODO: we dont need a register for the return value but we allocated it anyways,
     // have to remove it.
     try func_gen.addUn(.ret_none, func_gen.allocRegister(), node.loc);
     var executable = try func_gen.finalize();
@@ -567,10 +556,15 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
                     try g.genAssignSimple(node, value);
                 },
                 else => {
-                    //TODO:  generate Error for invalid assignment
+                    var obj = try Exception.new(g.gc);
+                    var exception: *Exception = obj.as(Exception);
+                    const str_obj = try String.new(g.gc, "Invalid assignment target");
+                    exception.tag = .invalid_assignment_target_error;
+                    exception.message = str_obj.as(String);
+                    const index = try g.addConstant(Value.object(obj));
+                    try g.addUn(.build_trace_and_throw_exception, index, node.loc);
                 },
             }
-
             return value;
         },
         .call => {

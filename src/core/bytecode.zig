@@ -41,6 +41,7 @@ pub const Inst = struct {
         load_global_by_name, // uses bin
 
         build_function, // uses bin
+        build_trace_and_throw_exception, //uses un
 
         call, // uses call
 
@@ -168,6 +169,7 @@ pub const Executable = struct {
                 .store_global_by_name => try stdout.print("StoreGlobalByName names[{d}] r{d}", .{ inst.data.bin.lhs, inst.data.bin.rhs }),
                 .load_global_by_name => try stdout.print("LoadGlobalByName r{d}, names[{d}]", .{ inst.data.bin.lhs, inst.data.bin.rhs }),
                 .build_function => try stdout.print("MakeFunction r{d} e[{d}] names[{d}]", .{ inst.data.bin.lhs, inst.data.bin.rhs, inst.data.bin.rhs }),
+                .build_trace_and_throw_exception => try stdout.print("BuildTraceAndThrowException", .{}),
                 .call => {
                     try stdout.print("Call r{d} <- r{d}(", .{ inst.data.call.ret, inst.data.call.callee });
                     for (inst.data.call.args, 0..) |arg, i| {

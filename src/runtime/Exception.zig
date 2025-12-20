@@ -13,6 +13,7 @@ pub const Tag = enum {
     reference_error,
     property_error,
     zero_division_error,
+    invalid_assignment_target_error,
 
     pub fn toString(self: Tag) []const u8 {
         return switch (self) {
@@ -20,6 +21,7 @@ pub const Tag = enum {
             .property_error => "PropertyError",
             .zero_division_error => "ZeroDivisionError",
             .reference_error => "ReferenceError",
+            .invalid_assignment_target_error => "InvalidAssignmentTargetError",
         };
     }
 };
@@ -70,8 +72,10 @@ pub const type_descriptor: Object.TypeDescriptor = .{
     .finalize = finalize,
 };
 
-pub fn new(gc: *Gc) !*Exception {
+pub fn new(gc: *Gc) !*Object {
     const ex = try gc.alloc(Exception);
+    var exception: *Exception = ex.as(Exception);
+    exception.traceback = .empty;
     return ex;
 }
 

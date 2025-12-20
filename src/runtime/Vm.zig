@@ -376,6 +376,12 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 registers[data.bin.rhs] = Value.object(func);
                 continue :start;
             },
+            .build_trace_and_throw_exception => {
+                const exception: *Exception = constants[data.un].toObject().as(Exception);
+                try exception.buildTraceback(vm);
+                vm.interpreter.exception = exception;
+                return Error.ExceptionThrown;
+            },
             .object_create => {
                 const obj = try Object.new(vm.gc);
                 registers[data.un] = Value.object(obj);
