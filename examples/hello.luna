@@ -1,6 +1,8 @@
-fn hello(){
-    this.a=10
+let a={
+    b:10,
+    hello:fn(){
+        console.log(this.b)
+    }
 }
 
-hello()
-console.log(hello.a)
+a.hello()

@@ -630,10 +630,33 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
             try g.addTri(.object_subscript_get, object, index, dst, node.loc);
             return dst;
         },
+        .function_expr => return try g.genFunctionExpr(node),
         else => {
             unreachable;
         },
     }
+}
+
+inline fn genFunctionExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
+    var func_gen = try Generator.init(g.gpa, g.ast, g.gc, g.string_interner);
+    defer func_gen.deinit();
+    func_gen.global_variables = g.global_variables;
+    func_gen.scope_depth = 1;
+    for (node.data.fndecl.params) |param| {
+        try func_gen.declareParam(param);
+    }
+    try func_gen.genStmt(node.data.fndecl.body);
+
+    //TODO: we dont need a register for the return value but we allocated it anyways,
+    // have to remove it.
+    try func_gen.addUn(.ret_none, func_gen.allocRegister(), node.loc);
+    var executable = try func_gen.finalize();
+    executable.name = try g.string_interner.intern("<anonymous>");
+
+    const executable_index = try g.addConstant(Value.object(Object.from(executable)));
+    const function_index = g.allocRegister();
+    try g.addBin(.build_function, executable_index, function_index, node.loc);
+    return function_index;
 }
 
 inline fn genIdentifier(g: *Generator, node: *const Ast.Node) GenError!u32 {

@@ -56,6 +56,7 @@ pub const Node = struct {
         computed_member_expr,
 
         this_expr,
+        function_expr,
 
         identifier,
         int_literal,
@@ -313,6 +314,18 @@ pub fn makeObjectExpr(ast: *Ast, loc: Token.Loc, properties: []*const Node) !*No
     var node = try makeNode(ast, .object_expr, loc);
     node.data = .{
         .list = properties,
+    };
+    return node;
+}
+
+pub fn makeFunctionExpr(ast: *Ast, loc: Token.Loc, params: [][]const u8, body: *Node) !*Node {
+    var node = try makeNode(ast, .function_expr, loc);
+    node.data = .{
+        .fndecl = .{
+            .name = undefined,
+            .params = params,
+            .body = body,
+        },
     };
     return node;
 }

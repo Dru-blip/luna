@@ -15,6 +15,7 @@ pub fn new(gc: *Gc) !*Object {
     return obj;
 }
 
+//TODO: need formatter.
 fn log(_: *Vm, _: *Object, args: []Value) Value {
     for (args) |arg| {
         switch (arg.type) {
