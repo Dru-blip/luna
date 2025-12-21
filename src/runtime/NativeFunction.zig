@@ -5,10 +5,11 @@ const Value = @import("../core/Value.zig");
 const Object = @import("Object.zig");
 const Gc = @import("../core/Gc.zig");
 const ObjectSet = @import("ObjectSet.zig");
+const Interpreter = @import("Interpreter.zig");
 
 const NativeFunction = @This();
 
-pub const Function = *const fn (*Vm, *Object, []Value) Value;
+pub const Function = *const fn (*Vm, *Object, []Value) Interpreter.Error!Value;
 
 arity: u8,
 function: Function,

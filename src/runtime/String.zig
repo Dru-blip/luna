@@ -1,8 +1,12 @@
 const std = @import("std");
 const Gc = @import("../core/Gc.zig");
+const Value = @import("../core/Value.zig");
 const Object = @import("Object.zig");
 const ObjectSet = @import("ObjectSet.zig");
+const Interpreter = @import("Interpreter.zig");
 const PropertyKey = @import("property_map.zig").PropertyKey;
+
+const StringPrototype = @import("StringPrototype.zig");
 
 const String = @This();
 
@@ -26,6 +30,8 @@ pub const type_descriptor = Object.TypeDescriptor{
 
 pub fn new(gc: *Gc, bytes: []const u8) !*Object {
     var obj = try gc.alloc(String);
+    obj.prototype = gc.interpreter.string_prototype;
+    // try obj.defineProperty(gc, "prototype", Value.object(obj.prototype.?));
     var s: *String = obj.as(String);
 
     s.length = bytes.len;

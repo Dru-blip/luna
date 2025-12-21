@@ -15,7 +15,7 @@ marked: bool = false,
 ptr: *anyopaque, // do i really need this ?
 type_descriptor: *const TypeDescriptor,
 property_map: PropertyMap,
-prototype: ?*Object,
+prototype: ?*Object = null,
 
 pub const TypeDescriptor = struct {
     name: []const u8,
@@ -40,8 +40,15 @@ pub fn set(obj: *Object, key: PropertyKey, value: Value) !void {
     try obj.property_map.put(key, value);
 }
 
-pub fn get(obj: *Object, key: PropertyKey) ?Value {
-    return obj.property_map.get(key);
+pub fn get(self: *Object, key: PropertyKey) ?Value {
+    var current: ?*Object = self;
+    while (current) |obj| {
+        if (obj.property_map.get(key)) |value| {
+            return value;
+        }
+        current = obj.prototype;
+    }
+    return null;
 }
 
 pub inline fn isFunction(obj: *Object) bool {
@@ -63,10 +70,15 @@ pub inline fn asNativeFunction(obj: *Object) ?*NativeFunction {
     return if (obj.type_descriptor == &NativeFunction.type_descriptor) obj.as(NativeFunction) else null;
 }
 
-pub inline fn defineNativeFunction(obj: *Object, interpreter: *Interpreter, name: []const u8, func: NativeFunction.Function, arity: u8, isVariadic: bool) !void {
-    const function_name = try interpreter.string_interner.intern(name);
-    const function = try NativeFunction.new(&interpreter.gc, func, arity, isVariadic);
+pub inline fn defineNativeFunction(obj: *Object, gc: *Gc, name: []const u8, func: NativeFunction.Function, arity: u8, isVariadic: bool) !void {
+    const function_name = try gc.interpreter.string_interner.intern(name);
+    const function = try NativeFunction.new(gc, func, arity, isVariadic);
     try obj.set(function_name.toPropertyKey(), Value.object(function));
+}
+
+pub inline fn defineProperty(obj: *Object, gc: *Gc, name: []const u8, value: Value) !void {
+    const property_name = try gc.interpreter.string_interner.intern(name);
+    try obj.set(property_name.toPropertyKey(), value);
 }
 
 pub const Base = struct {
@@ -96,5 +108,7 @@ pub const Base = struct {
 };
 
 pub fn new(gc: *Gc) !*Object {
-    return try gc.alloc(Base);
+    var obj = try gc.alloc(Base);
+    obj.prototype = gc.interpreter.object_prototype;
+    return obj;
 }

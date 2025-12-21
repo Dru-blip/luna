@@ -468,7 +468,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     for (data.call.args, 0..) |arg, i| {
                         args[i] = record.registers[arg];
                     }
-                    _ = native_function.function(vm, this_value.toObject(), args);
+                    registers[data.call.ret] = try native_function.function(vm, this_value.toObject(), args);
                     continue :start;
                 }
 

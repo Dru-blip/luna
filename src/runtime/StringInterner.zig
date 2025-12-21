@@ -6,6 +6,8 @@ const String = @import("String.zig");
 
 const StringInterner = @This();
 
+const Interpreter = @import("Interpreter.zig");
+
 strings: std.StringHashMap(*String),
 gc: *Gc,
 
@@ -20,7 +22,7 @@ pub fn deinit(interner: *StringInterner) void {
     interner.strings.deinit();
 }
 
-pub fn intern(interner: *StringInterner, bytes: []const u8) !*String {
+pub fn intern(interner: *StringInterner, bytes: []const u8) std.mem.Allocator.Error!*String {
     if (interner.strings.get(bytes)) |existing| {
         return existing;
     }
