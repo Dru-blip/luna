@@ -400,12 +400,7 @@ fn parsePrefixExpr(p: *Parser) ParserError!*Node {
 fn parsePrimaryExpr(p: *Parser) ParserError!*Node {
     const token = p.peek();
     switch (token.tag) {
-        .int => {
-            p.advance();
-            const value = try std.fmt.parseInt(i64, p.source[token.loc.start..token.loc.end], 10);
-            return try p.ast.makeIntLiteral(token.loc, value);
-        },
-        .float => {
+        .number => {
             p.advance();
             const value = try std.fmt.parseFloat(f64, p.source[token.loc.start..token.loc.end]);
             return try p.ast.makeFloatLiteral(token.loc, value);

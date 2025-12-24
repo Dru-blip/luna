@@ -176,12 +176,6 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
 
-                // Bool and Int
-                if (lhs.isInteger() and rhs.isInteger()) {
-                    registers[data.tri.dst] = Value.int(lhs.asInt() + rhs.asInt());
-                    continue :start;
-                }
-
                 // Float
                 if (lhs.isNumeric() and rhs.isNumeric()) {
                     registers[data.tri.dst] = Value.float(lhs.asFloat() + rhs.asFloat());
@@ -194,11 +188,6 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
 
-                if (lhs.isInteger() and rhs.isInteger()) {
-                    registers[data.tri.dst] = Value.int(lhs.asInt() - rhs.asInt());
-                    continue :start;
-                }
-
                 if (lhs.isNumeric() and rhs.isNumeric()) {
                     registers[data.tri.dst] = Value.float(lhs.asFloat() - rhs.asFloat());
                     continue :start;
@@ -210,11 +199,6 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
 
-                if (lhs.isInteger() and rhs.isInteger()) {
-                    registers[data.tri.dst] = Value.int(lhs.asInt() * rhs.asInt());
-                    continue :start;
-                }
-
                 if (lhs.isNumeric() and rhs.isNumeric()) {
                     registers[data.tri.dst] = Value.float(lhs.asFloat() * rhs.asFloat());
                     continue :start;
@@ -225,16 +209,6 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             .div => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-
-                if (lhs.isInteger() and rhs.isInteger()) {
-                    const lvalue = lhs.asInt();
-                    const rvalue = rhs.asInt();
-                    if (rvalue == 0) {
-                        return vm.raiseException(.zero_division_error, "division by zero", .{});
-                    }
-                    registers[data.tri.dst] = Value.int(@divFloor(lvalue, rvalue));
-                    continue :start;
-                }
 
                 if (lhs.isNumeric() and rhs.isNumeric()) {
                     const lvalue = lhs.asFloat();
@@ -252,16 +226,6 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
 
-                if (lhs.isInteger() and rhs.isInteger()) {
-                    const lvalue = lhs.asInt();
-                    const rvalue = rhs.asInt();
-                    if (rvalue == 0) {
-                        return vm.raiseException(.zero_division_error, "modulo by zero", .{});
-                    }
-                    registers[data.tri.dst] = Value.int(@mod(lvalue, rvalue));
-                    continue :start;
-                }
-
                 if (lhs.isNumeric() and rhs.isNumeric()) {
                     const lvalue = lhs.asFloat();
                     const rvalue = rhs.asFloat();
@@ -278,11 +242,6 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
 
-                if (lhs.isInteger() and rhs.isInteger()) {
-                    registers[data.tri.dst] = Value.bool(lhs.asInt() < rhs.asInt());
-                    continue :start;
-                }
-
                 if (lhs.isNumeric() and rhs.isNumeric()) {
                     registers[data.tri.dst] = Value.bool(lhs.asFloat() < rhs.asFloat());
                     continue :start;
@@ -293,11 +252,6 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             .test_le => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-
-                if (lhs.isInteger() and rhs.isInteger()) {
-                    registers[data.tri.dst] = Value.bool(lhs.asInt() <= rhs.asInt());
-                    continue :start;
-                }
 
                 if (lhs.isNumeric() and rhs.isNumeric()) {
                     registers[data.tri.dst] = Value.bool(lhs.asFloat() <= rhs.asFloat());
@@ -310,11 +264,6 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
 
-                if (lhs.isInteger() and rhs.isInteger()) {
-                    registers[data.tri.dst] = Value.bool(lhs.asInt() > rhs.asInt());
-                    continue :start;
-                }
-
                 if (lhs.isNumeric() and rhs.isNumeric()) {
                     registers[data.tri.dst] = Value.bool(lhs.asFloat() > rhs.asFloat());
                     continue :start;
@@ -324,11 +273,6 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             .test_ge => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-
-                if (lhs.isInteger() and rhs.isInteger()) {
-                    registers[data.tri.dst] = Value.bool(lhs.asInt() >= rhs.asInt());
-                    continue :start;
-                }
 
                 if (lhs.isNumeric() and rhs.isNumeric()) {
                     registers[data.tri.dst] = Value.bool(lhs.asFloat() >= rhs.asFloat());
@@ -341,11 +285,6 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
 
-                if (lhs.isInteger() and rhs.isInteger()) {
-                    registers[data.tri.dst] = Value.bool(lhs.asInt() == rhs.asInt());
-                    continue :start;
-                }
-
                 if (lhs.isNumeric() and rhs.isNumeric()) {
                     registers[data.tri.dst] = Value.bool(lhs.asFloat() == rhs.asFloat());
                     continue :start;
@@ -357,11 +296,6 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             .test_neq => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
-
-                if (lhs.isInteger() and rhs.isInteger()) {
-                    registers[data.tri.dst] = Value.bool(lhs.asInt() != rhs.asInt());
-                    continue :start;
-                }
 
                 if (lhs.isNumeric() and rhs.isNumeric()) {
                     registers[data.tri.dst] = Value.bool(lhs.asFloat() != rhs.asFloat());

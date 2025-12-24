@@ -1,6 +1,4 @@
 const std = @import("std");
-const PropertyMap = @import("property_map.zig").PropertyMap;
-const PropertyKey = @import("property_map.zig").PropertyKey;
 
 const Gc = @import("../core/Gc.zig");
 const Object = @This();
@@ -14,8 +12,6 @@ const Interpreter = @import("Interpreter.zig");
 marked: bool = false,
 ptr: *anyopaque, // do i really need this ?
 type_descriptor: *const TypeDescriptor,
-property_map: PropertyMap,
-prototype: ?*Object = null,
 
 pub const TypeDescriptor = struct {
     name: []const u8,
@@ -32,24 +28,13 @@ pub inline fn from(ptr: *anyopaque) *Object {
     return @ptrFromInt(obj_base - @sizeOf(Object));
 }
 
-pub inline fn getPropertyIterator(obj: *Object) PropertyMap.Iterator {
-    return obj.property_map.iterator();
-}
+// pub fn set(obj: *Object, key: PropertyKey, value: Value) !void {
+//     try obj.property_map.put(key, value);
+// }
 
-pub fn set(obj: *Object, key: PropertyKey, value: Value) !void {
-    try obj.property_map.put(key, value);
-}
-
-pub fn get(self: *Object, key: PropertyKey) ?Value {
-    var current: ?*Object = self;
-    while (current) |obj| {
-        if (obj.property_map.get(key)) |value| {
-            return value;
-        }
-        current = obj.prototype;
-    }
-    return null;
-}
+// pub fn get(_: *Object, _: PropertyKey) ?Value {
+//     return null;
+// }
 
 pub inline fn isFunction(obj: *Object) bool {
     return obj.type_descriptor == &Function.type_descriptor or obj.type_descriptor == &NativeFunction.type_descriptor;
@@ -70,16 +55,16 @@ pub inline fn asNativeFunction(obj: *Object) ?*NativeFunction {
     return if (obj.type_descriptor == &NativeFunction.type_descriptor) obj.as(NativeFunction) else null;
 }
 
-pub inline fn defineNativeFunction(obj: *Object, gc: *Gc, name: []const u8, func: NativeFunction.Function, arity: u8, isVariadic: bool) !void {
-    const function_name = try gc.interpreter.string_interner.intern(name);
-    const function = try NativeFunction.new(gc, func, arity, isVariadic);
-    try obj.set(function_name.toPropertyKey(), Value.object(function));
-}
+// pub inline fn defineNativeFunction(obj: *Object, gc: *Gc, name: []const u8, func: NativeFunction.Function, arity: u8, isVariadic: bool) !void {
+//     const function_name = try gc.interpreter.string_interner.intern(name);
+//     const function = try NativeFunction.new(gc, func, arity, isVariadic);
+//     try obj.set(function_name.toPropertyKey(), Value.object(function));
+// }
 
-pub inline fn defineProperty(obj: *Object, gc: *Gc, name: []const u8, value: Value) !void {
-    const property_name = try gc.interpreter.string_interner.intern(name);
-    try obj.set(property_name.toPropertyKey(), value);
-}
+// pub inline fn defineProperty(obj: *Object, gc: *Gc, name: []const u8, value: Value) !void {
+//     const property_name = try gc.interpreter.string_interner.intern(name);
+//     try obj.set(property_name.toPropertyKey(), value);
+// }
 
 pub const Base = struct {
     pub const type_descriptor: Object.TypeDescriptor = .{
@@ -89,26 +74,28 @@ pub const Base = struct {
     };
 
     pub fn visit(self: *Object, live_objects: *ObjectSet) !void {
+        _ = self;
+        _ = live_objects;
         //TODO: find a way to avoid recursion if possible
-        try live_objects.add(self);
-        var iterator = self.getPropertyIterator();
-        while (iterator.next()) |entry| {
-            const value = entry.value_ptr.*;
-            if (value.isObject()) {
-                const object = value.toObject();
-                try object.type_descriptor.visit(object, live_objects);
-            }
-            //TODO: visit property key if it is a string
-        }
+        // try live_objects.add(self);
+        // var iterator = self.getPropertyIterator();
+        // while (iterator.next()) |entry| {
+        //     const value = entry.value_ptr.*;
+        //     if (value.isObject()) {
+        //         const object = value.toObject();
+        //         try object.type_descriptor.visit(object, live_objects);
+        //     }
+        //     //TODO: visit property key if it is a string
+        // }
     }
 
     pub fn finalize(self: *Object, _: *Gc) void {
-        self.property_map.deinit();
+        _ = self;
+        // self.property_map.deinit();
     }
 };
 
 pub fn new(gc: *Gc) !*Object {
-    var obj = try gc.alloc(Base);
-    obj.prototype = gc.interpreter.object_prototype;
+    const obj = try gc.alloc(Base);
     return obj;
 }

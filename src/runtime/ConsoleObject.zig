@@ -8,8 +8,8 @@ const Object = @import("Object.zig");
 const Gc = @import("../core/Gc.zig");
 
 pub fn new(gc: *Gc) !*Object {
-    var obj = try gc.alloc(Object.Base);
-    try obj.defineNativeFunction(gc, "print", print, 8, true);
+    const obj = try gc.alloc(Object.Base);
+    // try obj.defineNativeFunction(gc, "print", print, 8, true);
     return obj;
 }
 

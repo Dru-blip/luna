@@ -468,13 +468,7 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
         .this_expr => {
             return 0;
         },
-        .int_literal => {
-            const reg = g.allocRegister();
-            const const_index = try g.addConstant(Value.int(node.data.int));
-            try g.addBin(.load_const, const_index, reg, node.loc);
-            return reg;
-        },
-        .float_literal => {
+        .num_literal => {
             const reg = g.allocRegister();
             const const_index = try g.addConstant(Value.float(node.data.float));
             try g.addBin(.load_const, const_index, reg, node.loc);

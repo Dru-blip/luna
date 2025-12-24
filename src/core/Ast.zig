@@ -61,6 +61,7 @@ pub const Node = struct {
         identifier,
         int_literal,
         float_literal,
+        num_literal,
         bool_literal,
         none_literal,
         string_literal,
@@ -176,7 +177,7 @@ pub fn makeIntLiteral(ast: *Ast, loc: Token.Loc, value: i64) !*Node {
 }
 
 pub fn makeFloatLiteral(ast: *Ast, loc: Token.Loc, value: f64) !*Node {
-    var node = try makeNode(ast, .float_literal, loc);
+    var node = try makeNode(ast, .num_literal, loc);
     node.data = .{ .float = value };
     return node;
 }

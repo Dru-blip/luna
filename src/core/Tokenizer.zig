@@ -62,8 +62,7 @@ pub const Token = struct {
         colon,
         dot,
 
-        int,
-        float,
+        number,
         string,
         identifier,
         keyword_return,
@@ -250,8 +249,8 @@ pub fn next(self: *Tokenizer) Token {
                 result.loc.start = self.index;
                 result.loc.col = self.col;
                 result.loc.line = self.line;
-                result.tag = .int;
-                continue :state .int;
+                result.tag = .number;
+                continue :state .number;
             },
             'a'...'z', 'A'...'Z', '_' => {
                 result.loc.start = self.index;
@@ -394,12 +393,12 @@ pub fn next(self: *Tokenizer) Token {
                 },
             }
         },
+        //TODO: should merge these cases.
         .int => {
             self.advance();
             switch (self.buffer[self.index]) {
                 '0'...'9' => continue :state .int,
                 '.' => {
-                    result.tag = .float;
                     continue :state .float;
                 },
                 else => {},
@@ -412,6 +411,7 @@ pub fn next(self: *Tokenizer) Token {
                 else => {},
             }
         },
+        //-------
         .string => {
             self.advance();
             switch (self.buffer[self.index]) {
