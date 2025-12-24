@@ -1,5 +1,7 @@
 let a={
     hello:fn(){
-        console.log(1)
+        console.print("hello world")
     }
 }
+
+a.hello()

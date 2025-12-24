@@ -31,7 +31,6 @@ pub const type_descriptor = Object.TypeDescriptor{
 pub fn new(gc: *Gc, bytes: []const u8) !*Object {
     var obj = try gc.alloc(String);
     obj.prototype = gc.interpreter.string_prototype;
-    // try obj.defineProperty(gc, "prototype", Value.object(obj.prototype.?));
     var s: *String = obj.as(String);
 
     s.length = bytes.len;

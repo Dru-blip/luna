@@ -9,14 +9,12 @@ const Gc = @import("../core/Gc.zig");
 
 pub fn new(gc: *Gc) !*Object {
     var obj = try gc.alloc(Object.Base);
-
-    try obj.defineNativeFunction(gc, "log", log, 8, true);
-
+    try obj.defineNativeFunction(gc, "print", print, 8, true);
     return obj;
 }
 
 //TODO: implement an inspector and formatter.
-fn log(_: *Vm, _: *Object, args: []Value) !Value {
+fn print(_: *Vm, _: *Object, args: []Value) !Value {
     for (args) |arg| {
         switch (arg.type) {
             .int => {
@@ -40,6 +38,5 @@ fn log(_: *Vm, _: *Object, args: []Value) !Value {
         }
     }
     std.debug.print("\n", .{});
-
     return Value.None;
 }
