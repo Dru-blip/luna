@@ -250,7 +250,7 @@ pub fn next(self: *Tokenizer) Token {
                 result.loc.col = self.col;
                 result.loc.line = self.line;
                 result.tag = .number;
-                continue :state .number;
+                continue :state .int;
             },
             'a'...'z', 'A'...'Z', '_' => {
                 result.loc.start = self.index;

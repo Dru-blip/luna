@@ -91,6 +91,7 @@ pub const Executable = struct {
 
     pub fn new(gc: *Gc) !*Executable {
         const obj = try gc.alloc(Executable);
+        obj.class = gc.interpreter.base_class;
         return obj.as(Executable);
     }
 
@@ -105,7 +106,6 @@ pub const Executable = struct {
         gc.gpa.free(executable.constants);
         gc.gpa.free(executable.spans);
         gc.gpa.free(executable.instructions);
-        Object.Base.finalize(self, gc);
     }
 
     fn visit(self: *Object, live_objects: *ObjectSet) !void {

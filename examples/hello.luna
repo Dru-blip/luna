@@ -1,7 +1,6 @@
-let a={
-    hello:fn(){
-        console.print("hello world")
-    }
+fn add(a,b){
+    return a+b
 }
 
-a.hello()
+
+print(add(1,2))

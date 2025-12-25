@@ -7,6 +7,9 @@ const Vm = @import("Vm.zig");
 const Generator = @import("../core/Generator.zig");
 const Exception = @import("Exception.zig");
 const Object = @import("Object.zig");
+const Class = @import("Class.zig");
+const StringClass = @import("StringClass.zig");
+const String = @import("String.zig");
 
 const GlobalObject = @import("GlobalObject.zig");
 
@@ -18,7 +21,16 @@ gc: Gc,
 string_interner: StringInterner = undefined,
 vm: *Vm = undefined,
 exception: ?*Exception = null,
-builtins: *Object = undefined,
+builtins: *Class = undefined,
+string_class: *Class = undefined,
+base_class: *Class = undefined,
+
+common_names: Names = undefined,
+
+pub const Names = struct {
+    class: *String,
+    object: *String,
+};
 
 // running_module: *Module,
 
@@ -32,8 +44,10 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
 
     interpreter.vm = try Vm.init(gpa, interpreter);
     interpreter.string_interner = StringInterner.init(&interpreter.gc);
+    interpreter.string_class = try StringClass.new(&interpreter.gc);
+    try StringClass.registerMethods(&interpreter.gc, interpreter.string_class);
     interpreter.builtins = try GlobalObject.new(&interpreter.gc);
-
+    interpreter.base_class = try Class.new(&interpreter.gc);
     return interpreter;
 }
 
@@ -70,6 +84,8 @@ pub fn runFile(i: *Interpreter, path: []const u8) !Value {
             },
         }
     };
+
+    try i.gc.collectGarbage();
 
     return result;
 }

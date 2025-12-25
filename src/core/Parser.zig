@@ -369,7 +369,7 @@ fn parsePrefixExpr(p: *Parser) ParserError!*Node {
             var properties: std.ArrayList(*const Node) = .empty;
             while (p.peek().tag != .r_brace) {
                 const tag = p.peek().tag;
-                if (tag != .identifier and tag != .int) {
+                if (tag != .identifier and tag != .number) {
                     return ParserError.SyntaxError;
                 }
                 const key = try p.parseExpr(0);

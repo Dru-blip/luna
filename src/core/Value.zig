@@ -1,6 +1,5 @@
 const std = @import("std");
 const Object = @import("../runtime/Object.zig");
-const PropertyKey = @import("../runtime/property_map.zig").PropertyKey;
 const String = @import("../runtime/String.zig");
 
 const Value = @This();
@@ -135,7 +134,7 @@ pub fn eql(a: Value, b: Value) bool {
     return switch (a.type) {
         .number => a.data.number == b.data.number,
         .bool => a.data.bool == b.data.bool,
-        .none, .undefined => true,
+        .none => true,
         .object => a.data.object == b.data.object,
     };
 }

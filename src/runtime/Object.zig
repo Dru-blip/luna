@@ -8,10 +8,12 @@ const String = @import("String.zig");
 const Value = @import("../core/Value.zig");
 const ObjectSet = @import("ObjectSet.zig");
 const Interpreter = @import("Interpreter.zig");
+const Class = @import("Class.zig");
 
 marked: bool = false,
 ptr: *anyopaque, // do i really need this ?
 type_descriptor: *const TypeDescriptor,
+class: *Class,
 
 pub const TypeDescriptor = struct {
     name: []const u8,
@@ -55,17 +57,6 @@ pub inline fn asNativeFunction(obj: *Object) ?*NativeFunction {
     return if (obj.type_descriptor == &NativeFunction.type_descriptor) obj.as(NativeFunction) else null;
 }
 
-// pub inline fn defineNativeFunction(obj: *Object, gc: *Gc, name: []const u8, func: NativeFunction.Function, arity: u8, isVariadic: bool) !void {
-//     const function_name = try gc.interpreter.string_interner.intern(name);
-//     const function = try NativeFunction.new(gc, func, arity, isVariadic);
-//     try obj.set(function_name.toPropertyKey(), Value.object(function));
-// }
-
-// pub inline fn defineProperty(obj: *Object, gc: *Gc, name: []const u8, value: Value) !void {
-//     const property_name = try gc.interpreter.string_interner.intern(name);
-//     try obj.set(property_name.toPropertyKey(), value);
-// }
-
 pub const Base = struct {
     pub const type_descriptor: Object.TypeDescriptor = .{
         .name = "Object",
@@ -74,25 +65,11 @@ pub const Base = struct {
     };
 
     pub fn visit(self: *Object, live_objects: *ObjectSet) !void {
-        _ = self;
-        _ = live_objects;
-        //TODO: find a way to avoid recursion if possible
-        // try live_objects.add(self);
-        // var iterator = self.getPropertyIterator();
-        // while (iterator.next()) |entry| {
-        //     const value = entry.value_ptr.*;
-        //     if (value.isObject()) {
-        //         const object = value.toObject();
-        //         try object.type_descriptor.visit(object, live_objects);
-        //     }
-        //     //TODO: visit property key if it is a string
-        // }
+        const class = Object.from(self.class);
+        try class.type_descriptor.visit(class, live_objects);
     }
 
-    pub fn finalize(self: *Object, _: *Gc) void {
-        _ = self;
-        // self.property_map.deinit();
-    }
+    pub fn finalize(_: *Object, _: *Gc) void {}
 };
 
 pub fn new(gc: *Gc) !*Object {

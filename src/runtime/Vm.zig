@@ -158,11 +158,10 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             },
             .load_global_by_name => {
                 const name: *String = identifiers[data.bin.lhs].toObject().as(String);
-                if (vm.interpreter.builtins.get(name.toPropertyKey())) |obj| {
-                    registers[data.bin.rhs] = obj;
+                if (vm.interpreter.builtins.getField(name)) |field| {
+                    registers[data.bin.rhs] = field;
                     continue :start;
                 }
-
                 return vm.raiseException(.reference_error, "undeclared identifier '{s}'", .{name.asSlice()});
             },
             .store_global_by_name => {
@@ -178,7 +177,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 
                 // Float
                 if (lhs.isNumeric() and rhs.isNumeric()) {
-                    registers[data.tri.dst] = Value.float(lhs.asFloat() + rhs.asFloat());
+                    registers[data.tri.dst] = Value.number(lhs.asNumber() + rhs.asNumber());
                     continue :start;
                 }
 
@@ -189,7 +188,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const rhs = registers[data.tri.op2];
 
                 if (lhs.isNumeric() and rhs.isNumeric()) {
-                    registers[data.tri.dst] = Value.float(lhs.asFloat() - rhs.asFloat());
+                    registers[data.tri.dst] = Value.number(lhs.asNumber() - rhs.asNumber());
                     continue :start;
                 }
 
@@ -200,7 +199,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const rhs = registers[data.tri.op2];
 
                 if (lhs.isNumeric() and rhs.isNumeric()) {
-                    registers[data.tri.dst] = Value.float(lhs.asFloat() * rhs.asFloat());
+                    registers[data.tri.dst] = Value.number(lhs.asNumber() * rhs.asNumber());
                     continue :start;
                 }
 
@@ -211,12 +210,12 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const rhs = registers[data.tri.op2];
 
                 if (lhs.isNumeric() and rhs.isNumeric()) {
-                    const lvalue = lhs.asFloat();
-                    const rvalue = rhs.asFloat();
+                    const lvalue = lhs.asNumber();
+                    const rvalue = rhs.asNumber();
                     if (rvalue == 0.0) {
                         return vm.raiseException(.zero_division_error, "division by zero", .{});
                     }
-                    registers[data.tri.dst] = Value.float(@divFloor(lvalue, rvalue));
+                    registers[data.tri.dst] = Value.number(@divFloor(lvalue, rvalue));
                     continue :start;
                 }
 
@@ -227,12 +226,12 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const rhs = registers[data.tri.op2];
 
                 if (lhs.isNumeric() and rhs.isNumeric()) {
-                    const lvalue = lhs.asFloat();
-                    const rvalue = rhs.asFloat();
+                    const lvalue = lhs.asNumber();
+                    const rvalue = rhs.asNumber();
                     if (rvalue == 0.0) {
                         return vm.raiseException(.zero_division_error, "modulo by zero", .{});
                     }
-                    registers[data.tri.dst] = Value.float(@mod(lvalue, rvalue));
+                    registers[data.tri.dst] = Value.number(@mod(lvalue, rvalue));
                     continue :start;
                 }
 
@@ -243,7 +242,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const rhs = registers[data.tri.op2];
 
                 if (lhs.isNumeric() and rhs.isNumeric()) {
-                    registers[data.tri.dst] = Value.bool(lhs.asFloat() < rhs.asFloat());
+                    registers[data.tri.dst] = Value.bool(lhs.asNumber() < rhs.asNumber());
                     continue :start;
                 }
 
@@ -254,7 +253,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const rhs = registers[data.tri.op2];
 
                 if (lhs.isNumeric() and rhs.isNumeric()) {
-                    registers[data.tri.dst] = Value.bool(lhs.asFloat() <= rhs.asFloat());
+                    registers[data.tri.dst] = Value.bool(lhs.asNumber() <= rhs.asNumber());
                     continue :start;
                 }
 
@@ -265,7 +264,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const rhs = registers[data.tri.op2];
 
                 if (lhs.isNumeric() and rhs.isNumeric()) {
-                    registers[data.tri.dst] = Value.bool(lhs.asFloat() > rhs.asFloat());
+                    registers[data.tri.dst] = Value.bool(lhs.asNumber() > rhs.asNumber());
                     continue :start;
                 }
                 return vm.raiseTypeException(">", lhs, rhs);
@@ -275,7 +274,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const rhs = registers[data.tri.op2];
 
                 if (lhs.isNumeric() and rhs.isNumeric()) {
-                    registers[data.tri.dst] = Value.bool(lhs.asFloat() >= rhs.asFloat());
+                    registers[data.tri.dst] = Value.bool(lhs.asNumber() >= rhs.asNumber());
                     continue :start;
                 }
 
@@ -286,7 +285,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const rhs = registers[data.tri.op2];
 
                 if (lhs.isNumeric() and rhs.isNumeric()) {
-                    registers[data.tri.dst] = Value.bool(lhs.asFloat() == rhs.asFloat());
+                    registers[data.tri.dst] = Value.bool(lhs.asNumber() == rhs.asNumber());
                     continue :start;
                 }
 
@@ -298,7 +297,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const rhs = registers[data.tri.op2];
 
                 if (lhs.isNumeric() and rhs.isNumeric()) {
-                    registers[data.tri.dst] = Value.bool(lhs.asFloat() != rhs.asFloat());
+                    registers[data.tri.dst] = Value.bool(lhs.asNumber() != rhs.asNumber());
                     continue :start;
                 }
 
@@ -323,11 +322,11 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             },
             .object_set_property => {
                 const val = registers[data.tri.dst];
-                const key = registers[data.tri.op1];
-                const value = registers[data.tri.op2];
-                if (val.asObject()) |obj| {
+                _ = registers[data.tri.op1];
+                _ = registers[data.tri.op2];
+                if (val.asObject()) |_| {
                     //TODO: currently we assume any value is a valid property key
-                    try obj.set(key.toPropertyKey().?, value);
+                    // try obj.set(key.toPropertyKey().?, value);
                 }
                 continue :start;
             },
@@ -335,11 +334,11 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const obj_val = registers[data.tri.op1];
                 const key: *String = constants[data.tri.op2].toObject().as(String);
 
-                if (obj_val.asObject()) |object| {
-                    if (object.get(key.toPropertyKey())) |v| {
-                        registers[data.tri.dst] = v;
-                        continue :start;
-                    }
+                if (obj_val.asObject()) |_| {
+                    // if (object.get(key.toPropertyKey())) |v| {
+                    //     registers[data.tri.dst] = v;
+                    //     continue :start;
+                    // }
                     return vm.raiseException(.property_error, "{s}", .{key.asSlice()});
                 }
                 return vm.raiseException(.type_error, "{s} is not subscriptable", .{obj_val.getTypeString()});
@@ -347,27 +346,27 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             .object_subscript_get => {
                 const val = registers[data.tri.op1];
                 const property = registers[data.tri.op2];
-                if (val.asObject()) |obj| {
-                    if (property.toPropertyKey()) |key| {
-                        if (obj.get(key)) |v| {
-                            registers[data.tri.dst] = v;
-                            continue :start;
-                        }
-                        return vm.raiseException(.property_error, "{s}", .{property.getTypeString()});
-                    }
+                if (val.asObject()) |_| {
+                    // if (property.toPropertyKey()) |key| {
+                    //     if (obj.get(key)) |v| {
+                    //         registers[data.tri.dst] = v;
+                    //         continue :start;
+                    //     }
+                    //     return vm.raiseException(.property_error, "{s}", .{property.getTypeString()});
+                    // }
                     return vm.raiseException(.property_error, "invalid property key type: {s}", .{property.getTypeString()});
                 }
                 return vm.raiseException(.type_error, "{s} is not subscriptable", .{val.getTypeString()});
             },
             .object_subscript_set => {
-                const value = registers[data.tri.dst];
+                _ = registers[data.tri.dst];
                 const obj = registers[data.tri.op1];
                 const index = registers[data.tri.op2];
-                if (obj.asObject()) |o| {
-                    if (index.toPropertyKey()) |key| {
-                        try o.set(key, value);
-                        continue :start;
-                    }
+                if (obj.asObject()) |_| {
+                    // if (index.toPropertyKey()) |key| {
+                    //     try o.set(key, value);
+                    //     continue :start;
+                    // }
                     return vm.raiseException(.property_error, "invalid property key type: {s}", .{index.getTypeString()});
                 }
                 return vm.raiseException(.type_error, "{s} is not subscriptable", .{obj.getTypeString()});

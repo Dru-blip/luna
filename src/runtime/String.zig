@@ -4,9 +4,6 @@ const Value = @import("../core/Value.zig");
 const Object = @import("Object.zig");
 const ObjectSet = @import("ObjectSet.zig");
 const Interpreter = @import("Interpreter.zig");
-// const PropertyKey = @import("property_map.zig").PropertyKey;
-
-const StringPrototype = @import("StringPrototype.zig");
 
 const String = @This();
 
@@ -30,7 +27,7 @@ pub const type_descriptor = Object.TypeDescriptor{
 
 pub fn new(gc: *Gc, bytes: []const u8) !*Object {
     var obj = try gc.alloc(String);
-    obj.prototype = gc.interpreter.string_prototype;
+    obj.class = gc.interpreter.string_class;
     var s: *String = obj.as(String);
 
     s.length = bytes.len;
@@ -71,5 +68,6 @@ fn finalize(self: *Object, gc: *Gc) void {
 }
 
 fn visit(self: *Object, live_objects: *ObjectSet) std.mem.Allocator.Error!void {
+    std.debug.print("{s}\n", .{self.as(String).asSlice()});
     try Object.Base.visit(self, live_objects);
 }

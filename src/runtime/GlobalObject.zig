@@ -3,15 +3,34 @@ const Object = @import("Object.zig");
 const Gc = @import("../core/Gc.zig");
 const ConsoleObject = @import("ConsoleObject.zig");
 const Value = @import("../core/Value.zig");
+const Vm = @import("Vm.zig");
+const Class = @import("Class.zig");
 
-pub fn new(gc: *Gc) !*Object {
-    const global = try gc.alloc(Object.Base);
+pub fn new(gc: *Gc) !*Class {
+    const class = try Class.new(gc);
 
-    const console_key = try gc.interpreter.string_interner.intern("console");
+    try class.defineNativeMethod(gc, "print", print, 10, true);
 
-    const console_obj = try ConsoleObject.new(gc);
+    return class;
+}
 
-    try global.set(console_key.toPropertyKey(), Value.object(console_obj));
-
-    return global;
+fn print(_: *Vm, _: *Object, args: []Value) !Value {
+    for (args) |arg| {
+        switch (arg.type) {
+            .number => {
+                std.debug.print("{any} ", .{arg.data.number});
+            },
+            .bool => {
+                std.debug.print("{s} ", .{if (arg.data.bool) "true" else "false"});
+            },
+            .none => {
+                std.debug.print("none", .{});
+            },
+            .object => {
+                std.debug.print("Object", .{});
+            },
+        }
+    }
+    std.debug.print("\n", .{});
+    return Value.None;
 }

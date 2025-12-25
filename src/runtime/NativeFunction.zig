@@ -17,6 +17,7 @@ isVariadic: bool = false,
 
 pub fn new(gc: *Gc, func: Function, arity: u8, isVariadic: bool) !*Object {
     var obj = try gc.alloc(NativeFunction);
+    obj.class = gc.interpreter.base_class;
     var s: *NativeFunction = obj.as(NativeFunction);
     s.function = func;
     s.arity = arity;

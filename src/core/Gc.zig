@@ -1,6 +1,6 @@
 const std = @import("std");
 const Value = @import("../core/Value.zig");
-const PropertyMap = @import("../runtime/property_map.zig").PropertyMap;
+
 const Object = @import("../runtime/Object.zig");
 const ObjectSet = @import("../runtime/ObjectSet.zig");
 const Interpreter = @import("../runtime/Interpreter.zig");
@@ -80,7 +80,7 @@ inline fn allocImpl(
     gc: *Gc,
     comptime T: anytype,
 ) !*Object {
-    //TODO: check alignment , align if needed
+    //TODO: check alignment
     const obj_size = @sizeOf(T);
     const header_size = @sizeOf(Object);
     const cell_size = header_size + obj_size;
@@ -105,7 +105,6 @@ inline fn allocImpl(
     }
 
     header.type_descriptor = &T.type_descriptor;
-    header.property_map = PropertyMap.init(gc.gpa);
     header.ptr = obj_ptr;
 
     return header;
@@ -154,6 +153,7 @@ inline fn findSuitableBlock(gc: *Gc, comptime strategy: AllocationStrategy, cell
             }
             return null;
         },
+        //TODO: implement best fit allocation.
         .best_fit => unreachable,
     }
 }
@@ -171,7 +171,7 @@ pub fn collectGarbage(gc: *Gc) !void {
 }
 
 fn collectRoots(gc: *Gc, roots: *ObjectSet) !void {
-    try roots.add(gc.interpreter.builtins);
+    try roots.add(Object.from(gc.interpreter.builtins));
     for (gc.interpreter.vm.records.items) |*record| {
         for (record.registers) |val| {
             if (val.asObject()) |obj| {

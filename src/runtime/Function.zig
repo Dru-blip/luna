@@ -18,6 +18,7 @@ data: union(enum) {
 
 pub fn withExecutable(gc: *Gc, executable: *Executable) !*Object {
     const obj = try gc.alloc(Function);
+    obj.class = gc.interpreter.base_class;
     const function = obj.as(Function);
     function.* = .{
         .param_count = 0,

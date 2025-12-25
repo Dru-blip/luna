@@ -4,7 +4,7 @@ const Interpreter = @import("runtime/Interpreter.zig");
 pub fn main() !void {
     var gpa = std.heap.DebugAllocator(.{}){};
     defer {
-        // const deinit_status = gpa.deinit();
+        // _ = gpa.deinit();
         // if (deinit_status == .leak) {
         //     std.debug.print("Memory leak detected\n", .{});
         // }
