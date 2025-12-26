@@ -368,10 +368,6 @@ fn parsePrefixExpr(p: *Parser) ParserError!*Node {
             const lbrace = try p.expectToken(.l_brace);
             var properties: std.ArrayList(*const Node) = .empty;
             while (p.peek().tag != .r_brace) {
-                const tag = p.peek().tag;
-                if (tag != .identifier and tag != .number) {
-                    return ParserError.SyntaxError;
-                }
                 const key = try p.parseExpr(0);
                 _ = try p.expectToken(.colon);
                 const value = try p.parseExpr(0);
@@ -379,11 +375,11 @@ fn parsePrefixExpr(p: *Parser) ParserError!*Node {
                 if (p.peek().tag == .comma) {
                     p.advance();
                 }
-                const property = try p.ast.makeProperty(key.loc.merge(&value.loc), key, value);
+                const property = try p.ast.makeAttribute(key.loc.merge(&value.loc), key, value);
                 try properties.append(p.ast.arena.allocator(), property);
             }
             const rbrace = try p.expectToken(.r_brace);
-            return p.ast.makeObjectExpr(lbrace.loc.merge(&rbrace.loc), try properties.toOwnedSlice(p.ast.arena.allocator()));
+            return p.ast.makeDictExpr(lbrace.loc.merge(&rbrace.loc), try properties.toOwnedSlice(p.ast.arena.allocator()));
         },
         .keyword_fn => {
             p.advance();

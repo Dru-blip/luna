@@ -591,30 +591,16 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
             try g.addInst(.call, data, node.loc);
             return data.call.ret;
         },
-        .object_expr => {
-            const object = g.allocRegister();
-            try g.addUn(.object_create, object, node.loc);
-            for (node.data.list) |property| {
-                const key = switch (property.data.property.key.tag) {
-                    .identifier => blk: {
-                        const key_string = try g.string_interner.intern(property.data.property.key.data.string);
-                        const key_index = try g.addConstant(Value.object(Object.from(key_string)));
-                        const reg = g.allocRegister();
-                        try g.addBin(.load_const, key_index, reg, node.loc);
-                        break :blk reg;
-                    },
-                    .int_literal => blk: {
-                        break :blk try g.genExpr(property.data.property.key);
-                    },
-                    else => blk: {
-                        break :blk 2;
-                        //TODO: raise exeception
-                    },
-                };
-                const value = try g.genExpr(property.data.property.value);
-                try g.addTri(.object_set_property, key, value, object, property.loc);
+        .dict_expr => {
+            const dict = g.allocRegister();
+            try g.addUn(.build_dict, dict, node.loc);
+            for (node.data.list) |entry| {
+                const key = try g.genExpr(entry.data.dict_entry.key);
+                const value = try g.genExpr(entry.data.dict_entry.value);
+                try g.addTri(.add_dict_entry, key, value, dict, node.loc);
             }
-            return object;
+
+            return dict;
         },
         .member_expr => {
             return try g.genMemberExpr(node, null);

@@ -9,6 +9,8 @@ const Exception = @import("Exception.zig");
 const Object = @import("Object.zig");
 const Class = @import("Class.zig");
 const StringClass = @import("StringClass.zig");
+const DictClass = @import("DictClass.zig");
+
 const String = @import("String.zig");
 
 const GlobalObject = @import("GlobalObject.zig");
@@ -24,6 +26,7 @@ exception: ?*Exception = null,
 builtins: *Class = undefined,
 string_class: *Class = undefined,
 base_class: *Class = undefined,
+dict_class: *Class = undefined,
 
 common_names: Names = undefined,
 
@@ -33,7 +36,6 @@ pub const Names = struct {
 };
 
 // running_module: *Module,
-
 pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     var interpreter = try gpa.create(Interpreter);
     const gc = Gc.init(gpa, interpreter);
@@ -46,12 +48,15 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     interpreter.string_interner = StringInterner.init(&interpreter.gc);
     interpreter.base_class = try Class.new(&interpreter.gc);
     interpreter.string_class = try StringClass.new(&interpreter.gc);
+    interpreter.dict_class = try DictClass.new(&interpreter.gc);
     interpreter.builtins = try GlobalObject.new(&interpreter.gc);
 
     Object.from(interpreter.base_class).class = interpreter.base_class;
     Object.from(interpreter.builtins).class = interpreter.base_class;
+    Object.from(interpreter.dict_class).class = interpreter.base_class;
 
     try StringClass.registerMethods(&interpreter.gc, interpreter.string_class);
+    try DictClass.registerMethods(&interpreter.gc, interpreter.dict_class);
 
     return interpreter;
 }

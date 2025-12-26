@@ -45,6 +45,9 @@ pub const Inst = struct {
 
         call, // uses call
 
+        build_dict,
+        add_dict_entry,
+
         object_create,
         object_set_property,
         object_subscript_get,
@@ -178,6 +181,8 @@ pub const Executable = struct {
                     }
                     try stdout.print(")", .{});
                 },
+                .build_dict => try stdout.print("BuildDict r{d}", .{inst.data.un}),
+                .add_dict_entry => try stdout.print("SetDictEntry r{d}={{r{d}:r{d}}}", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
                 .object_create => try stdout.print("ObjectCreate r{d}", .{inst.data.un}),
                 .object_set_property => try stdout.print("ObjectSetProperty r{d}={{r{d}:r{d}}}", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
                 .object_subscript_get => try stdout.print("ObjectSubscriptGet r{d}=r{d}[r{d}]", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),

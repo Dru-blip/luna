@@ -50,8 +50,8 @@ pub const Node = struct {
 
         call,
 
-        object_expr,
-        object_property,
+        dict_expr,
+        dict_entry,
         member_expr,
         computed_member_expr,
 
@@ -84,7 +84,7 @@ pub const Node = struct {
             callee: *Node,
             args: []*Node,
         },
-        property: struct {
+        dict_entry: struct {
             key: *Node,
             value: *Node,
         },
@@ -307,10 +307,10 @@ pub fn makeCall(ast: *Ast, loc: Token.Loc, callee: *Node, args: []*Node) !*Node 
     return node;
 }
 
-pub fn makeProperty(ast: *Ast, loc: Token.Loc, key: *Node, value: *Node) !*Node {
-    var node = try makeNode(ast, .object_property, loc);
+pub fn makeAttribute(ast: *Ast, loc: Token.Loc, key: *Node, value: *Node) !*Node {
+    var node = try makeNode(ast, .dict_entry, loc);
     node.data = .{
-        .property = .{
+        .dict_entry = .{
             .key = key,
             .value = value,
         },
@@ -318,8 +318,8 @@ pub fn makeProperty(ast: *Ast, loc: Token.Loc, key: *Node, value: *Node) !*Node 
     return node;
 }
 
-pub fn makeObjectExpr(ast: *Ast, loc: Token.Loc, properties: []*const Node) !*Node {
-    var node = try makeNode(ast, .object_expr, loc);
+pub fn makeDictExpr(ast: *Ast, loc: Token.Loc, properties: []*const Node) !*Node {
+    var node = try makeNode(ast, .dict_expr, loc);
     node.data = .{
         .list = properties,
     };
