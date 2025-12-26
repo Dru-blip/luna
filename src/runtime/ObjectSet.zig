@@ -16,6 +16,10 @@ pub inline fn add(self: *ObjectSet, obj: *Object) std.mem.Allocator.Error!void {
     try self.objects.put(obj, {});
 }
 
+pub inline fn contains(self: *ObjectSet, obj: *Object) bool {
+    return self.objects.contains(obj);
+}
+
 pub inline fn iterator(self: *ObjectSet) Map.KeyIterator {
     return self.objects.keyIterator();
 }

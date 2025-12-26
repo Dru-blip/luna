@@ -44,10 +44,15 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
 
     interpreter.vm = try Vm.init(gpa, interpreter);
     interpreter.string_interner = StringInterner.init(&interpreter.gc);
-    interpreter.string_class = try StringClass.new(&interpreter.gc);
-    try StringClass.registerMethods(&interpreter.gc, interpreter.string_class);
-    interpreter.builtins = try GlobalObject.new(&interpreter.gc);
     interpreter.base_class = try Class.new(&interpreter.gc);
+    interpreter.string_class = try StringClass.new(&interpreter.gc);
+    interpreter.builtins = try GlobalObject.new(&interpreter.gc);
+
+    Object.from(interpreter.base_class).class = interpreter.base_class;
+    Object.from(interpreter.builtins).class = interpreter.base_class;
+
+    try StringClass.registerMethods(&interpreter.gc, interpreter.string_class);
+
     return interpreter;
 }
 
@@ -84,8 +89,6 @@ pub fn runFile(i: *Interpreter, path: []const u8) !Value {
             },
         }
     };
-
-    try i.gc.collectGarbage();
 
     return result;
 }

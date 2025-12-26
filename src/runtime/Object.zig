@@ -65,6 +65,8 @@ pub const Base = struct {
     };
 
     pub fn visit(self: *Object, live_objects: *ObjectSet) !void {
+        if (live_objects.contains(self)) return;
+        try live_objects.add(self);
         const class = Object.from(self.class);
         try class.type_descriptor.visit(class, live_objects);
     }

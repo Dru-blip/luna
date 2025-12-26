@@ -43,5 +43,7 @@ fn visit(self: *Object, live_objects: *ObjectSet) !void {
     try Object.Base.visit(self, live_objects);
     const function: *Function = self.as(Function);
     const exe_obj = Object.from(function.data.executable);
-    try exe_obj.type_descriptor.visit(exe_obj, live_objects);
+    if (!live_objects.contains(exe_obj)) {
+        try exe_obj.type_descriptor.visit(exe_obj, live_objects);
+    }
 }

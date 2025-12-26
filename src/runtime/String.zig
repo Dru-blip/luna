@@ -21,7 +21,7 @@ const Storage = union(enum) {
 
 pub const type_descriptor = Object.TypeDescriptor{
     .name = "String",
-    .visit = visit,
+    .visit = Object.Base.visit,
     .finalize = finalize,
 };
 
@@ -67,7 +67,7 @@ fn finalize(self: *Object, gc: *Gc) void {
     Object.Base.finalize(self, gc);
 }
 
-fn visit(self: *Object, live_objects: *ObjectSet) std.mem.Allocator.Error!void {
-    std.debug.print("{s}\n", .{self.as(String).asSlice()});
-    try Object.Base.visit(self, live_objects);
-}
+// fn visit(self: *Object, live_objects: *ObjectSet) std.mem.Allocator.Error!void {
+//     if (live_objects.contains(self)) return;
+//     try Object.Base.visit(self, live_objects);
+// }

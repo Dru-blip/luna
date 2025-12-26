@@ -74,6 +74,8 @@ pub const type_descriptor: Object.TypeDescriptor = .{
 
 pub fn new(gc: *Gc) !*Object {
     const ex = try gc.alloc(Exception);
+    //TODO: should change class to base exception class
+    ex.class = gc.interpreter.base_class;
     var exception: *Exception = ex.as(Exception);
     exception.traceback = .empty;
     return ex;
@@ -143,7 +145,16 @@ fn visit(self: *Object, live_objects: *ObjectSet) !void {
     try Object.Base.visit(self, live_objects);
     const err: *Exception = self.as(Exception);
     const message = Object.from(err.message);
-    try message.type_descriptor.visit(message, live_objects);
+    if (!live_objects.contains(message)) {
+        try message.type_descriptor.visit(message, live_objects);
+    }
+
+    for (err.traceback.items) |frame| {
+        const func_name_obj = Object.from(frame.function_name);
+        if (!live_objects.contains(func_name_obj)) {
+            try func_name_obj.type_descriptor.visit(func_name_obj, live_objects);
+        }
+    }
 }
 
 fn readFile(path: []const u8, gpa: std.mem.Allocator) ![]const u8 {

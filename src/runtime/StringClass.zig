@@ -8,6 +8,9 @@ const StringClass = @This();
 
 pub fn new(gc: *Gc) !*Class {
     const sc = try Class.new(gc);
+    var obj = Object.from(sc);
+    obj.class = gc.interpreter.base_class;
+    sc.super_class = gc.interpreter.base_class;
     return sc;
 }
 

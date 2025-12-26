@@ -14,6 +14,7 @@ methods: FieldMap,
 
 pub inline fn new(gc: *Gc) !*Class {
     const obj = try gc.alloc(Class);
+    obj.class = undefined;
     var class: *Class = obj.as(Class);
     class.super_class = null;
     class.methods = FieldMap.init(gc);
@@ -41,11 +42,14 @@ pub const type_descriptor: Object.TypeDescriptor = .{
 };
 
 pub fn visit(self: *Object, live_objects: *ObjectSet) !void {
+    try live_objects.add(self);
     const class: *Class = self.as(Class);
 
     if (class.super_class) |sc| {
-        const obj = Object.from(sc);
-        try obj.type_descriptor.visit(obj, live_objects);
+        const super_class_obj = Object.from(sc);
+        if (!live_objects.contains(super_class_obj)) {
+            try super_class_obj.type_descriptor.visit(super_class_obj, live_objects);
+        }
     }
 
     var iterator = class.methods.iterator();
@@ -53,11 +57,15 @@ pub fn visit(self: *Object, live_objects: *ObjectSet) !void {
     while (iterator.next()) |entry| {
         const key = entry.key_ptr.*;
         const key_obj = Object.from(key);
-        try key_obj.type_descriptor.visit(key_obj, live_objects);
+        if (!live_objects.contains(key_obj)) {
+            try key_obj.type_descriptor.visit(key_obj, live_objects);
+        }
 
         const value = entry.value_ptr;
         if (value.asObject()) |obj| {
-            try obj.type_descriptor.visit(obj, live_objects);
+            if (!live_objects.contains(obj)) {
+                try obj.type_descriptor.visit(obj, live_objects);
+            }
         }
     }
 }

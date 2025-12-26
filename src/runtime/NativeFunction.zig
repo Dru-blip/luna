@@ -27,14 +27,14 @@ pub fn new(gc: *Gc, func: Function, arity: u8, isVariadic: bool) !*Object {
 
 pub const type_descriptor: Object.TypeDescriptor = .{
     .name = "NativeFunction",
-    .visit = visit,
-    .finalize = finalize,
+    .visit = Object.Base.visit,
+    .finalize = Object.Base.finalize,
 };
 
-fn finalize(self: *Object, gc: *Gc) void {
-    Object.Base.finalize(self, gc);
-}
+// fn finalize(self: *Object, gc: *Gc) void {
+//     Object.Base.finalize(self, gc);
+// }
 
-fn visit(self: *Object, live_objects: *ObjectSet) !void {
-    try Object.Base.visit(self, live_objects);
-}
+// fn visit(self: *Object, live_objects: *ObjectSet) !void {
+//     try Object.Base.visit(self, live_objects);
+// }
