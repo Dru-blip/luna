@@ -383,27 +383,24 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const target = registers[data.tri.op1];
                 const index = registers[data.tri.op2];
 
-                const target_class = target.toObject().class;
-                const getitem_method = target_class.getField(try vm.interpreter.string_interner.intern("__getitem__"));
+                var args: [1]Value = undefined;
+                args[0] = index;
 
-                if (getitem_method) |method_value| {
-                    var args: [8]Value = undefined;
-                    args[0] = index;
-
-                    if (method_value.asObject()) |callable_obj| {
-                        const retvalue = try callable_obj.callAssumeCallable(
-                            vm,
-                            target.toObject(),
-                            &args,
-                        );
-                        registers[data.tri.dst] = retvalue;
-                        continue :start;
-                    }
-                }
-
-                return vm.raiseException(.type_error, "{s} is not subscriptable", .{target.getTypeString()});
+                registers[data.tri.dst] = try vm.invokeSpecialMethod(target, "__getitem__", &args);
+                continue :start;
             },
-            .set_item => {},
+            .set_item => {
+                const target = registers[data.tri.op1];
+                const index = registers[data.tri.op2];
+
+                var args: [2]Value = undefined;
+                args[0] = index;
+                args[1] = registers[data.tri.dst];
+
+                _ = try vm.invokeSpecialMethod(target, "__setitem__", &args);
+
+                continue :start;
+            },
             .get_attribute => {},
             .set_attribute => {},
             .jmp => {
@@ -494,6 +491,47 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
     }
 
     return Value.None;
+}
+
+fn invokeSpecialMethod(
+    vm: *Vm,
+    target: Value,
+    method_name: []const u8,
+    args: []const Value,
+) Error!Value {
+    //TODO: refactor
+    if (!target.isObject()) {
+        return vm.raiseException(
+            .type_error,
+            "{s} is not subscriptable",
+            .{target.getTypeString()},
+        );
+    }
+
+    const cls = target.toObject().class;
+    const method = cls.getField(
+        try vm.interpreter.string_interner.intern(method_name),
+    ) orelse {
+        return vm.raiseException(
+            .type_error,
+            "{s} is not subscriptable",
+            .{target.getTypeString()},
+        );
+    };
+
+    const callable = method.asObject() orelse {
+        return vm.raiseException(
+            .type_error,
+            "{s} is not callable",
+            .{method.getTypeString()},
+        );
+    };
+
+    return callable.callAssumeCallable(
+        vm,
+        target.toObject(),
+        args,
+    );
 }
 
 pub fn raiseTypeException(vm: *Vm, comptime op: []const u8, lhs: Value, rhs: Value) Error!Value {

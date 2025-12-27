@@ -1,2 +1,3 @@
 let a = {"name":"john"}
+a["name"]="druva"
 print(a["name"])

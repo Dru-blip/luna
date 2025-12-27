@@ -706,15 +706,8 @@ inline fn genAssignMember(g: *Generator, node: *const Ast.Node, value: u32) GenE
 
 inline fn genAssignComputedMember(g: *Generator, node: *const Ast.Node, value: u32) GenError!void {
     const obj = try g.genExpr(node.data.bin.lhs);
-
-    const computed_index = if (node.data.bin.rhs.tag == .identifier) blk: {
-        const property_ident_index = try g.addIdentifier(node.data.bin.rhs.data.string);
-        const ident_reg = g.allocRegister();
-        try g.addBin(.load_ident, property_ident_index, ident_reg, node.loc);
-        break :blk ident_reg;
-    } else try g.genExpr(node.data.bin.rhs);
-
-    try g.addTri(.object_subscript_set, obj, computed_index, value, node.loc);
+    const computed_index = try g.genExpr(node.data.bin.rhs);
+    try g.addTri(.set_item, obj, computed_index, value, node.loc);
 }
 
 inline fn genBinOp(g: *Generator, op: Inst.Op, node: *const Ast.Node) GenError!u32 {

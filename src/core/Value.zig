@@ -126,7 +126,10 @@ pub inline fn getTypeString(v: Value) []const u8 {
     return switch (v.type) {
         .number => "number",
         .bool => "bool",
-        .object => "object",
+        .object => {
+            const class = v.toObject().class;
+            return class.name.asSlice();
+        },
         .none => "none",
     };
 }
