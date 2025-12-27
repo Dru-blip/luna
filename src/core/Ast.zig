@@ -18,6 +18,7 @@ pub const Node = struct {
         loop_stmt,
         while_stmt,
         for_stmt,
+        foreach_stmt,
         break_stmt,
         continue_stmt,
         return_stmt,
@@ -107,6 +108,11 @@ pub const Node = struct {
             init: *Node,
             @"test": *Node,
             update: *Node,
+            body: *Node,
+        },
+        foreach: struct {
+            variable: []const u8,
+            iterable: *Node,
             body: *Node,
         },
         let: struct {
@@ -280,6 +286,18 @@ pub fn makeForStmt(ast: *Ast, loc: Token.Loc, initializer: *Node, @"test": *Node
             .init = initializer,
             .@"test" = @"test",
             .update = update,
+            .body = body,
+        },
+    };
+    return node;
+}
+
+pub fn makeForeachStmt(ast: *Ast, loc: Token.Loc, variable: []const u8, iterable: *Node, body: *Node) !*Node {
+    var node = try makeNode(ast, .foreach_stmt, loc);
+    node.data = .{
+        .foreach = .{
+            .variable = variable,
+            .iterable = iterable,
             .body = body,
         },
     };

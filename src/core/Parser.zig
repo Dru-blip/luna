@@ -151,6 +151,7 @@ fn parseStmt(p: *Parser) ParserError!*Node {
         .keyword_continue => return p.parseContinueStmt(),
         .keyword_while => return p.parseWhileStmt(),
         .keyword_for => return p.parseForStmt(),
+        .keyword_foreach => return p.parseForEachStmt(),
         else => {
             const expr = try p.parseExpr(0);
             return p.ast.makeExprStmt(expr);
@@ -187,6 +188,15 @@ fn parseLetDecl(p: *Parser) ParserError!*Node {
     _ = try p.expectToken(.equal);
     const expr = try p.parseExpr(0);
     return p.ast.makeLetDecl(token.loc.merge(&expr.loc), p.source[name.loc.start..name.loc.end], expr);
+}
+
+fn parseForEachStmt(p: *Parser) ParserError!*Node {
+    const token = try p.expectToken(.keyword_foreach);
+    const variable = try p.expectToken(.identifier);
+    _ = try p.expectToken(.keyword_in);
+    const iterable = try p.parseExpr(0);
+    const body = try p.parseStmt();
+    return p.ast.makeForeachStmt(token.loc.merge(&body.loc), p.source[variable.loc.start..variable.loc.end], iterable, body);
 }
 
 fn parseForStmt(p: *Parser) ParserError!*Node {

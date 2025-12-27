@@ -78,6 +78,8 @@ pub const Token = struct {
         keyword_break,
         keyword_continue,
         keyword_this,
+        keyword_foreach,
+        keyword_in,
 
         keyword_fn,
 
@@ -97,8 +99,10 @@ pub const Token = struct {
         .{ "continue", .keyword_continue },
         .{ "while", .keyword_while },
         .{ "for", .keyword_for },
+        .{ "foreach", .keyword_foreach },
         .{ "fn", .keyword_fn },
         .{ "this", .keyword_this },
+        .{ "in", .keyword_in },
     });
 
     pub fn getKeyword(bytes: []const u8) ?Tag {
