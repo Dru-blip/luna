@@ -55,6 +55,8 @@ pub const Node = struct {
         member_expr,
         computed_member_expr,
 
+        list_expr,
+
         this_expr,
         function_expr,
 
@@ -322,6 +324,14 @@ pub fn makeDictExpr(ast: *Ast, loc: Token.Loc, properties: []*const Node) !*Node
     var node = try makeNode(ast, .dict_expr, loc);
     node.data = .{
         .list = properties,
+    };
+    return node;
+}
+
+pub fn makeListExpr(ast: *Ast, loc: Token.Loc, elements: []*const Node) !*Node {
+    var node = try makeNode(ast, .list_expr, loc);
+    node.data = .{
+        .list = elements,
     };
     return node;
 }

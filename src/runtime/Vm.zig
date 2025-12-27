@@ -386,12 +386,12 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             .call => {
                 const callee = registers[data.call.callee];
                 if (!callee.isObject()) {
-                    return vm.raiseException(.type_error, "non callable value", .{});
+                    return vm.raiseException(.type_error, "'{s}' is not callable", .{callee.getTypeString()});
                 }
                 const callee_obj = callee.toObject();
 
                 if (!callee_obj.isFunction()) {
-                    return vm.raiseException(.type_error, "non callable object", .{});
+                    return vm.raiseException(.type_error, "'{s}' object is not callable", .{callee_obj.getClassName()});
                 }
 
                 const this_value = registers[data.call.this];
