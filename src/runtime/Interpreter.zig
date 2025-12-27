@@ -33,8 +33,31 @@ list_class: *Class = undefined,
 common_names: Names = undefined,
 
 pub const Names = struct {
-    class: *String,
-    object: *String,
+    Class: *String,
+    Object: *String,
+    Dict: *String,
+    List: *String,
+    String: *String,
+    module: *String,
+    __getitem__: *String,
+    __setitem__: *String,
+    __getattr__: *String,
+    __setattr__: *String,
+
+    pub fn init(string_interner: *StringInterner) !Names {
+        return .{
+            .Class = try string_interner.intern("Class"),
+            .Object = try string_interner.intern("Object"),
+            .Dict = try string_interner.intern("Dict"),
+            .List = try string_interner.intern("List"),
+            .String = try string_interner.intern("String"),
+            .module = try string_interner.intern("<module>"),
+            .__getitem__ = try string_interner.intern("__getitem__"),
+            .__setitem__ = try string_interner.intern("__setitem__"),
+            .__getattr__ = try string_interner.intern("__getattr__"),
+            .__setattr__ = try string_interner.intern("__setattr__"),
+        };
+    }
 };
 
 // running_module: *Module,
@@ -63,10 +86,12 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     try DictClass.registerMethods(&interpreter.gc, interpreter.dict_class);
     try ListClass.registerMethods(&interpreter.gc, interpreter.list_class);
 
-    interpreter.string_class.name = try interpreter.string_interner.intern("String");
-    interpreter.dict_class.name = try interpreter.string_interner.intern("Dict");
-    interpreter.base_class.name = try interpreter.string_interner.intern("Class");
-    interpreter.list_class.name = try interpreter.string_interner.intern("List");
+    interpreter.common_names = try Names.init(&interpreter.string_interner);
+
+    interpreter.string_class.name = interpreter.common_names.String;
+    interpreter.dict_class.name = interpreter.common_names.Dict;
+    interpreter.base_class.name = interpreter.common_names.Class;
+    interpreter.list_class.name = interpreter.common_names.List;
 
     return interpreter;
 }

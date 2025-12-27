@@ -346,7 +346,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 var args: [1]Value = undefined;
                 args[0] = index;
 
-                registers[data.tri.dst] = try vm.invokeSpecialMethod(target, "__getitem__", &args);
+                registers[data.tri.dst] = try vm.invokeSpecialMethod(target, vm.interpreter.common_names.__getitem__, &args);
                 continue :start;
             },
             .set_item => {
@@ -357,7 +357,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 args[0] = index;
                 args[1] = registers[data.tri.dst];
 
-                _ = try vm.invokeSpecialMethod(target, "__setitem__", &args);
+                _ = try vm.invokeSpecialMethod(target, vm.interpreter.common_names.__setitem__, &args);
 
                 continue :start;
             },
@@ -368,7 +368,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 var args: [1]Value = undefined;
                 args[0] = index;
 
-                registers[data.tri.dst] = try vm.invokeSpecialMethod(target, "__getattr__", &args);
+                registers[data.tri.dst] = try vm.invokeSpecialMethod(target, vm.interpreter.common_names.__getattr__, &args);
                 continue :start;
             },
             .set_attribute => {
@@ -379,7 +379,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 args[1] = index;
                 args[0] = registers[data.tri.op1];
 
-                _ = try vm.invokeSpecialMethod(target, "__setattr__", &args);
+                _ = try vm.invokeSpecialMethod(target, vm.interpreter.common_names.__setattr__, &args);
 
                 continue :start;
             },
@@ -476,7 +476,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 fn invokeSpecialMethod(
     vm: *Vm,
     target: Value,
-    comptime method_name: []const u8,
+    method_name: *String,
     args: []const Value,
 ) Error!Value {
     //TODO: refactor
@@ -484,18 +484,16 @@ fn invokeSpecialMethod(
         return vm.raiseException(
             .type_error,
             "invalid type '{s}' for operation '{s}'",
-            .{ target.getTypeString(), method_name },
+            .{ target.getTypeString(), method_name.asSlice() },
         );
     }
 
     const cls = target.toObject().class;
-    const method = cls.getField(
-        try vm.interpreter.string_interner.intern(method_name),
-    ) orelse {
+    const method = cls.getField(method_name) orelse {
         return vm.raiseException(
             .type_error,
             "'{s}' object does not support special method '{s}'",
-            .{ target.getTypeString(), method_name },
+            .{ target.getTypeString(), method_name.asSlice() },
         );
     };
 
