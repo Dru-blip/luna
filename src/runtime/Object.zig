@@ -40,7 +40,16 @@ pub inline fn from(ptr: *anyopaque) *Object {
 // }
 
 pub inline fn isFunction(obj: *Object) bool {
+    //TODO: should switch to class based
     return obj.type_descriptor == &Function.type_descriptor or obj.type_descriptor == &NativeFunction.type_descriptor;
+}
+
+pub inline fn isString(obj: *Object) bool {
+    return obj.type_descriptor == &String.type_descriptor;
+}
+
+pub inline fn toString(obj: *Object) *String {
+    return obj.as(String);
 }
 
 pub inline fn asString(obj: *Object) ?*String {

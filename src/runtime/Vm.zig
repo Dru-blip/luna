@@ -176,9 +176,15 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
 
-                // Float
                 if (lhs.isNumeric() and rhs.isNumeric()) {
                     registers[data.tri.dst] = Value.number(lhs.asNumber() + rhs.asNumber());
+                    continue :start;
+                }
+
+                if (lhs.isString() and rhs.isString()) {
+                    const a = lhs.toObject().toString();
+                    const b = rhs.toObject().toString();
+                    registers[data.tri.dst] = Value.object(try a.concat(vm.gc, b));
                     continue :start;
                 }
 

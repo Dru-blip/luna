@@ -44,6 +44,31 @@ pub fn new(gc: *Gc, bytes: []const u8) !*Object {
     return obj;
 }
 
+pub fn concat(a: *const String, gc: *Gc, b: *const String) !*Object {
+    const total_len = a.length + b.length;
+
+    var obj = try gc.alloc(String);
+    obj.class = gc.interpreter.string_class;
+    var result: *String = obj.as(String);
+    result.length = total_len;
+    result.interned = false;
+
+    if (total_len <= max_small_string_len) {
+        result.storage = .{ .@"inline" = undefined };
+        @memcpy(result.storage.@"inline"[0..a.length], a.asSlice());
+        @memcpy(result.storage.@"inline"[a.length..total_len], b.asSlice());
+        result.hash = std.hash.Wyhash.hash(0, result.storage.@"inline"[0..total_len]);
+    } else {
+        const buf = try gc.gpa.alloc(u8, total_len);
+        @memcpy(buf[0..a.length], a.asSlice());
+        @memcpy(buf[a.length..total_len], b.asSlice());
+        result.storage = .{ .heap = buf };
+        result.hash = std.hash.Wyhash.hash(0, buf);
+    }
+
+    return obj;
+}
+
 pub inline fn asSlice(self: *const String) []const u8 {
     return switch (self.storage) {
         .@"inline" => |buf| buf[0..self.length],

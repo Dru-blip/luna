@@ -122,6 +122,10 @@ pub inline fn isNumeric(value: Value) bool {
     return value.type == .number or value.type == .bool;
 }
 
+pub inline fn isString(value: Value) bool {
+    return value.type == .object and value.toObject().type_descriptor == &String.type_descriptor;
+}
+
 pub inline fn getTypeString(v: Value) []const u8 {
     return switch (v.type) {
         .number => "number",

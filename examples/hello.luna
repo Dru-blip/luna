@@ -1,2 +1,18 @@
-let a=[1,2,3]
-a.append(4)
+let EMPTY_CELL=" "
+let board = [EMPTY_CELL, EMPTY_CELL, EMPTY_CELL, EMPTY_CELL, EMPTY_CELL, EMPTY_CELL, EMPTY_CELL, EMPTY_CELL, EMPTY_CELL]
+let current = "X"
+
+fn print_board() {
+    print(board[0] + " | " + board[1] + " | " + board[2])
+    print("- + - + -")
+    print(board[3] + " | " + board[4] + " | " + board[5])
+    print("- + - + -")
+    print(board[6] + " | " + board[7] + " | " + board[8])
+}
+
+fn play() {
+    print("Tic Tac Toe!")
+    print_board()
+}
+
+play()
