@@ -327,58 +327,6 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 try dict.set(key, value);
                 continue :start;
             },
-            .object_create => {
-                const obj = try Object.new(vm.gc);
-                registers[data.un] = Value.object(obj);
-                continue :start;
-            },
-            .object_set_property => {
-                const val = registers[data.tri.dst];
-                _ = registers[data.tri.op1];
-                _ = registers[data.tri.op2];
-                if (val.asObject()) |_| {
-                    //TODO: currently we assume any value is a valid property key
-                    // try obj.set(key.toPropertyKey().?, value);
-                }
-                continue :start;
-            },
-            .object_get_property => {
-                const obj_val = registers[data.tri.op1];
-                const key: *String = constants[data.tri.op2].toObject().as(String);
-
-                if (obj_val.asObject()) |_| {
-                    // if (object.get(key.toPropertyKey())) |v| {
-                    //     registers[data.tri.dst] = v;
-                    //     continue :start;
-                    // }
-                    return vm.raiseException(.property_error, "{s}", .{key.asSlice()});
-                }
-                return vm.raiseException(.type_error, "{s} is not subscriptable", .{obj_val.getTypeString()});
-            },
-            .object_subscript_get => {
-                const val = registers[data.tri.op1];
-                const property = registers[data.tri.op2];
-                if (val.asObject()) |_| {
-                    // if (property.toPropertyKey()) |key| {
-                    //     if (obj.get(key)) |v| {
-                    //         registers[data.tri.dst] = v;
-                    //         continue :start;
-                    //     }
-                    //     return vm.raiseException(.property_error, "{s}", .{property.getTypeString()});
-                    // }
-                    return vm.raiseException(.property_error, "invalid property key type: {s}", .{property.getTypeString()});
-                }
-                return vm.raiseException(.type_error, "{s} is not subscriptable", .{val.getTypeString()});
-            },
-            .object_subscript_set => {
-                _ = registers[data.tri.dst];
-                const obj = registers[data.tri.op1];
-                const index = registers[data.tri.op2];
-                if (obj.asObject()) |_| {
-                    return vm.raiseException(.property_error, "invalid property key type: {s}", .{index.getTypeString()});
-                }
-                return vm.raiseException(.type_error, "{s} is not subscriptable", .{obj.getTypeString()});
-            },
             .get_item => {
                 const target = registers[data.tri.op1];
                 const index = registers[data.tri.op2];
@@ -523,8 +471,8 @@ fn invokeSpecialMethod(
     if (!target.isObject()) {
         return vm.raiseException(
             .type_error,
-            "{s} is not subscriptable",
-            .{target.getTypeString()},
+            "invalid type '{s}' for operation '{s}'",
+            .{ target.getTypeString(), method_name },
         );
     }
 
@@ -534,15 +482,15 @@ fn invokeSpecialMethod(
     ) orelse {
         return vm.raiseException(
             .type_error,
-            "{s} is not subscriptable",
-            .{target.getTypeString()},
+            "'{s}' object does not support special method '{s}'",
+            .{ target.getTypeString(), method_name },
         );
     };
 
     const callable = method.asObject() orelse {
         return vm.raiseException(
             .type_error,
-            "{s} is not callable",
+            "{s} has to be callable object",
             .{method.getTypeString()},
         );
     };

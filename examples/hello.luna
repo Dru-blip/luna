@@ -1,2 +1,2 @@
-let a = {"name":"john"}
-a.b=1
+let a = "s"
+a[1]="b"

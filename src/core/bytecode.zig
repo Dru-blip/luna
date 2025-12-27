@@ -48,12 +48,6 @@ pub const Inst = struct {
         build_dict,
         add_dict_entry,
 
-        object_create,
-        object_set_property, //.=
-        object_subscript_get, //[]=
-        object_subscript_set, //[]
-        object_get_property, //.
-
         get_attribute,
         set_attribute,
         get_item,
@@ -188,11 +182,6 @@ pub const Executable = struct {
                 },
                 .build_dict => try stdout.print("BuildDict r{d}", .{inst.data.un}),
                 .add_dict_entry => try stdout.print("SetDictEntry r{d}={{r{d}:r{d}}}", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
-                .object_create => try stdout.print("ObjectCreate r{d}", .{inst.data.un}),
-                .object_set_property => try stdout.print("ObjectSetProperty r{d}={{r{d}:r{d}}}", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
-                .object_subscript_get => try stdout.print("ObjectSubscriptGet r{d}=r{d}[r{d}]", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
-                .object_subscript_set => try stdout.print("ObjectSubscriptSet r{d}[r{d}]=r{d}", .{ inst.data.tri.op1, inst.data.tri.op2, inst.data.tri.dst }),
-                .object_get_property => try stdout.print("ObjectGetProperty", .{}),
                 .get_attribute => try stdout.print("GetAttribute", .{}),
                 .set_attribute => try stdout.print("SetAttribute", .{}),
                 .set_item => try stdout.print("SetItem", .{}),
