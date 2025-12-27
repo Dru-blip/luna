@@ -401,8 +401,28 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 
                 continue :start;
             },
-            .get_attribute => {},
-            .set_attribute => {},
+            .get_attribute => {
+                const target = registers[data.tri.op1];
+                const index = constants[data.tri.op2];
+
+                var args: [1]Value = undefined;
+                args[0] = index;
+
+                registers[data.tri.dst] = try vm.invokeSpecialMethod(target, "__getattr__", &args);
+                continue :start;
+            },
+            .set_attribute => {
+                const target = registers[data.tri.dst];
+                const index = registers[data.tri.op2];
+
+                var args: [2]Value = undefined;
+                args[1] = index;
+                args[0] = registers[data.tri.op1];
+
+                _ = try vm.invokeSpecialMethod(target, "__setattr__", &args);
+
+                continue :start;
+            },
             .jmp => {
                 record.ip = data.un;
                 continue :start;
@@ -496,7 +516,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 fn invokeSpecialMethod(
     vm: *Vm,
     target: Value,
-    method_name: []const u8,
+    comptime method_name: []const u8,
     args: []const Value,
 ) Error!Value {
     //TODO: refactor

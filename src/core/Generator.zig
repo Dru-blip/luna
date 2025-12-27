@@ -701,7 +701,7 @@ inline fn genAssignMember(g: *Generator, node: *const Ast.Node, value: u32) GenE
     const property_ident_index = try g.addIdentifier(node.data.member.property);
     const ident_reg = g.allocRegister();
     try g.addBin(.load_ident, property_ident_index, ident_reg, node.loc);
-    try g.addTri(.object_set_property, ident_reg, value, obj, node.loc);
+    try g.addTri(.set_attribute, ident_reg, value, obj, node.loc);
 }
 
 inline fn genAssignComputedMember(g: *Generator, node: *const Ast.Node, value: u32) GenError!void {

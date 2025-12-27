@@ -65,10 +65,18 @@ fn size(_: *Vm, self: *Object, _: []const Value) !Value {
     return Value.number(@floatFromInt(dict.size()));
 }
 
-fn getattr(_: *Vm, self: *Object, args: []const Value) !Value {
+fn getattr(vm: *Vm, self: *Object, args: []const Value) !Value {
     const dict = self.as(Dict);
     const key = args[0];
-    return dict.get(key) orelse Value.None;
+    if (dict.get(key)) |value| {
+        return value;
+    }
+    const name = key.toObject().asString().?;
+    return self.class.getField(name) orelse try vm.raiseException(
+        .attribute_error,
+        "'{s}' object has no attribute '{s}'",
+        .{ self.class.name.asSlice(), name.asSlice() },
+    );
 }
 
 fn setattr(_: *Vm, self: *Object, args: []const Value) !Value {

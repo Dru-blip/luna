@@ -1,3 +1,2 @@
 let a = {"name":"john"}
-a["name"]="druva"
-print(a["name"])
+a.b=1

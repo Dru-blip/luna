@@ -58,6 +58,10 @@ pub inline fn asNativeFunction(obj: *Object) ?*NativeFunction {
     return if (obj.type_descriptor == &NativeFunction.type_descriptor) obj.as(NativeFunction) else null;
 }
 
+pub inline fn getClassName(obj: *Object) []const u8 {
+    return obj.class.name.asSlice();
+}
+
 pub const Base = struct {
     pub const type_descriptor: Object.TypeDescriptor = .{
         .name = "Object",

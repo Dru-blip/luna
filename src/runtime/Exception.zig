@@ -11,9 +11,10 @@ const Exception = @This();
 pub const Tag = enum {
     type_error,
     reference_error,
-    property_error,
+    property_error, //TODO: remove
     zero_division_error,
     invalid_assignment_target_error,
+    attribute_error,
 
     pub fn toString(self: Tag) []const u8 {
         return switch (self) {
@@ -22,6 +23,7 @@ pub const Tag = enum {
             .zero_division_error => "ZeroDivisionError",
             .reference_error => "ReferenceError",
             .invalid_assignment_target_error => "InvalidAssignmentTargetError",
+            .attribute_error => "AttributeError",
         };
     }
 };
