@@ -9,7 +9,7 @@ const Interpreter = @import("Interpreter.zig");
 
 const NativeFunction = @This();
 
-pub const Function = *const fn (*Vm, *Object, []Value) Interpreter.Error!Value;
+pub const Function = *const fn (*Vm, *Object, []const Value) Interpreter.Error!Value;
 
 arity: u8,
 function: Function,

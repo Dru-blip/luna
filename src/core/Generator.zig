@@ -656,19 +656,14 @@ inline fn genIdentifier(g: *Generator, node: *const Ast.Node) GenError!u32 {
 inline fn genComputedMemberExpr(g: *Generator, node: *const Ast.Node, this_reg: ?*u32) GenError!u32 {
     const object = try g.genExpr(node.data.bin.lhs);
 
-    const index = if (node.data.bin.rhs.tag == .identifier) blk: {
-        const property_ident_index = try g.addIdentifier(node.data.bin.rhs.data.string);
-        const ident_reg = g.allocRegister();
-        try g.addBin(.load_ident, property_ident_index, ident_reg, node.loc);
-        break :blk ident_reg;
-    } else try g.genExpr(node.data.bin.rhs);
+    const index = try g.genExpr(node.data.bin.rhs);
 
     if (this_reg) |this| {
         this.* = object;
     }
 
     const dst = g.allocRegister();
-    try g.addTri(.object_subscript_get, object, index, dst, node.loc);
+    try g.addTri(.get_item, object, index, dst, node.loc);
     return dst;
 }
 
@@ -677,7 +672,7 @@ inline fn genMemberExpr(g: *Generator, node: *const Ast.Node, this_reg: ?*u32) G
     const dst = g.allocRegister();
     const ident = try g.string_interner.intern(node.data.member.property);
     const key_index = try g.addConstant(Value.object(Object.from(ident)));
-    try g.addTri(.object_get_property, object, key_index, dst, node.loc);
+    try g.addTri(.get_attribute, object, key_index, dst, node.loc);
     if (this_reg) |this| {
         this.* = object;
     }

@@ -18,7 +18,7 @@ pub fn registerMethods(gc: *Gc, sc: *Class) !void {
     try sc.defineNativeMethod(gc, "at", at, 1, false);
 }
 
-fn at(vm: *Vm, self: *Object, args: []Value) !Value {
+fn at(vm: *Vm, self: *Object, args: []const Value) !Value {
     _ = vm;
     _ = self;
     _ = args;

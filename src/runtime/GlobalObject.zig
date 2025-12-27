@@ -14,7 +14,7 @@ pub fn new(gc: *Gc) !*Class {
     return class;
 }
 
-fn print(_: *Vm, _: *Object, args: []Value) !Value {
+fn print(vm: *Vm, _: *Object, args: []const Value) !Value {
     for (args) |arg| {
         switch (arg.type) {
             .number => {
@@ -27,7 +27,23 @@ fn print(_: *Vm, _: *Object, args: []Value) !Value {
                 std.debug.print("none", .{});
             },
             .object => {
-                std.debug.print("Object", .{});
+                if (arg.toObject().asString()) |str| {
+                    std.debug.print("{s} ", .{str.asSlice()});
+                    continue;
+                }
+                const class = arg.toObject().class;
+                const str_method_value = class.getField(try vm.interpreter.string_interner.intern("__str__"));
+                if (str_method_value) |str_method_object| {
+                    if (str_method_object.asObject()) |str| {
+                        const s = try str.callAssumeCallable(vm, arg.toObject(), &[_]Value{});
+                        //TODO: should check if s is not a string
+                        std.debug.print("{s} ", .{s.toObject().asString().?.asSlice()});
+                        continue;
+                    }
+                    std.debug.print("Object", .{});
+                } else {
+                    std.debug.print("Object", .{});
+                }
             },
         }
     }

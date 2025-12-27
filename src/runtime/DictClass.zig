@@ -1,3 +1,4 @@
+const std = @import("std");
 const Gc = @import("../core/Gc.zig");
 const Value = @import("../core/Value.zig");
 const Class = @import("Class.zig");
@@ -27,7 +28,7 @@ pub fn registerMethods(gc: *Gc, dc: *Class) !void {
     try dc.defineNativeMethod(gc, "__setitem__", setitem, 2, false);
 }
 
-fn set(_: *Vm, self: *Object, args: []Value) !Value {
+fn set(_: *Vm, self: *Object, args: []const Value) !Value {
     const dict: *Dict = self.as(Dict);
     const key = args[0];
     const value = args[1];
@@ -35,42 +36,42 @@ fn set(_: *Vm, self: *Object, args: []Value) !Value {
     return Value.None;
 }
 
-fn get(_: *Vm, self: *Object, args: []Value) !Value {
+fn get(_: *Vm, self: *Object, args: []const Value) !Value {
     const dict: *Dict = self.as(Dict);
     const key = args[0];
     return dict.get(key) orelse Value.None;
 }
 
-fn remove(_: *Vm, self: *Object, args: []Value) !Value {
+fn remove(_: *Vm, self: *Object, args: []const Value) !Value {
     const dict = self.as(Dict);
     const key = args[0];
     return Value.bool(dict.remove(key));
 }
 
-fn contains(_: *Vm, self: *Object, args: []Value) !Value {
+fn contains(_: *Vm, self: *Object, args: []const Value) !Value {
     const dict = self.as(Dict);
     const key = args[0];
     return Value.bool(dict.contains(key));
 }
 
-fn clear(_: *Vm, self: *Object, _: []Value) !Value {
+fn clear(_: *Vm, self: *Object, _: []const Value) !Value {
     const dict = self.as(Dict);
     dict.clear();
     return Value.None;
 }
 
-fn size(_: *Vm, self: *Object, _: []Value) !Value {
+fn size(_: *Vm, self: *Object, _: []const Value) !Value {
     const dict: *Dict = self.as(Dict);
     return Value.number(@floatFromInt(dict.size()));
 }
 
-fn getattr(_: *Vm, self: *Object, args: []Value) !Value {
+fn getattr(_: *Vm, self: *Object, args: []const Value) !Value {
     const dict = self.as(Dict);
     const key = args[0];
     return dict.get(key) orelse Value.None;
 }
 
-fn setattr(_: *Vm, self: *Object, args: []Value) !Value {
+fn setattr(_: *Vm, self: *Object, args: []const Value) !Value {
     const dict = self.as(Dict);
     const key = args[0];
     const value = args[1];
@@ -78,13 +79,14 @@ fn setattr(_: *Vm, self: *Object, args: []Value) !Value {
     return Value.None;
 }
 
-fn getitem(_: *Vm, self: *Object, args: []Value) !Value {
-    const dict = self.as(Dict);
+fn getitem(_: *Vm, self: *Object, args: []const Value) !Value {
+    const dict: *Dict = self.as(Dict);
     const key = args[0];
-    return dict.get(key) orelse Value.None;
+    const res = dict.get(key);
+    return res orelse Value.None;
 }
 
-fn setitem(_: *Vm, self: *Object, args: []Value) !Value {
+fn setitem(_: *Vm, self: *Object, args: []const Value) !Value {
     const dict = self.as(Dict);
     const key = args[0];
     const value = args[1];

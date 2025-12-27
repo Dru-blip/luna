@@ -1,6 +1,8 @@
 const std = @import("std");
 const Object = @import("../runtime/Object.zig");
 const String = @import("../runtime/String.zig");
+const Vm = @import("../runtime/Vm.zig");
+const Function = @import("../runtime/Function.zig");
 
 const Value = @This();
 
@@ -135,6 +137,16 @@ pub fn eql(a: Value, b: Value) bool {
         .number => a.data.number == b.data.number,
         .bool => a.data.bool == b.data.bool,
         .none => true,
-        .object => a.data.object == b.data.object,
+        .object => {
+            const ao = a.toObject();
+            const bo = b.toObject();
+            if (ao.asString()) |as| {
+                if (bo.asString()) |bs| {
+                    return std.mem.eql(u8, as.asSlice(), bs.asSlice());
+                }
+                return false;
+            }
+            return ao == bo;
+        },
     };
 }

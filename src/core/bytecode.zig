@@ -49,10 +49,15 @@ pub const Inst = struct {
         add_dict_entry,
 
         object_create,
-        object_set_property,
-        object_subscript_get,
-        object_subscript_set,
-        object_get_property,
+        object_set_property, //.=
+        object_subscript_get, //[]=
+        object_subscript_set, //[]
+        object_get_property, //.
+
+        get_attribute,
+        set_attribute,
+        get_item,
+        set_item,
 
         ret, // uses un
         ret_none, // uses un
@@ -188,6 +193,10 @@ pub const Executable = struct {
                 .object_subscript_get => try stdout.print("ObjectSubscriptGet r{d}=r{d}[r{d}]", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
                 .object_subscript_set => try stdout.print("ObjectSubscriptSet r{d}[r{d}]=r{d}", .{ inst.data.tri.op1, inst.data.tri.op2, inst.data.tri.dst }),
                 .object_get_property => try stdout.print("ObjectGetProperty", .{}),
+                .get_attribute => try stdout.print("GetAttribute", .{}),
+                .set_attribute => try stdout.print("SetAttribute", .{}),
+                .set_item => try stdout.print("SetItem", .{}),
+                .get_item => try stdout.print("GetItem", .{}),
                 .ret => try stdout.print("Ret r{d}", .{inst.data.un}),
                 .ret_none => try stdout.print("RetNone", .{}),
             }

@@ -9,6 +9,7 @@ const Value = @import("../core/Value.zig");
 const ObjectSet = @import("ObjectSet.zig");
 const Interpreter = @import("Interpreter.zig");
 const Class = @import("Class.zig");
+const Vm = @import("Vm.zig");
 
 marked: bool = false,
 ptr: *anyopaque, // do i really need this ?
@@ -77,4 +78,39 @@ pub const Base = struct {
 pub fn new(gc: *Gc) !*Object {
     const obj = try gc.alloc(Base);
     return obj;
+}
+
+pub fn callAssumeCallable(
+    self: *Object,
+    vm: *Vm,
+    this_value: *Object,
+    args: []const Value,
+) !Value {
+    if (self.asNativeFunction()) |native_fn| {
+        return native_fn.function(vm, this_value, args);
+    }
+
+    if (self.isFunction()) {
+        const function: *Function = self.as(Function);
+
+        vm.records.appendAssumeCapacity(
+            try Vm.ActivationRecord.init(function.data.executable, &vm.register_pool),
+        );
+
+        var record = &vm.records.items[vm.records.items.len - 1];
+        record.caller_return_reg = 0;
+
+        record.registers[0] = Value.object(this_value);
+        for (args, 0..) |arg, i| {
+            record.registers[i + 1] = arg;
+        }
+
+        return vm.runRecord(record, true);
+    }
+
+    return vm.raiseException(
+        .type_error,
+        "{s} is not callable",
+        .{"object"},
+    );
 }

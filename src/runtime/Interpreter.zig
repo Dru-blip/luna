@@ -58,6 +58,10 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     try StringClass.registerMethods(&interpreter.gc, interpreter.string_class);
     try DictClass.registerMethods(&interpreter.gc, interpreter.dict_class);
 
+    interpreter.string_class.name = try interpreter.string_interner.intern("String");
+    interpreter.dict_class.name = try interpreter.string_interner.intern("Dict");
+    interpreter.base_class.name = try interpreter.string_interner.intern("Object");
+
     return interpreter;
 }
 

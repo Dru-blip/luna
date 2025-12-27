@@ -56,7 +56,7 @@ const RegisterPool = struct {
     }
 };
 
-const ActivationRecord = struct {
+pub const ActivationRecord = struct {
     executable: *Executable,
     registers: []Value,
     ip: usize = 0,
@@ -115,7 +115,6 @@ pub fn runExecutable(vm: *Vm, executable: *Executable) Error!Value {
 }
 
 pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
-    _ = as_callback;
     var record = r;
     var registers = record.registers;
     var globals = &vm.globals;
@@ -376,14 +375,37 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const obj = registers[data.tri.op1];
                 const index = registers[data.tri.op2];
                 if (obj.asObject()) |_| {
-                    // if (index.toPropertyKey()) |key| {
-                    //     try o.set(key, value);
-                    //     continue :start;
-                    // }
                     return vm.raiseException(.property_error, "invalid property key type: {s}", .{index.getTypeString()});
                 }
                 return vm.raiseException(.type_error, "{s} is not subscriptable", .{obj.getTypeString()});
             },
+            .get_item => {
+                const target = registers[data.tri.op1];
+                const index = registers[data.tri.op2];
+
+                const target_class = target.toObject().class;
+                const getitem_method = target_class.getField(try vm.interpreter.string_interner.intern("__getitem__"));
+
+                if (getitem_method) |method_value| {
+                    var args: [8]Value = undefined;
+                    args[0] = index;
+
+                    if (method_value.asObject()) |callable_obj| {
+                        const retvalue = try callable_obj.callAssumeCallable(
+                            vm,
+                            target.toObject(),
+                            &args,
+                        );
+                        registers[data.tri.dst] = retvalue;
+                        continue :start;
+                    }
+                }
+
+                return vm.raiseException(.type_error, "{s} is not subscriptable", .{target.getTypeString()});
+            },
+            .set_item => {},
+            .get_attribute => {},
+            .set_attribute => {},
             .jmp => {
                 record.ip = data.un;
                 continue :start;
@@ -437,7 +459,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             },
             .ret => {
                 var callee = vm.records.pop().?;
-                if (vm.records.items.len == 0) {
+                if (vm.records.items.len == 0 or as_callback) {
                     return registers[data.un];
                 }
                 record = &vm.records.items[vm.records.items.len - 1];
@@ -452,7 +474,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             },
             .ret_none => {
                 var callee = vm.records.pop().?;
-                if (vm.records.items.len == 0) {
+                if (vm.records.items.len == 0 or as_callback) {
                     return Value.None;
                 }
                 record = &vm.records.items[vm.records.items.len - 1];
