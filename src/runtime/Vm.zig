@@ -10,6 +10,7 @@ const Error = Interpreter.Error;
 const Exception = @import("Exception.zig");
 const Gc = @import("../core/Gc.zig");
 const Dict = @import("Dict.zig");
+const List = @import("List.zig");
 
 const Vm = @This();
 
@@ -325,6 +326,17 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const key = registers[data.tri.op1];
                 const value = registers[data.tri.op2];
                 try dict.set(key, value);
+                continue :start;
+            },
+            .build_list => {
+                const list = try List.new(vm.gc);
+                registers[data.un] = Value.object(list);
+                continue :start;
+            },
+            .append_list_item => {
+                const list: *List = registers[data.bin.rhs].toObject().as(List);
+                const item = registers[data.bin.lhs];
+                try list.append(item);
                 continue :start;
             },
             .get_item => {

@@ -602,6 +602,17 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
 
             return dict;
         },
+        .list_expr => {
+            const list = g.allocRegister();
+            try g.addUn(.build_list, list, node.loc);
+
+            for (node.data.list) |item| {
+                const value = try g.genExpr(item);
+                try g.addBin(.append_list_item, value, list, node.loc);
+            }
+
+            return list;
+        },
         .member_expr => {
             return try g.genMemberExpr(node, null);
         },

@@ -10,6 +10,7 @@ const Object = @import("Object.zig");
 const Class = @import("Class.zig");
 const StringClass = @import("StringClass.zig");
 const DictClass = @import("DictClass.zig");
+const ListClass = @import("ListClass.zig");
 
 const String = @import("String.zig");
 
@@ -27,6 +28,7 @@ builtins: *Class = undefined,
 string_class: *Class = undefined,
 base_class: *Class = undefined,
 dict_class: *Class = undefined,
+list_class: *Class = undefined,
 
 common_names: Names = undefined,
 
@@ -49,18 +51,22 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     interpreter.base_class = try Class.new(&interpreter.gc);
     interpreter.string_class = try StringClass.new(&interpreter.gc);
     interpreter.dict_class = try DictClass.new(&interpreter.gc);
+    interpreter.list_class = try ListClass.new(&interpreter.gc);
     interpreter.builtins = try GlobalObject.new(&interpreter.gc);
 
     Object.from(interpreter.base_class).class = interpreter.base_class;
     Object.from(interpreter.builtins).class = interpreter.base_class;
     Object.from(interpreter.dict_class).class = interpreter.base_class;
+    Object.from(interpreter.list_class).class = interpreter.base_class;
 
     try StringClass.registerMethods(&interpreter.gc, interpreter.string_class);
     try DictClass.registerMethods(&interpreter.gc, interpreter.dict_class);
+    try ListClass.registerMethods(&interpreter.gc, interpreter.list_class);
 
     interpreter.string_class.name = try interpreter.string_interner.intern("String");
     interpreter.dict_class.name = try interpreter.string_interner.intern("Dict");
-    interpreter.base_class.name = try interpreter.string_interner.intern("Object");
+    interpreter.base_class.name = try interpreter.string_interner.intern("Class");
+    interpreter.list_class.name = try interpreter.string_interner.intern("List");
 
     return interpreter;
 }

@@ -48,6 +48,9 @@ pub const Inst = struct {
         build_dict,
         add_dict_entry,
 
+        build_list,
+        append_list_item,
+
         get_attribute,
         set_attribute,
         get_item,
@@ -182,6 +185,8 @@ pub const Executable = struct {
                 },
                 .build_dict => try stdout.print("BuildDict r{d}", .{inst.data.un}),
                 .add_dict_entry => try stdout.print("SetDictEntry r{d}={{r{d}:r{d}}}", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
+                .build_list => try stdout.print("BuildList r{d}", .{inst.data.un}),
+                .append_list_item => try stdout.print("AppendListItem ", .{}),
                 .get_attribute => try stdout.print("GetAttribute", .{}),
                 .set_attribute => try stdout.print("SetAttribute", .{}),
                 .set_item => try stdout.print("SetItem", .{}),
