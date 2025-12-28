@@ -31,17 +31,11 @@ pub inline fn from(ptr: *anyopaque) *Object {
     return @ptrFromInt(obj_base - @sizeOf(Object));
 }
 
-// pub fn set(obj: *Object, key: PropertyKey, value: Value) !void {
-//     try obj.property_map.put(key, value);
-// }
-
-// pub fn get(_: *Object, _: PropertyKey) ?Value {
-//     return null;
-// }
-
 pub inline fn isFunction(obj: *Object) bool {
     //TODO: should switch to class based
-    return obj.type_descriptor == &Function.type_descriptor or obj.type_descriptor == &NativeFunction.type_descriptor;
+    return obj.type_descriptor == &Function.type_descriptor or
+        obj.type_descriptor == &NativeFunction.type_descriptor or
+        obj.type_descriptor == &Class.type_descriptor;
 }
 
 pub inline fn isString(obj: *Object) bool {
@@ -65,6 +59,10 @@ pub inline fn asFunction(obj: *Object) ?*Function {
 
 pub inline fn asNativeFunction(obj: *Object) ?*NativeFunction {
     return if (obj.type_descriptor == &NativeFunction.type_descriptor) obj.as(NativeFunction) else null;
+}
+
+pub inline fn asClass(obj: *Object) ?*Class {
+    return if (obj.type_descriptor == &Class.type_descriptor) obj.as(Class) else null;
 }
 
 pub inline fn getClassName(obj: *Object) []const u8 {

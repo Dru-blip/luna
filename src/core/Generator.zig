@@ -304,6 +304,11 @@ fn genClassDecl(g: *Generator, node: *const Ast.Node) !void {
     const class_reg = g.allocRegister();
     try g.addBin(.build_class, class_name_index, class_reg, node.loc);
     try g.addBin(if (variable.scope == .global) .store_global_by_index else .mov, class_reg, variable.allocated_reg_slot, node.loc);
+
+    for (node.data.class_decl.methods) |method| {
+        const method_reg = try g.genFunctionExpr(method, method.data.fndecl.name);
+        try g.addBin(.add_class_method, method_reg, class_reg, method.loc);
+    }
 }
 
 fn declareParam(g: *Generator, name: []const u8) !void {
@@ -543,6 +548,11 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
             try g.addUn(.load_none, reg, node.loc);
             return reg;
         },
+        .undefined_literal => {
+            const reg = g.allocRegister();
+            try g.addUn(.load_undefined, reg, node.loc);
+            return reg;
+        },
         .string_literal => {
             const reg = g.allocRegister();
             const const_index = try g.addConstant(Value.object(try String.new(g.gc, node.data.string)));
@@ -678,14 +688,14 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
         .computed_member_expr => {
             return try g.genComputedMemberExpr(node, null);
         },
-        .function_expr => return try g.genFunctionExpr(node),
+        .function_expr => return try g.genFunctionExpr(node, "<anonymous>"),
         else => {
             unreachable;
         },
     }
 }
 
-inline fn genFunctionExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
+inline fn genFunctionExpr(g: *Generator, node: *const Ast.Node, name: []const u8) GenError!u32 {
     var func_gen = try Generator.init(g.gpa, g.ast, g.gc, g.string_interner);
     defer func_gen.deinit();
     func_gen.global_variables = g.global_variables;
@@ -697,7 +707,7 @@ inline fn genFunctionExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
 
     try func_gen.addUn(.ret_none, func_gen.allocRegister(), node.loc);
     var executable = try func_gen.finalize();
-    executable.name = try g.string_interner.intern("<anonymous>");
+    executable.name = try g.string_interner.intern(name);
 
     const executable_index = try g.addConstant(Value.object(Object.from(executable)));
     const function_index = g.allocRegister();

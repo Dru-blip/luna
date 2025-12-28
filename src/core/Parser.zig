@@ -164,8 +164,13 @@ fn parseClassDecl(p: *Parser) ParserError!*Node {
     const token = try p.expectToken(.keyword_class);
     const name = try p.expectToken(.identifier);
     _ = try p.expectToken(.l_brace);
+    var methods: std.ArrayList(*Node) = .empty;
+    while (p.peek().tag != .r_brace) {
+        const method = try p.parseFunctionDecl();
+        try methods.append(p.ast.arena.allocator(), method);
+    }
     const rbrace = try p.expectToken(.r_brace);
-    return p.ast.makeClassDecl(token.loc.merge(&rbrace.loc), p.source[name.loc.start..name.loc.end]);
+    return p.ast.makeClassDecl(token.loc.merge(&rbrace.loc), p.source[name.loc.start..name.loc.end], try methods.toOwnedSlice(p.ast.arena.allocator()));
 }
 
 fn parseFunctionDecl(p: *Parser) ParserError!*Node {
@@ -459,6 +464,10 @@ fn parsePrimaryExpr(p: *Parser) ParserError!*Node {
             p.advance();
             const node = try p.ast.makeNode(.this_expr, token.loc);
             return node;
+        },
+        .keyword_undefined => {
+            p.advance();
+            return try p.ast.makeNode(.undefined_literal, token.loc);
         },
         else => {
             if (token.tag == .eof) {

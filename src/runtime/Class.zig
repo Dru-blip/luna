@@ -5,6 +5,7 @@ const Value = @import("../core/Value.zig");
 const NativeFunction = @import("NativeFunction.zig");
 const Object = @import("Object.zig");
 const ObjectSet = @import("ObjectSet.zig");
+const Instance = @import("Instance.zig");
 
 const Class = @This();
 
@@ -21,6 +22,17 @@ pub inline fn new(gc: *Gc) !*Class {
     return class;
 }
 
+pub inline fn newInstance(class: *Class, gc: *Gc) !*Object {
+    const obj = try gc.alloc(Instance);
+    obj.class = class;
+    const instance: *Instance = obj.as(Instance);
+    instance.* = .{
+        .attributes = FieldMap.init(gc),
+        .class = class,
+    };
+    return obj;
+}
+
 pub fn defineNativeMethod(class: *Class, gc: *Gc, name: []const u8, func: NativeFunction.Function, arity: u8, isVariadic: bool) !void {
     const nf = try NativeFunction.new(gc, func, arity, isVariadic);
     try class.putField(gc, name, Value.object(nf));
@@ -33,6 +45,10 @@ pub fn putField(class: *Class, gc: *Gc, name: []const u8, value: Value) !void {
 
 pub fn getField(class: *Class, name: *String) ?Value {
     return class.methods.fields.get(name);
+}
+
+pub fn addMethod(class: *Class, name: *String, function: Value) !void {
+    try class.methods.fields.put(name, function);
 }
 
 pub const type_descriptor: Object.TypeDescriptor = .{
@@ -75,7 +91,7 @@ pub fn finalize(self: *Object, _: *Gc) void {
     class.methods.deinit();
 }
 
-const FieldMap = struct {
+pub const FieldMap = struct {
     const Map = std.HashMap(*String, Value, FieldContext, std.hash_map.default_max_load_percentage);
 
     fields: Map,

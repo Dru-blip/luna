@@ -150,6 +150,10 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 registers[data.un] = Value.None;
                 continue :start;
             },
+            .load_undefined => {
+                registers[data.un] = Value.Undefined;
+                continue :start;
+            },
             .store_global_by_index => {
                 globals.fast_slots[data.bin.rhs] = registers[data.bin.lhs];
                 continue :start;
@@ -321,7 +325,14 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const class_name = identifiers[data.bin.lhs];
                 const class = try Class.new(vm.gc);
                 class.name = class_name.toObject().toString();
+                Object.from(class).class = vm.interpreter.base_class;
                 registers[data.bin.rhs] = Value.object(Object.from(class));
+                continue :start;
+            },
+            .add_class_method => {
+                const class: *Class = registers[data.bin.rhs].toObject().as(Class);
+                const method: *Function = registers[data.bin.lhs].toObject().as(Function);
+                try class.addMethod(method.data.executable.name, registers[data.bin.lhs]);
                 continue :start;
             },
             .build_trace_and_throw_exception => {
@@ -439,6 +450,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 }
 
                 const this_value = registers[data.call.this];
+
                 if (callee_obj.asNativeFunction()) |native_function| {
                     const args = try vm.gpa.alloc(Value, data.call.args.len);
                     defer vm.gpa.free(args);
@@ -446,6 +458,11 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                         args[i] = record.registers[arg];
                     }
                     registers[data.call.ret] = try native_function.function(vm, this_value.toObject(), args);
+                    continue :start;
+                }
+
+                if (callee_obj.asClass()) |class| {
+                    registers[data.call.ret] = Value.object(try class.newInstance(vm.gc));
                     continue :start;
                 }
 

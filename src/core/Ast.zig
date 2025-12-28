@@ -69,6 +69,7 @@ pub const Node = struct {
         bool_literal,
         none_literal,
         string_literal,
+        undefined_literal,
     };
 
     const Data = union {
@@ -127,6 +128,7 @@ pub const Node = struct {
         },
         class_decl: struct {
             name: []const u8,
+            methods: []const *Node,
         },
     };
 };
@@ -370,11 +372,12 @@ pub fn makeFunctionExpr(ast: *Ast, loc: Token.Loc, params: [][]const u8, body: *
     return node;
 }
 
-pub fn makeClassDecl(ast: *Ast, loc: Token.Loc, name: []const u8) !*Node {
+pub fn makeClassDecl(ast: *Ast, loc: Token.Loc, name: []const u8, methods: []const *Node) !*Node {
     var node = try makeNode(ast, .class_decl, loc);
     node.data = .{
         .class_decl = .{
             .name = name,
+            .methods = methods,
         },
     };
     return node;

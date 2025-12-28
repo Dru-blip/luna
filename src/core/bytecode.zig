@@ -18,6 +18,7 @@ pub const Inst = struct {
         load_false, // uses un
         load_none, // uses un
         load_ident, // uses un
+        load_undefined,
         add, // uses tri
         sub, // uses tri
         mul, // uses tri
@@ -60,6 +61,7 @@ pub const Inst = struct {
         iter_next,
 
         build_class,
+        add_class_method,
 
         ret, // uses un
         ret_none, // uses un
@@ -160,6 +162,7 @@ pub const Executable = struct {
                 .load_true => try stdout.print("LoadTrue r{d}", .{inst.data.un}),
                 .load_false => try stdout.print("LoadFalse r{d}", .{inst.data.un}),
                 .load_none => try stdout.print("LoadNone r{d}", .{inst.data.un}),
+                .load_undefined => try stdout.print("LoadUndefined r{d}", .{inst.data.un}),
                 .load_ident => try stdout.print("LoadIdent r{d} [ident {d}]", .{ inst.data.bin.rhs, inst.data.bin.lhs }),
                 .add => try stdout.print("Add r{d} <- r{d} , r{d}", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
                 .sub => try stdout.print("Sub r{d} <- r{d} , r{d}", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
@@ -181,6 +184,7 @@ pub const Executable = struct {
                 .load_global_by_name => try stdout.print("LoadGlobalByName r{d}, names[{d}]", .{ inst.data.bin.lhs, inst.data.bin.rhs }),
                 .build_function => try stdout.print("MakeFunction r{d} e[{d}] names[{d}]", .{ inst.data.bin.lhs, inst.data.bin.rhs, inst.data.bin.rhs }),
                 .build_class => try stdout.print("BuildClass r{d} names[{d}]", .{ inst.data.bin.rhs, inst.data.bin.lhs }),
+                .add_class_method => try stdout.print("AddClassMethod r{d}", .{inst.data.bin.rhs}),
                 .build_trace_and_throw_exception => try stdout.print("BuildTraceAndThrowException", .{}),
                 .call => {
                     try stdout.print("Call r{d} <- r{d}(", .{ inst.data.call.ret, inst.data.call.callee });
