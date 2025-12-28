@@ -19,7 +19,7 @@ const GlobalObject = @import("GlobalObject.zig");
 
 const Interpreter = @This();
 
-pub const Error = error{ ExceptionThrown, RegisterPoolExhausted } || std.mem.Allocator.Error;
+pub const Error = error{ ExceptionThrown, RegisterPoolExhausted } || std.mem.Allocator.Error || error{ ReadFailed, StreamTooLong } || std.fs.File.WriteError;
 
 gc: Gc,
 string_interner: StringInterner = undefined,
@@ -137,6 +137,9 @@ pub fn runFile(i: *Interpreter, path: []const u8) !Value {
             },
             error.ExceptionThrown => {
                 std.debug.print("{s}\n", .{try i.exception.?.traceString(i.gc.gpa)});
+                return Value.None;
+            },
+            else => {
                 return Value.None;
             },
         }

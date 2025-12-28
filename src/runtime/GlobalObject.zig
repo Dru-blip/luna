@@ -5,13 +5,32 @@ const ConsoleObject = @import("ConsoleObject.zig");
 const Value = @import("../core/Value.zig");
 const Vm = @import("Vm.zig");
 const Class = @import("Class.zig");
+const String = @import("String.zig");
 
 pub fn new(gc: *Gc) !*Class {
     const class = try Class.new(gc);
 
     try class.defineNativeMethod(gc, "print", print, 10, true);
+    try class.defineNativeMethod(gc, "input", input, 0, true);
 
     return class;
+}
+
+fn input(vm: *Vm, _: *Object, args: []const Value) !Value {
+    //TODO:
+    if (args.len > 0) {
+        if (args[0].isString()) {
+            const prompt = args[0].toObject().toString();
+            _ = try std.fs.File.stdout().write(prompt.asSlice());
+        }
+    }
+    var input_buffer: [1024]u8 = undefined;
+    var input_reader = std.fs.File.stdin().reader(&input_buffer);
+    const input_str = try input_reader.interface.takeDelimiter('\n');
+    if (input_str) |str| {
+        return Value.object(try String.new(vm.gc, str));
+    }
+    return Value.object(try String.new(vm.gc, ""));
 }
 
 fn print(vm: *Vm, _: *Object, args: []const Value) !Value {

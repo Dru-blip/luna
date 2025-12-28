@@ -16,6 +16,7 @@ pub const Tag = enum {
     invalid_assignment_target_error,
     attribute_error,
     index_error,
+    value_error,
 
     pub fn toString(self: Tag) []const u8 {
         return switch (self) {
@@ -26,6 +27,7 @@ pub const Tag = enum {
             .invalid_assignment_target_error => "InvalidAssignmentTargetError",
             .attribute_error => "AttributeError",
             .index_error => "IndexError",
+            .value_error => "ValueError",
         };
     }
 };

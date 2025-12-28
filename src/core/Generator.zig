@@ -357,6 +357,8 @@ fn genForEachStmt(g: *Generator, node: *const Ast.Node) GenError!void {
     g.switchBasicBlock(head_block);
     const next_value_reg = g.allocRegister();
     try g.addBin(.iter_next, iterator_reg, next_value_reg, node.loc);
+    // TODO: Avoid relying on a falsy check here.
+    // If the iterator returns a falsy value, the iteration stops prematurely.
     try g.addTri(.branch, next_value_reg, body_block.id, end_block.id, node.loc);
 
     g.switchBasicBlock(body_block);
