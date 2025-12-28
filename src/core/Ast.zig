@@ -25,6 +25,7 @@ pub const Node = struct {
         expr_stmt,
         let_decl,
         function_decl,
+        class_decl,
 
         add,
         sub,
@@ -123,6 +124,9 @@ pub const Node = struct {
             name: []const u8,
             params: [][]const u8,
             body: *Node,
+        },
+        class_decl: struct {
+            name: []const u8,
         },
     };
 };
@@ -361,6 +365,16 @@ pub fn makeFunctionExpr(ast: *Ast, loc: Token.Loc, params: [][]const u8, body: *
             .name = undefined,
             .params = params,
             .body = body,
+        },
+    };
+    return node;
+}
+
+pub fn makeClassDecl(ast: *Ast, loc: Token.Loc, name: []const u8) !*Node {
+    var node = try makeNode(ast, .class_decl, loc);
+    node.data = .{
+        .class_decl = .{
+            .name = name,
         },
     };
     return node;

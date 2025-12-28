@@ -152,11 +152,20 @@ fn parseStmt(p: *Parser) ParserError!*Node {
         .keyword_while => return p.parseWhileStmt(),
         .keyword_for => return p.parseForStmt(),
         .keyword_foreach => return p.parseForEachStmt(),
+        .keyword_class => return p.parseClassDecl(),
         else => {
             const expr = try p.parseExpr(0);
             return p.ast.makeExprStmt(expr);
         },
     }
+}
+
+fn parseClassDecl(p: *Parser) ParserError!*Node {
+    const token = try p.expectToken(.keyword_class);
+    const name = try p.expectToken(.identifier);
+    _ = try p.expectToken(.l_brace);
+    const rbrace = try p.expectToken(.r_brace);
+    return p.ast.makeClassDecl(token.loc.merge(&rbrace.loc), p.source[name.loc.start..name.loc.end]);
 }
 
 fn parseFunctionDecl(p: *Parser) ParserError!*Node {

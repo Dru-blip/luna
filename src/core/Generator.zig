@@ -249,6 +249,9 @@ fn genNodes(g: *Generator, nodes: Ast.Nodes) GenError!void {
 
 fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
     switch (node.tag) {
+        .class_decl => {
+            try g.genClassDecl(node);
+        },
         .function_decl => {
             try g.genFuncDecl(node);
         },
@@ -291,6 +294,16 @@ fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
             unreachable;
         },
     }
+}
+
+fn genClassDecl(g: *Generator, node: *const Ast.Node) !void {
+    var variable: Variable = undefined;
+    try g.declareVariable(node.data.class_decl.name, &variable);
+
+    const class_name_index = try g.addIdentifier(node.data.class_decl.name);
+    const class_reg = g.allocRegister();
+    try g.addBin(.build_class, class_name_index, class_reg, node.loc);
+    try g.addBin(if (variable.scope == .global) .store_global_by_index else .mov, class_reg, variable.allocated_reg_slot, node.loc);
 }
 
 fn declareParam(g: *Generator, name: []const u8) !void {

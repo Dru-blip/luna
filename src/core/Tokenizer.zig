@@ -80,8 +80,8 @@ pub const Token = struct {
         keyword_this,
         keyword_foreach,
         keyword_in,
-
         keyword_fn,
+        keyword_class,
 
         eof,
     };
@@ -103,6 +103,7 @@ pub const Token = struct {
         .{ "fn", .keyword_fn },
         .{ "this", .keyword_this },
         .{ "in", .keyword_in },
+        .{ "class", .keyword_class },
     });
 
     pub fn getKeyword(bytes: []const u8) ?Tag {

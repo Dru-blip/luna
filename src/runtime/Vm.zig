@@ -11,6 +11,7 @@ const Exception = @import("Exception.zig");
 const Gc = @import("../core/Gc.zig");
 const Dict = @import("Dict.zig");
 const List = @import("List.zig");
+const Class = @import("Class.zig");
 
 const Vm = @This();
 
@@ -314,6 +315,13 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             .build_function => {
                 const func = try Function.withExecutable(vm.gc, constants[data.bin.lhs].toObject().as(Executable));
                 registers[data.bin.rhs] = Value.object(func);
+                continue :start;
+            },
+            .build_class => {
+                const class_name = identifiers[data.bin.lhs];
+                const class = try Class.new(vm.gc);
+                class.name = class_name.toObject().toString();
+                registers[data.bin.rhs] = Value.object(Object.from(class));
                 continue :start;
             },
             .build_trace_and_throw_exception => {
