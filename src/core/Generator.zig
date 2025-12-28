@@ -159,7 +159,7 @@ fn declareVariable(g: *Generator, name: []const u8, out: *Variable) !void {
     var i: usize = g.local_variables.items.len;
     while (i > 0) : (i -= 1) {
         const local = g.local_variables.items[i - 1];
-        if (std.mem.eql(u8, local.name, name)) {
+        if (std.mem.eql(u8, local.name, name) and local.scope_depth == g.scope_depth) {
             out.* = local;
             return;
         }
@@ -258,6 +258,9 @@ fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
         .for_stmt => {
             try g.genForStmt(node);
         },
+        .foreach_stmt => {
+            try g.genForEachStmt(node);
+        },
         .while_stmt => {
             try g.genWhileStmt(node);
         },
@@ -324,6 +327,47 @@ fn genFuncDecl(g: *Generator, node: *const Ast.Node) GenError!void {
     const function_index = g.allocRegister();
     try g.addBin(.build_function, executable_index, function_index, node.loc);
     try g.addBin(if (variable.scope == .global) .store_global_by_index else .mov, function_index, variable.allocated_reg_slot, node.loc);
+}
+
+fn genForEachStmt(g: *Generator, node: *const Ast.Node) GenError!void {
+    const init_block = try g.makeBasicBlock();
+    const head_block = try g.makeBasicBlock();
+    const body_block = try g.makeBasicBlock();
+    const end_block = try g.makeBasicBlock();
+
+    const loop_info: LoopInfo = .{
+        .start_block = head_block.id,
+        .end_block = end_block.id,
+    };
+
+    try g.loop_stack.append(g.gpa, loop_info);
+    try g.addUn(.jmp, init_block.id, node.loc);
+
+    g.beginScope();
+
+    var loop_variable: Variable = undefined;
+    try g.declareVariable(node.data.foreach.variable, &loop_variable);
+
+    g.switchBasicBlock(init_block);
+    const iterable_reg = try g.genExpr(node.data.foreach.iterable);
+    const iterator_reg = g.allocRegister();
+    try g.addBin(.get_iter, iterable_reg, iterator_reg, node.data.foreach.iterable.loc);
+    try g.addUn(.jmp, head_block.id, node.loc);
+
+    g.switchBasicBlock(head_block);
+    const next_value_reg = g.allocRegister();
+    try g.addBin(.iter_next, iterator_reg, next_value_reg, node.loc);
+    try g.addTri(.branch, next_value_reg, body_block.id, end_block.id, node.loc);
+
+    g.switchBasicBlock(body_block);
+    try g.addBin(.mov, next_value_reg, loop_variable.allocated_reg_slot, node.loc);
+
+    try g.genStmt(node.data.foreach.body);
+    try g.addUn(.jmp, head_block.id, node.loc);
+
+    _ = g.loop_stack.pop();
+    g.switchBasicBlock(end_block);
+    g.endScope();
 }
 
 fn genForStmt(g: *Generator, node: *const Ast.Node) GenError!void {

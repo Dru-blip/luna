@@ -13,6 +13,7 @@ pub const Type = enum {
     number,
     bool,
     none,
+    undefined,
     object,
 };
 
@@ -20,6 +21,7 @@ pub const Data = union(Type) {
     number: f64,
     bool: bool,
     none: void,
+    undefined: void,
     object: *Object,
 };
 
@@ -40,6 +42,13 @@ pub const None: Value = .{
     .type = .none,
     .data = .{
         .none = {},
+    },
+};
+
+pub const Undefined: Value = .{
+    .type = .undefined,
+    .data = .{
+        .undefined = {},
     },
 };
 
@@ -111,7 +120,7 @@ pub inline fn asNumber(value: Value) f64 {
 }
 
 pub inline fn isFalsy(v: Value) bool {
-    return v.type == .none or (v.type == .bool and v.data.bool == false);
+    return v.type == .none or v.type == .undefined or (v.type == .bool and v.data.bool == false);
 }
 
 pub inline fn isTruthy(v: Value) bool {
@@ -130,6 +139,7 @@ pub inline fn getTypeString(v: Value) []const u8 {
     return switch (v.type) {
         .number => "number",
         .bool => "bool",
+        .undefined => "undefined",
         .object => {
             const class = v.toObject().class;
             return class.name.asSlice();
@@ -143,7 +153,7 @@ pub fn eql(a: Value, b: Value) bool {
     return switch (a.type) {
         .number => a.data.number == b.data.number,
         .bool => a.data.bool == b.data.bool,
-        .none => true,
+        .none, .undefined => true,
         .object => {
             const ao = a.toObject();
             const bo = b.toObject();

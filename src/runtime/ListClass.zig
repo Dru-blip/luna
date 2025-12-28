@@ -6,6 +6,7 @@ const Vm = @import("Vm.zig");
 const Object = @import("Object.zig");
 const List = @import("List.zig");
 const String = @import("String.zig");
+const ListIterator = @import("ListIterator.zig");
 
 const ListClass = @This();
 
@@ -28,6 +29,7 @@ pub fn registerMethods(gc: *Gc, lc: *Class) !void {
     try lc.defineNativeMethod(gc, "__getattr__", getattr, 1, false);
     try lc.defineNativeMethod(gc, "__getitem__", getitem, 1, false);
     try lc.defineNativeMethod(gc, "__setitem__", setitem, 2, false);
+    try lc.defineNativeMethod(gc, "__iter__", iter, 0, false);
 }
 
 fn append(_: *Vm, self: *Object, args: []const Value) !Value {
@@ -197,4 +199,8 @@ fn setitem(vm: *Vm, self: *Object, args: []const Value) !Value {
         );
     }
     return Value.None;
+}
+
+fn iter(vm: *Vm, self: *Object, _: []const Value) !Value {
+    return Value.object(try ListIterator.newInstance(vm.gc, self));
 }

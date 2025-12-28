@@ -124,6 +124,7 @@ pub fn traceString(exception: *Exception, gpa: std.mem.Allocator) ![]const u8 {
 
         var line_start_offset: usize = 0;
         var line_length: usize = 0;
+        //TODO: format if it spans multiple lines.
         extractSourceLine(source, &frame.location, &line_start_offset, &line_length);
         try writer.print("\t{s}\n\t", .{source[line_start_offset .. line_start_offset + line_length]});
         for (0..(frame.location.start - line_start_offset)) |_| {

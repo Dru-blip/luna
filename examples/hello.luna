@@ -44,5 +44,3 @@ fn play() {
     print("Tic Tac Toe!")
     print_board()
 }
-
-play()

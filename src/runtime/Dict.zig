@@ -16,7 +16,7 @@ const ValueContext = struct {
         switch (key.type) {
             .number => return @as(u64, @bitCast(key.data.number)),
             .bool => return @as(u64, @intFromBool(key.data.bool)),
-            .none => return 0,
+            .none, .undefined => return 0,
             .object => {
                 if (key.toObject().asString()) |str| {
                     return str.hash;

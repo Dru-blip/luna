@@ -33,15 +33,12 @@ pub fn append(list: *List, value: Value) !void {
 inline fn normalizeIndex(list: *List, index: isize) ?usize {
     const len = @as(isize, @intCast(list.items.items.len));
     var normalized: isize = index;
-
     if (normalized < 0) {
         normalized += len;
     }
-
     if (normalized < 0 or normalized >= len) {
         return null;
     }
-
     return @intCast(normalized);
 }
 

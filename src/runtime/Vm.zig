@@ -389,6 +389,24 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 
                 continue :start;
             },
+            .get_iter => {
+                const iterable_value = registers[data.bin.lhs];
+                registers[data.bin.rhs] = try vm.invokeSpecialMethod(
+                    iterable_value,
+                    vm.interpreter.common_names.__iter__,
+                    &[_]Value{},
+                );
+                continue :start;
+            },
+            .iter_next => {
+                const iterator_value = registers[data.bin.lhs];
+                registers[data.bin.rhs] = try vm.invokeSpecialMethod(
+                    iterator_value,
+                    vm.interpreter.common_names.__next__,
+                    &[_]Value{},
+                );
+                continue :start;
+            },
             .jmp => {
                 record.ip = data.un;
                 continue :start;

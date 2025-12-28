@@ -56,6 +56,9 @@ pub const Inst = struct {
         get_item,
         set_item,
 
+        get_iter,
+        iter_next,
+
         ret, // uses un
         ret_none, // uses un
     };
@@ -148,6 +151,7 @@ pub const Executable = struct {
         for (self.instructions, 0..) |inst, idx| {
             try stdout.print("  {d:0>4}: ", .{idx});
 
+            //TODO: print instruction details
             switch (inst.op) {
                 .hlt => try stdout.print("Hlt", .{}),
                 .load_const => try stdout.print("LoadConst r{d} [const {d}]", .{ inst.data.bin.lhs, inst.data.bin.rhs }),
@@ -191,6 +195,8 @@ pub const Executable = struct {
                 .set_attribute => try stdout.print("SetAttribute", .{}),
                 .set_item => try stdout.print("SetItem", .{}),
                 .get_item => try stdout.print("GetItem", .{}),
+                .get_iter => try stdout.print("GetIter", .{}),
+                .iter_next => try stdout.print("IterNext", .{}),
                 .ret => try stdout.print("Ret r{d}", .{inst.data.un}),
                 .ret_none => try stdout.print("RetNone", .{}),
             }

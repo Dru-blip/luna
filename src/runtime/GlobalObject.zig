@@ -26,6 +26,9 @@ fn print(vm: *Vm, _: *Object, args: []const Value) !Value {
             .none => {
                 std.debug.print("none", .{});
             },
+            .undefined => {
+                std.debug.print("undefined", .{});
+            },
             .object => {
                 if (arg.toObject().asString()) |str| {
                     std.debug.print("{s} ", .{str.asSlice()});
