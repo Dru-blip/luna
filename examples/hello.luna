@@ -27,10 +27,10 @@ class range{
 let a=range(0,5,1)
 let r=range(5,10,1)
 
-foreach i in a{
+/* foreach i in a{
     print(i)
 }
 
 foreach i in r{
     print(i)
-}
+} */

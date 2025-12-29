@@ -141,6 +141,9 @@ const State = enum {
     minus,
     asterisk,
     slash,
+    comment,
+    multiline_comment,
+    multiline_comment_end,
     modulus,
     int,
     float,
@@ -309,11 +312,39 @@ pub fn next(self: *Tokenizer) Token {
         .slash => {
             self.advance();
             switch (self.buffer[self.index]) {
+                '/' => continue :state .comment,
+                '*' => continue :state .multiline_comment,
                 '=' => {
                     result.tag = .slash_equal;
                     self.advance();
                 },
                 else => result.tag = .slash,
+            }
+        },
+        .comment => {
+            self.advance();
+            switch (self.buffer[self.index]) {
+                '\n', 0 => continue :state .start,
+                else => continue :state .comment,
+            }
+        },
+        .multiline_comment => {
+            self.advance();
+            switch (self.buffer[self.index]) {
+                '*' => continue :state .multiline_comment_end,
+                0 => continue :state .invalid,
+                else => continue :state .multiline_comment,
+            }
+        },
+        .multiline_comment_end => {
+            self.advance();
+            switch (self.buffer[self.index]) {
+                '/' => {
+                    self.advance();
+                    continue :state .start;
+                },
+                0 => continue :state .invalid,
+                else => continue :state .multiline_comment,
             }
         },
         .modulus => {
