@@ -62,6 +62,7 @@ pub const Inst = struct {
 
         build_class,
         add_class_method,
+        set_super_class,
 
         ret, // uses un
         ret_none, // uses un
@@ -186,6 +187,7 @@ pub const Executable = struct {
                 .build_function => try stdout.print("MakeFunction r{d} e[{d}] names[{d}]", .{ inst.data.bin.lhs, inst.data.bin.rhs, inst.data.bin.rhs }),
                 .build_class => try stdout.print("BuildClass r{d} names[{d}]", .{ inst.data.bin.rhs, inst.data.bin.lhs }),
                 .add_class_method => try stdout.print("AddClassMethod r{d}", .{inst.data.bin.rhs}),
+                .set_super_class => try stdout.print("SetSuperClass r{d}, r{d}", .{ inst.data.bin.lhs, inst.data.bin.rhs }),
                 .build_trace_and_throw_exception => try stdout.print("BuildTraceAndThrowException", .{}),
                 .call => {
                     try stdout.print("Call r{d} <- r{d}(", .{ inst.data.call.ret, inst.data.call.callee });

@@ -128,6 +128,7 @@ pub const Node = struct {
         },
         class_decl: struct {
             name: []const u8,
+            super_class: ?[]const u8,
             methods: []const *Node,
         },
     };
@@ -372,11 +373,12 @@ pub fn makeFunctionExpr(ast: *Ast, loc: Token.Loc, params: [][]const u8, body: *
     return node;
 }
 
-pub fn makeClassDecl(ast: *Ast, loc: Token.Loc, name: []const u8, methods: []const *Node) !*Node {
+pub fn makeClassDecl(ast: *Ast, loc: Token.Loc, name: []const u8, super_class: ?[]const u8, methods: []const *Node) !*Node {
     var node = try makeNode(ast, .class_decl, loc);
     node.data = .{
         .class_decl = .{
             .name = name,
+            .super_class = super_class,
             .methods = methods,
         },
     };

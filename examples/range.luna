@@ -1,0 +1,36 @@
+class range{
+    fn __init__(start,end,step){
+        this.start=start
+        this.end=end
+        this.step=step
+    }
+
+    fn __iter__(){
+        return this
+    }
+
+    fn __next__(){
+        if this.start<this.end{
+            let result=this.start
+            this.start=this.start+this.step
+            return result
+        }
+        return undefined
+    }
+
+    fn __str__(){
+        return "Range<"+this.start+":"+this.end+":"+this.step+">"
+    }
+}
+
+
+let a=range(0,5,1)
+let r=range(5,10,1)
+
+foreach i in a{
+    print(i)
+}
+
+foreach i in r{
+    print(i)
+}

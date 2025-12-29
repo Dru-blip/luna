@@ -1,5 +1,6 @@
 const std = @import("std");
 const Object = @import("../runtime/Object.zig");
+const Class = @import("../runtime/Class.zig");
 const String = @import("../runtime/String.zig");
 const Vm = @import("../runtime/Vm.zig");
 const Function = @import("../runtime/Function.zig");
@@ -109,6 +110,10 @@ pub inline fn toObject(value: Value) *Object {
 
 pub inline fn asObject(value: Value) ?*Object {
     return if (value.type == .object) value.data.object else null;
+}
+
+pub inline fn asClass(value: Value) ?*Class {
+    return if (value.type == .object) value.toObject().asClass() else null;
 }
 
 pub inline fn asNumber(value: Value) f64 {

@@ -353,6 +353,18 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 registers[data.bin.rhs] = Value.object(Object.from(class));
                 continue :start;
             },
+            .set_super_class => {
+                const sub_class_value = registers[data.bin.rhs];
+                const super_class_value = registers[data.bin.lhs];
+
+                if (super_class_value.asClass()) |super_class| {
+                    const sub_class: *Class = sub_class_value.toObject().as(Class);
+                    sub_class.super_class = super_class;
+                    continue :start;
+                }
+
+                return vm.raiseException(.type_error, "Expected a class", .{});
+            },
             .add_class_method => {
                 const class: *Class = registers[data.bin.rhs].toObject().as(Class);
                 const method: *Function = registers[data.bin.lhs].toObject().as(Function);

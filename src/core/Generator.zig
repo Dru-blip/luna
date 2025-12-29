@@ -305,6 +305,25 @@ fn genClassDecl(g: *Generator, node: *const Ast.Node) !void {
     try g.addBin(.build_class, class_name_index, class_reg, node.loc);
     try g.addBin(if (variable.scope == .global) .store_global_by_index else .mov, class_reg, variable.allocated_reg_slot, node.loc);
 
+    if (node.data.class_decl.super_class) |super_class| {
+        var super_class_var: Variable = undefined;
+        var super_class_reg: u32 = undefined;
+        if (g.findVariable(super_class, &super_class_var)) {
+            if (variable.scope == .global) {
+                super_class_reg = g.allocRegister();
+                try g.addBin(.load_global_by_index, super_class_var.allocated_reg_slot, super_class_reg, node.loc);
+            } else {
+                super_class_reg = super_class_var.allocated_reg_slot;
+            }
+        } else {
+            const super_class_name_index = try g.addIdentifier(super_class);
+            super_class_reg = g.allocRegister();
+            try g.addBin(.load_global_by_name, super_class_name_index, super_class_reg, node.loc);
+        }
+
+        try g.addBin(.set_super_class, super_class_reg, class_reg, node.loc);
+    }
+
     for (node.data.class_decl.methods) |method| {
         const method_reg = try g.genFunctionExpr(method, method.data.fndecl.name);
         try g.addBin(.add_class_method, method_reg, class_reg, method.loc);
@@ -375,7 +394,7 @@ fn genForEachStmt(g: *Generator, node: *const Ast.Node) GenError!void {
 
     g.switchBasicBlock(head_block);
     const next_value_reg = g.allocRegister();
-    try g.addBin(.iter_next, iterator_reg, next_value_reg, node.loc);
+    try g.addBin(.iter_next, iterator_reg, next_value_reg, node.data.foreach.iterable.loc);
     // TODO: Avoid relying on a falsy check here.
     // If the iterator returns a falsy value, the iteration stops prematurely.
     try g.addTri(.branch, next_value_reg, body_block.id, end_block.id, node.loc);
