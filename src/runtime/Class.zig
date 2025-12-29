@@ -34,13 +34,13 @@ pub inline fn newInstance(class: *Class, gc: *Gc) !*Object {
 }
 
 pub fn defineNativeMethod(class: *Class, gc: *Gc, name: []const u8, func: NativeFunction.Function, arity: u8, isVariadic: bool) !void {
-    const nf = try NativeFunction.new(gc, func, arity, isVariadic);
-    try class.putField(gc, name, Value.object(nf));
+    const interned_name = try gc.interpreter.string_interner.intern(name);
+    const nf = try NativeFunction.new(gc, func, interned_name, arity, isVariadic);
+    try class.putField(interned_name, Value.object(nf));
 }
 
-pub fn putField(class: *Class, gc: *Gc, name: []const u8, value: Value) !void {
-    const interned_name = try gc.interpreter.string_interner.intern(name);
-    try class.methods.fields.put(interned_name, value);
+pub fn putField(class: *Class, name: *String, value: Value) !void {
+    try class.methods.fields.put(name, value);
 }
 
 pub fn getField(class: *Class, name: *String) ?Value {

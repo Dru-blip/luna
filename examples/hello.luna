@@ -18,12 +18,8 @@ class range{
         return undefined
     }
 
-    fn __getitem(index){
-        return index
-    }
-
     fn __str__(){
-        return "range"
+        return "Range"
     }
 }
 

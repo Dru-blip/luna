@@ -340,6 +340,7 @@ fn genFuncDecl(g: *Generator, node: *const Ast.Node) GenError!void {
     try func_gen.addUn(.ret_none, func_gen.allocRegister(), node.loc);
     var executable = try func_gen.finalize();
     executable.name = name;
+    executable.param_count = @intCast(node.data.fndecl.params.len);
 
     const executable_index = try g.addConstant(Value.object(Object.from(executable)));
     const function_index = g.allocRegister();
@@ -708,6 +709,7 @@ inline fn genFunctionExpr(g: *Generator, node: *const Ast.Node, name: []const u8
     try func_gen.addUn(.ret_none, func_gen.allocRegister(), node.loc);
     var executable = try func_gen.finalize();
     executable.name = try g.string_interner.intern(name);
+    executable.param_count = @intCast(node.data.fndecl.params.len);
 
     const executable_index = try g.addConstant(Value.object(Object.from(executable)));
     const function_index = g.allocRegister();

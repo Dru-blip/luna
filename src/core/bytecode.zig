@@ -99,6 +99,7 @@ pub const Executable = struct {
     max_register_count: u32,
     global_variable_count: u32,
     name: *String,
+    param_count: u8,
     filepath: []const u8,
 
     pub fn new(gc: *Gc) !*Executable {

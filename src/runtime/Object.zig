@@ -101,11 +101,11 @@ pub fn callAssumeCallable(
         return native_fn.function(vm, this_value, args);
     }
 
-    if (self.isFunction()) {
-        const function: *Function = self.as(Function);
+    if (self.asFunction()) |function| {
+        _ = try vm.checkArity(Function, function.exe.name, function.arity, @intCast(args.len), false);
 
         vm.records.appendAssumeCapacity(
-            try Vm.ActivationRecord.init(function.data.executable, &vm.register_pool),
+            try Vm.ActivationRecord.init(function.exe, &vm.register_pool),
         );
 
         var record = &vm.records.items[vm.records.items.len - 1];

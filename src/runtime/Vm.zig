@@ -12,6 +12,7 @@ const Gc = @import("../core/Gc.zig");
 const Dict = @import("Dict.zig");
 const List = @import("List.zig");
 const Class = @import("Class.zig");
+const NativeFunction = @import("NativeFunction.zig");
 
 const Vm = @This();
 
@@ -333,7 +334,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             .add_class_method => {
                 const class: *Class = registers[data.bin.rhs].toObject().as(Class);
                 const method: *Function = registers[data.bin.lhs].toObject().as(Function);
-                try class.addMethod(method.data.executable.name, registers[data.bin.lhs]);
+                try class.addMethod(method.exe.name, registers[data.bin.lhs]);
                 continue :start;
             },
             .build_trace_and_throw_exception => {
@@ -453,12 +454,14 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const this_value = registers[data.call.this];
 
                 if (callee_obj.asNativeFunction()) |native_function| {
-                    const args = try vm.gpa.alloc(Value, data.call.args.len);
-                    defer vm.gpa.free(args);
+                    _ = try vm.checkArity(NativeFunction, native_function.name, native_function.arity, @intCast(data.call.args.len), native_function.isVariadic);
+
+                    var args: [8]Value = undefined;
                     for (data.call.args, 0..) |arg, i| {
                         args[i] = record.registers[arg];
                     }
-                    registers[data.call.ret] = try native_function.function(vm, this_value.toObject(), args);
+
+                    registers[data.call.ret] = try native_function.function(vm, this_value.toObject(), args[0..data.call.args.len]);
                     continue :start;
                 }
 
@@ -475,8 +478,11 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 }
 
                 const function: *Function = callee_obj.as(Function);
+
+                _ = try vm.checkArity(Function, function.exe.name, function.arity, @intCast(data.call.args.len), false);
+
                 const caller_record = vm.records.getLast();
-                vm.records.appendAssumeCapacity(try ActivationRecord.init(function.data.executable, &vm.register_pool));
+                vm.records.appendAssumeCapacity(try ActivationRecord.init(function.exe, &vm.register_pool));
                 record = &vm.records.items[vm.records.items.len - 1];
                 record.caller_return_reg = data.call.ret;
 
@@ -525,6 +531,30 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 return Value.None;
             },
         }
+    }
+
+    return Value.None;
+}
+
+pub inline fn checkArity(vm: *Vm, comptime T: anytype, name: *String, expected: u8, actual: u8, variadic: bool) !Value {
+    comptime {
+        if (!@hasField(T, "arity")) {
+            @compileError("Callable must define arity");
+        }
+    }
+
+    const check = switch (T) {
+        NativeFunction => !variadic and actual != expected,
+        Function => actual != expected,
+        else => unreachable,
+    };
+
+    if (check) {
+        return try vm.raiseException(
+            .type_error,
+            "'{s}' expects {d} arguments but got {d}",
+            .{ name.asSlice(), expected, actual },
+        );
     }
 
     return Value.None;
