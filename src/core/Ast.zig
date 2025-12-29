@@ -60,6 +60,7 @@ pub const Node = struct {
         list_expr,
 
         this_expr,
+        super_expr,
         function_expr,
 
         identifier,

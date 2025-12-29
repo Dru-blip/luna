@@ -621,6 +621,11 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
         .@"or" => {
             return try g.genLogicalOp(.@"or", node);
         },
+        .super_expr => {
+            const reg = g.allocRegister();
+            try g.addUn(.get_super_class, reg, node.loc);
+            return reg;
+        },
         .assign => {
             const value = try g.genExpr(node.data.bin.rhs);
             switch (node.data.bin.lhs.tag) {
@@ -775,7 +780,12 @@ inline fn genMemberExpr(g: *Generator, node: *const Ast.Node, this_reg: ?*u32) G
     const key_index = try g.addConstant(Value.object(Object.from(ident)));
     try g.addTri(.get_attribute, object, key_index, dst, node.loc);
     if (this_reg) |this| {
-        this.* = object;
+        //TODO: be careful with this
+        if (node.data.member.object.tag == .super_expr) {
+            this.* = 0;
+        } else {
+            this.* = object;
+        }
     }
     return dst;
 }

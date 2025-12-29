@@ -478,6 +478,11 @@ fn parsePrimaryExpr(p: *Parser) ParserError!*Node {
             p.advance();
             return try p.ast.makeNode(.undefined_literal, token.loc);
         },
+        .keyword_super => {
+            p.advance();
+            const node = try p.ast.makeNode(.super_expr, token.loc);
+            return node;
+        },
         else => {
             if (token.tag == .eof) {
                 try p.recordError(token.loc, "Unexpected end of file", .{});

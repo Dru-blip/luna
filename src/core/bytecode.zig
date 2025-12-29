@@ -63,6 +63,7 @@ pub const Inst = struct {
         build_class,
         add_class_method,
         set_super_class,
+        get_super_class,
 
         ret, // uses un
         ret_none, // uses un
@@ -188,6 +189,7 @@ pub const Executable = struct {
                 .build_class => try stdout.print("BuildClass r{d} names[{d}]", .{ inst.data.bin.rhs, inst.data.bin.lhs }),
                 .add_class_method => try stdout.print("AddClassMethod r{d}", .{inst.data.bin.rhs}),
                 .set_super_class => try stdout.print("SetSuperClass r{d}, r{d}", .{ inst.data.bin.lhs, inst.data.bin.rhs }),
+                .get_super_class => try stdout.print("GetSuperClass r{d}", .{inst.data.un}),
                 .build_trace_and_throw_exception => try stdout.print("BuildTraceAndThrowException", .{}),
                 .call => {
                     try stdout.print("Call r{d} <- r{d}(", .{ inst.data.call.ret, inst.data.call.callee });
@@ -201,7 +203,7 @@ pub const Executable = struct {
                 .add_dict_entry => try stdout.print("SetDictEntry r{d}={{r{d}:r{d}}}", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
                 .build_list => try stdout.print("BuildList r{d}", .{inst.data.un}),
                 .append_list_item => try stdout.print("AppendListItem ", .{}),
-                .get_attribute => try stdout.print("GetAttribute", .{}),
+                .get_attribute => try stdout.print("GetAttribute ", .{}),
                 .set_attribute => try stdout.print("SetAttribute", .{}),
                 .set_item => try stdout.print("SetItem", .{}),
                 .get_item => try stdout.print("GetItem", .{}),

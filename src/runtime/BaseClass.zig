@@ -18,6 +18,13 @@ fn getattr(vm: *Vm, self: *Object, args: []const Value) !Value {
     const key = args[0];
 
     const name = key.toObject().toString();
+
+    if (self.asClass()) |class| {
+        if (class.getField(name)) |val| {
+            return val;
+        }
+    }
+
     const instance: *Instance = self.as(Instance);
     const class: *Class = instance.class;
 

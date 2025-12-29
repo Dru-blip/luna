@@ -1,13 +1,16 @@
 class Animal{
+    fn __init__(name){
+        this.name=name
+    }
+
     fn speak(){
         print("Animal speaks")
     }
-
 }
 
 class Dog : Animal {
     fn __init__(){
-        this.name="leo"
+        super.__init__("leo")
     }
 
     fn speak(){

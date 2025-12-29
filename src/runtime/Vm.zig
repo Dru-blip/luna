@@ -365,6 +365,14 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 
                 return vm.raiseException(.type_error, "Expected a class", .{});
             },
+            .get_super_class => {
+                //ERROR: This is wrong , function should maintain a home class or home object.
+                // should fix later.
+                const self_value = registers[0];
+                const super_class = self_value.toObject().class.super_class.?;
+                registers[data.un] = Value.object(Object.from(super_class));
+                continue :start;
+            },
             .add_class_method => {
                 const class: *Class = registers[data.bin.rhs].toObject().as(Class);
                 const method: *Function = registers[data.bin.lhs].toObject().as(Function);
@@ -573,7 +581,6 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 instructions = record.executable.instructions;
                 constants = record.executable.constants;
                 identifiers = record.executable.identifiers;
-                record.registers[callee.caller_return_reg] = Value.None;
                 callee.deinit(&vm.register_pool);
                 continue :start;
             },
