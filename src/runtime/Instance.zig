@@ -4,6 +4,8 @@ const Class = @import("Class.zig");
 const Gc = @import("../core/Gc.zig");
 const Object = @import("Object.zig");
 const ObjectSet = @import("ObjectSet.zig");
+const String = @import("String.zig");
+const Value = @import("../core/Value.zig");
 
 const Instance = @This();
 
@@ -15,6 +17,14 @@ pub const type_descriptor: Object.TypeDescriptor = .{
     .visit = visit,
     .finalize = finalize,
 };
+
+pub fn getAttribute(self: *Instance, name: *String) ?Value {
+    return self.attributes.fields.get(name);
+}
+
+pub fn setAttribute(self: *Instance, name: *String, value: Value) !void {
+    try self.attributes.fields.put(name, value);
+}
 
 pub fn visit(self: *Object, live_objects: *ObjectSet) !void {
     try live_objects.add(self);

@@ -11,6 +11,7 @@ const Class = @import("Class.zig");
 const StringClass = @import("StringClass.zig");
 const DictClass = @import("DictClass.zig");
 const ListClass = @import("ListClass.zig");
+const BaseClass = @import("BaseClass.zig");
 const ListIterator = @import("ListIterator.zig");
 
 const String = @import("String.zig");
@@ -48,6 +49,7 @@ pub const Names = struct {
     __setattr__: *String,
     __iter__: *String,
     __next__: *String,
+    __init__: *String,
 
     pub fn init(string_interner: *StringInterner) !Names {
         return .{
@@ -64,6 +66,7 @@ pub const Names = struct {
             .__setattr__ = try string_interner.intern("__setattr__"),
             .__iter__ = try string_interner.intern("__iter__"),
             .__next__ = try string_interner.intern("__next__"),
+            .__init__ = try string_interner.intern("__init__"),
         };
     }
 };
@@ -92,6 +95,7 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     Object.from(interpreter.list_class).class = interpreter.base_class;
     Object.from(interpreter.list_iterator_class).class = interpreter.base_class;
 
+    try BaseClass.registerMethods(&interpreter.gc, interpreter.base_class);
     try StringClass.registerMethods(&interpreter.gc, interpreter.string_class);
     try DictClass.registerMethods(&interpreter.gc, interpreter.dict_class);
     try ListClass.registerMethods(&interpreter.gc, interpreter.list_class);

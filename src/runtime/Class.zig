@@ -44,7 +44,14 @@ pub fn putField(class: *Class, gc: *Gc, name: []const u8, value: Value) !void {
 }
 
 pub fn getField(class: *Class, name: *String) ?Value {
-    return class.methods.fields.get(name);
+    var current_class: ?*Class = class;
+    while (current_class) |c| {
+        if (c.methods.fields.get(name)) |value| {
+            return value;
+        }
+        current_class = c.super_class;
+    }
+    return null;
 }
 
 pub fn addMethod(class: *Class, name: *String, function: Value) !void {

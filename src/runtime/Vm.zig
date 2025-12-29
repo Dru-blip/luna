@@ -324,6 +324,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             .build_class => {
                 const class_name = identifiers[data.bin.lhs];
                 const class = try Class.new(vm.gc);
+                class.super_class = vm.interpreter.base_class;
                 class.name = class_name.toObject().toString();
                 Object.from(class).class = vm.interpreter.base_class;
                 registers[data.bin.rhs] = Value.object(Object.from(class));
@@ -462,7 +463,14 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 }
 
                 if (callee_obj.asClass()) |class| {
+                    var args: [8]Value = undefined;
+                    for (data.call.args, 0..) |arg, i| {
+                        args[i] = record.registers[arg];
+                    }
                     registers[data.call.ret] = Value.object(try class.newInstance(vm.gc));
+                    if (class.getField(vm.interpreter.common_names.__init__)) |constructor| {
+                        _ = try constructor.toObject().callAssumeCallable(vm, registers[data.call.ret].toObject(), args[0..data.call.args.len]);
+                    }
                     continue :start;
                 }
 

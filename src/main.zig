@@ -1,6 +1,7 @@
 const std = @import("std");
 const Interpreter = @import("runtime/Interpreter.zig");
 
+//TODO: should flatten the inheritance chain.
 pub fn main() !void {
     var gpa = std.heap.DebugAllocator(.{}){};
     defer {
