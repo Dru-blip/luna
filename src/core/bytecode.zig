@@ -45,6 +45,7 @@ pub const Inst = struct {
         build_trace_and_throw_exception, //uses un
 
         call, // uses call
+        super_call, //uses super_call,
 
         build_dict,
         add_dict_entry,
@@ -84,6 +85,13 @@ pub const Inst = struct {
         call: struct {
             callee: u32,
             this: u32,
+            ret: u32,
+            args: []u32,
+        },
+        //INFO: i dont think i need super_call member, we can just reuse the call member.
+        // either way they share the same space.
+        super_call: struct {
+            method: u32,
             ret: u32,
             args: []u32,
         },
@@ -144,7 +152,6 @@ pub const Executable = struct {
                 if (obj.type_descriptor == &Executable.type_descriptor) {
                     const child_executable: *Executable = obj.as(Executable);
                     try child_executable.print();
-                    try stdout.print("\n", .{});
                 }
             }
         }
@@ -199,6 +206,9 @@ pub const Executable = struct {
                     }
                     try stdout.print(")", .{});
                 },
+                .super_call => {
+                    try stdout.print("SuperCall", .{});
+                },
                 .build_dict => try stdout.print("BuildDict r{d}", .{inst.data.un}),
                 .add_dict_entry => try stdout.print("SetDictEntry r{d}={{r{d}:r{d}}}", .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 }),
                 .build_list => try stdout.print("BuildList r{d}", .{inst.data.un}),
@@ -212,10 +222,8 @@ pub const Executable = struct {
                 .ret => try stdout.print("Ret r{d}", .{inst.data.un}),
                 .ret_none => try stdout.print("RetNone", .{}),
             }
-
             try stdout.print("\n", .{});
         }
-
         try stdout.print("}}\n", .{});
         try stdout.flush();
     }

@@ -35,7 +35,7 @@ pub inline fn newInstance(class: *Class, gc: *Gc) !*Object {
 
 pub fn defineNativeMethod(class: *Class, gc: *Gc, name: []const u8, func: NativeFunction.Function, arity: u8, isVariadic: bool) !void {
     const interned_name = try gc.interpreter.string_interner.intern(name);
-    const nf = try NativeFunction.new(gc, func, interned_name, arity, isVariadic);
+    const nf = try NativeFunction.new(gc, class, func, interned_name, arity, isVariadic);
     try class.putField(interned_name, Value.object(nf));
 }
 

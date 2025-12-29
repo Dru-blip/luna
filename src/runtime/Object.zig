@@ -105,7 +105,7 @@ pub fn callAssumeCallable(
         _ = try vm.checkArity(Function, function.exe.name, function.arity, @intCast(args.len), false);
 
         vm.records.appendAssumeCapacity(
-            try Vm.ActivationRecord.init(function.exe, &vm.register_pool),
+            try Vm.ActivationRecord.withFunction(&vm.register_pool, function),
         );
 
         var record = &vm.records.items[vm.records.items.len - 1];

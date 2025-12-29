@@ -659,6 +659,11 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
                     .ret = 0,
                 },
             };
+
+            if (node.data.call.callee.tag == .member_expr and node.data.call.callee.data.member.object.tag == .super_expr) {
+                return try g.genSuperCall(node);
+            }
+
             switch (node.data.call.callee.tag) {
                 .identifier => {
                     data.call.callee = try g.genIdentifier(node.data.call.callee);
@@ -718,6 +723,29 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
             unreachable;
         },
     }
+}
+
+inline fn genSuperCall(g: *Generator, node: *const Ast.Node) GenError!u32 {
+    const member = node.data.call.callee.data.member;
+
+    const method = try g.addIdentifier(member.property);
+
+    var args: std.ArrayList(u32) = .empty;
+    for (node.data.call.args) |arg| {
+        try args.append(g.gpa, try g.genExpr(arg));
+    }
+
+    const ret = g.allocRegister();
+
+    try g.addInst(.super_call, .{
+        .super_call = .{
+            .method = method,
+            .args = try args.toOwnedSlice(g.gpa),
+            .ret = ret,
+        },
+    }, node.loc);
+
+    return ret;
 }
 
 inline fn genFunctionExpr(g: *Generator, node: *const Ast.Node, name: []const u8) GenError!u32 {

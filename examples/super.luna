@@ -1,0 +1,90 @@
+//TEST:1
+class A {
+    fn speak() {
+        print("A")
+    }
+}
+
+class B : A {
+    fn speak() {
+        print("B")
+        super.speak()
+    }
+}
+
+class C : B {}
+
+//TEST:2
+class A {
+    fn __init__(name) {
+        this.name = name
+        print("A init")
+    }
+}
+
+class B : A {
+    fn __init__() {
+        print("B init start")
+        super.__init__("leo")
+        print("B init end")
+    }
+}
+
+//TEST:3
+
+class A {
+    fn speak() {
+        print(this.name)
+    }
+}
+
+class B : A {
+    fn __init__() {
+        this.name = "dog"
+    }
+
+    fn speak() {
+        super.speak()
+    }
+}
+
+
+//TEST:4
+class A {
+    fn speak() {
+        print("A")
+    }
+}
+
+class B : A {
+    fn speak() {
+        print("B")
+        super.speak()
+    }
+}
+
+class C : B {
+    fn speak() {
+        print("C")
+        super.speak()
+    }
+}
+
+//TEST:5
+class A {
+    fn speak(n) {
+        if n > 0 {
+            print(n)
+            super.speak(n - 1)
+        }
+    }
+}
+
+class B : A {
+    fn speak(n) {
+        super.speak(n)
+    }
+}
+
+//Should throw error
+B().speak(3)

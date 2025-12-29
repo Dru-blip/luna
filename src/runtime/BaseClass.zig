@@ -19,12 +19,19 @@ fn getattr(vm: *Vm, self: *Object, args: []const Value) !Value {
 
     const name = key.toObject().toString();
 
+    //PATH: __getattr__ is called on a class.
     if (self.asClass()) |class| {
         if (class.getField(name)) |val| {
             return val;
         }
+        return try vm.raiseException(
+            .attribute_error,
+            "'{s}' object has no attribute '{s}'",
+            .{ class.name.asSlice(), name.asSlice() },
+        );
     }
 
+    //PATH: __getattr__ is called on an instance.
     const instance: *Instance = self.as(Instance);
     const class: *Class = instance.class;
 
@@ -36,13 +43,15 @@ fn getattr(vm: *Vm, self: *Object, args: []const Value) !Value {
         return value;
     }
 
-    var current_class: ?*Class = self.class;
-    while (current_class) |cls| {
-        if (cls.getField(name)) |value| {
-            return value;
-        }
-        current_class = cls.super_class;
-    }
+    //INFO: we already walk the inheritance chain in class.getField
+    //
+    // var current_class: ?*Class = self.class;
+    // while (current_class) |cls| {
+    //     if (cls.getField(name)) |value| {
+    //         return value;
+    //     }
+    //     current_class = cls.super_class;
+    // }
 
     return try vm.raiseException(
         .attribute_error,

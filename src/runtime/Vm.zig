@@ -64,12 +64,22 @@ pub const ActivationRecord = struct {
     registers: []Value,
     ip: usize = 0,
     caller_return_reg: u32 = undefined,
+    function: ?*Function = null,
 
     pub fn init(executable: *Executable, register_pool: *RegisterPool) !ActivationRecord {
         const registers = try register_pool.allocate(executable.max_register_count);
         return .{
             .executable = executable,
             .registers = registers,
+        };
+    }
+
+    pub fn withFunction(register_pool: *RegisterPool, function: *Function) !ActivationRecord {
+        const registers = try register_pool.allocate(function.exe.max_register_count);
+        return .{
+            .executable = function.exe,
+            .registers = registers,
+            .function = function,
         };
     }
 
@@ -366,16 +376,15 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 return vm.raiseException(.type_error, "Expected a class", .{});
             },
             .get_super_class => {
-                //ERROR: This is wrong , function should maintain a home class or home object.
-                // should fix later.
-                const self_value = registers[0];
-                const super_class = self_value.toObject().class.super_class.?;
+                //ERROR: this is useless.
+                const super_class = record.function.?.home_class.?.super_class.?;
                 registers[data.un] = Value.object(Object.from(super_class));
                 continue :start;
             },
             .add_class_method => {
                 const class: *Class = registers[data.bin.rhs].toObject().as(Class);
                 const method: *Function = registers[data.bin.lhs].toObject().as(Function);
+                method.home_class = class;
                 try class.addMethod(method.exe.name, registers[data.bin.lhs]);
                 continue :start;
             },
@@ -498,6 +507,29 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 }
                 continue :start;
             },
+            .super_call => {
+                const super_class = record.function.?.home_class.?.super_class.?;
+                const method_name = identifiers[data.super_call.method].toObject().toString();
+                const method_value = super_class.getField(method_name);
+                const this_value = registers[0];
+
+                if (method_value) |meth_val| {
+                    if (meth_val.asObject()) |meth_obj| {
+                        var args: [8]Value = undefined;
+                        for (data.super_call.args, 0..) |arg, i| {
+                            args[i] = record.registers[arg];
+                        }
+
+                        _ = try meth_obj.callAssumeCallable(vm, this_value.toObject(), args[0..data.super_call.args.len]);
+                        continue :start;
+                    }
+                }
+                return try vm.raiseException(
+                    .attribute_error,
+                    "'{s}' has no method '{s}'",
+                    .{ super_class.name.asSlice(), method_name.asSlice() },
+                );
+            },
             .call => {
                 const callee = registers[data.call.callee];
                 if (!callee.isObject()) {
@@ -540,7 +572,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 _ = try vm.checkArity(Function, function.exe.name, function.arity, @intCast(data.call.args.len), false);
 
                 const caller_record = vm.records.getLast();
-                vm.records.appendAssumeCapacity(try ActivationRecord.init(function.exe, &vm.register_pool));
+                vm.records.appendAssumeCapacity(try ActivationRecord.withFunction(&vm.register_pool, function));
                 record = &vm.records.items[vm.records.items.len - 1];
                 record.caller_return_reg = data.call.ret;
 

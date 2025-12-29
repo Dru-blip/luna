@@ -1,6 +1,7 @@
 class Animal{
     fn __init__(name){
         this.name=name
+        super.speak()
     }
 
     fn speak(){
@@ -17,6 +18,3 @@ class Dog : Animal {
         print(this.name+" barks")
     }
 }
-
-let a=Dog()
-a.speak()
