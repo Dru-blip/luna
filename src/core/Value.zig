@@ -167,3 +167,14 @@ pub fn eql(a: Value, b: Value) bool {
         },
     };
 }
+
+pub fn toString(value: Value) []const u8 {
+    var buf: [56]u8 = undefined;
+    return switch (value.type) {
+        .number => std.fmt.bufPrint(&buf, "{d}", .{value.data.number}) catch "0",
+        .bool => if (value.data.bool) "true" else "false",
+        .undefined => "undefined",
+        .none => "none",
+        else => unreachable,
+    };
+}

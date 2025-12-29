@@ -194,6 +194,28 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     continue :start;
                 }
 
+                if (lhs.isString() or rhs.isString()) {
+                    const self_str = if (lhs.isString())
+                        lhs.toObject().toString()
+                    else
+                        rhs.toObject().toString();
+
+                    const other_value = if (lhs.isString()) rhs else lhs;
+
+                    var other_str: *String = undefined;
+                    if (other_value.isObject()) {
+                        const s = try vm.invokeSpecialMethod(other_value, vm.interpreter.common_names.__str__, &[_]Value{});
+                        if (s.isString()) {
+                            other_str = s.toObject().toString();
+                        }
+                        _ = try vm.raiseException(.type_error, "__str__ method returned non-string value", .{});
+                    } else {
+                        other_str = (try String.new(vm.gc, other_value.toString())).asString().?;
+                    }
+                    registers[data.tri.dst] = Value.object(try self_str.concat(vm.gc, other_str));
+                    continue :start;
+                }
+
                 return vm.raiseTypeException("+", lhs, rhs);
             },
             .sub => {
@@ -373,7 +395,11 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 var args: [1]Value = undefined;
                 args[0] = index;
 
-                registers[data.tri.dst] = try vm.invokeSpecialMethod(target, vm.interpreter.common_names.__getitem__, &args);
+                registers[data.tri.dst] = try vm.invokeSpecialMethod(
+                    target,
+                    vm.interpreter.common_names.__getitem__,
+                    &args,
+                );
                 continue :start;
             },
             .set_item => {
@@ -384,7 +410,11 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 args[0] = index;
                 args[1] = registers[data.tri.dst];
 
-                _ = try vm.invokeSpecialMethod(target, vm.interpreter.common_names.__setitem__, &args);
+                _ = try vm.invokeSpecialMethod(
+                    target,
+                    vm.interpreter.common_names.__setitem__,
+                    &args,
+                );
 
                 continue :start;
             },
@@ -395,7 +425,11 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 var args: [1]Value = undefined;
                 args[0] = index;
 
-                registers[data.tri.dst] = try vm.invokeSpecialMethod(target, vm.interpreter.common_names.__getattr__, &args);
+                registers[data.tri.dst] = try vm.invokeSpecialMethod(
+                    target,
+                    vm.interpreter.common_names.__getattr__,
+                    &args,
+                );
                 continue :start;
             },
             .set_attribute => {
@@ -406,7 +440,11 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 args[1] = index;
                 args[0] = registers[data.tri.op1];
 
-                _ = try vm.invokeSpecialMethod(target, vm.interpreter.common_names.__setattr__, &args);
+                _ = try vm.invokeSpecialMethod(
+                    target,
+                    vm.interpreter.common_names.__setattr__,
+                    &args,
+                );
 
                 continue :start;
             },

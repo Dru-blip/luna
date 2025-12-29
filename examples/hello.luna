@@ -19,7 +19,7 @@ class range{
     }
 
     fn __str__(){
-        return "Range"
+        return "Range<"+this.start+":"+this.end+":"+this.step+">"
     }
 }
 
