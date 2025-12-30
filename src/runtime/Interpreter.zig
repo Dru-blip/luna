@@ -13,6 +13,7 @@ const DictClass = @import("DictClass.zig");
 const ListClass = @import("ListClass.zig");
 const BaseClass = @import("BaseClass.zig");
 const ListIterator = @import("ListIterator.zig");
+const Module = @import("Module.zig");
 
 const String = @import("String.zig");
 
@@ -20,7 +21,7 @@ const GlobalObject = @import("GlobalObject.zig");
 
 const Interpreter = @This();
 
-pub const Error = error{ ExceptionThrown, RegisterPoolExhausted } || std.mem.Allocator.Error || error{ ReadFailed, StreamTooLong } || std.fs.File.WriteError;
+pub const Error = error{ ExceptionThrown, RegisterPoolExhausted } || std.mem.Allocator.Error || error{ ReadFailed, StreamTooLong };
 
 gc: Gc,
 string_interner: StringInterner = undefined,
@@ -32,8 +33,9 @@ base_class: *Class = undefined,
 dict_class: *Class = undefined,
 list_class: *Class = undefined,
 list_iterator_class: *Class = undefined,
-
 common_names: Names = undefined,
+running_module: *Module = undefined,
+main_module: ?*Module = null,
 
 pub const Names = struct {
     Class: *String,
@@ -73,7 +75,6 @@ pub const Names = struct {
     }
 };
 
-// running_module: *Module,
 pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     var interpreter = try gpa.create(Interpreter);
     const gc = Gc.init(gpa, interpreter);
@@ -114,39 +115,57 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     return interpreter;
 }
 
-pub fn runFile(i: *Interpreter, path: []const u8) !Value {
-    var file = try std.fs.cwd().openFile(path, .{});
+pub fn runFile(i: *Interpreter, path: []const u8) Error!Value {
+    var file = std.fs.cwd().openFile(path, .{}) catch {
+        //TODO: Handle file opening error
+        return i.vm.raiseException(.module_not_found_error, "Module not found: {s}", .{path});
+    };
+
     defer file.close();
-    const file_stats = try file.stat();
+    const file_stats = file.stat() catch {
+        //TODO: Handle file stat error
+        return i.vm.raiseException(.module_not_found_error, "Module not found: {s}", .{path});
+    };
     var buffer = try i.gc.gpa.alloc(u8, file_stats.size + 1);
 
     //TODO: should switch to new reader implementation.
-    _ = try file.readAll(buffer);
+    _ = file.readAll(buffer) catch {
+        //TODO: do something with the error
+    };
     buffer[file_stats.size] = 0;
 
+    const prev_running_module = i.running_module;
+    defer i.running_module = prev_running_module;
+
+    const new_module = try Module.new(&i.gc, path);
+
+    i.running_module = new_module;
+
+    if (i.main_module == null) {
+        i.main_module = new_module;
+    }
+
     var ast = Ast.parse(path, buffer[0..file_stats.size :0], i.gc.gpa) catch {
+        //TODO: Handle AST parsing error
         return Value.None;
     };
     defer ast.deinit();
 
     var generator = try Generator.init(i.gc.gpa, ast, &i.gc, &i.string_interner);
     const executable = try generator.generate();
-    try executable.print();
+    executable.print() catch {};
 
     const result = i.vm.runExecutable(executable) catch |err| {
+        if (i.running_module != i.main_module.?) {
+            return err;
+        }
         switch (err) {
-            error.OutOfMemory => {
-                return Value.None;
-            },
-            error.RegisterPoolExhausted => {
-                return Value.None;
-            },
             error.ExceptionThrown => {
-                std.debug.print("{s}\n", .{try i.exception.?.traceString(i.gc.gpa)});
+                std.debug.print("{s}\n", .{i.exception.?.traceString(i.gc.gpa) catch ""});
                 return Value.None;
             },
             else => {
-                return Value.None;
+                return err;
             },
         }
     };

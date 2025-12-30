@@ -22,15 +22,5 @@ class range{
         return "Range<"+this.start+":"+this.end+":"+this.step+">"
     }
 }
-
-
-let a=range(0,5,1)
-let r=range(5,10,1)
-
-foreach i in a{
-    print(i)
-}
-
-foreach i in r{
-    print(i)
-}
+4+none
+return range

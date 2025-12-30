@@ -589,9 +589,10 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             },
             .ret => {
                 var callee = vm.records.pop().?;
-                if (vm.records.items.len == 0 or as_callback) {
+                if (vm.records.items.len == 0 or vm.interpreter.running_module != vm.interpreter.main_module.? or as_callback) {
                     return registers[data.un];
                 }
+
                 record = &vm.records.items[vm.records.items.len - 1];
 
                 registers = record.registers;
@@ -604,7 +605,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             },
             .ret_none => {
                 var callee = vm.records.pop().?;
-                if (vm.records.items.len == 0 or as_callback) {
+                if (vm.records.items.len == 0 or vm.interpreter.running_module != vm.interpreter.main_module.? or as_callback) {
                     return Value.None;
                 }
                 record = &vm.records.items[vm.records.items.len - 1];

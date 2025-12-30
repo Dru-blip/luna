@@ -1,3 +1,25 @@
+class Animal{
+    fn __init__(name){
+        this.name=name
+        super.speak()
+    }
+
+    fn speak(){
+        print("Animal speaks")
+    }
+}
+
+class Dog : Animal {
+    fn __init__(){
+        super.__init__("leo")
+    }
+
+    fn speak(){
+        print(this.name+" barks")
+    }
+}
+
+
 //TEST:1
 class A {
     fn speak() {

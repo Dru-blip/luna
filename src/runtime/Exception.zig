@@ -17,6 +17,7 @@ pub const Tag = enum {
     attribute_error,
     index_error,
     value_error,
+    module_not_found_error,
 
     pub fn toString(self: Tag) []const u8 {
         return switch (self) {
@@ -28,6 +29,7 @@ pub const Tag = enum {
             .attribute_error => "AttributeError",
             .index_error => "IndexError",
             .value_error => "ValueError",
+            .module_not_found_error => "ModuleNotFoundError",
         };
     }
 };
