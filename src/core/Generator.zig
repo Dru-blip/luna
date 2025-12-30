@@ -97,6 +97,7 @@ pub fn generate(g: *Generator) !*Executable {
     try g.genNodes(g.ast.nodes);
     try g.addInst(.hlt, .{ .none = {} }, .{ .start = 0, .col = 1, .end = 0, .line = 1 });
     var exe = try g.finalize();
+    exe.param_count = 0;
     exe.name = g.gc.interpreter.common_names.module;
     return exe;
 }
