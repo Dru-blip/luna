@@ -24,6 +24,7 @@ const Interpreter = @This();
 pub const Error = error{ ExceptionThrown, RegisterPoolExhausted } || std.mem.Allocator.Error || error{ ReadFailed, StreamTooLong };
 
 gc: Gc,
+generator: ?*Generator = null,
 string_interner: StringInterner = undefined,
 vm: *Vm = undefined,
 exception: ?*Exception = null,

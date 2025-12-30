@@ -108,8 +108,7 @@ fn visit(self: *Object, live_objects: *ObjectSet) !void {
     }
 }
 
-fn finalize(self: *Object, gc: *Gc) void {
+fn finalize(self: *Object, _: *Gc) void {
     const list: *List = self.as(List);
     list.items.deinit(list.gpa);
-    Object.Base.finalize(self, gc);
 }

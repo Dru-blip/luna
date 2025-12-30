@@ -22,5 +22,5 @@ class range{
         return "Range<"+this.start+":"+this.end+":"+this.step+">"
     }
 }
-4+none
+
 return range

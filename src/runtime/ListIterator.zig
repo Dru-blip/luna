@@ -44,8 +44,8 @@ fn visit(self: *Object, live_objects: *ObjectSet) !void {
     }
 }
 
-fn finalize(self: *Object, gc: *Gc) void {
-    Object.Base.finalize(self, gc);
+fn finalize(_: *Object, _: *Gc) void {
+    // Object.Base.finalize(self, gc);
 }
 
 pub fn registerMethods(gc: *Gc, ic: *Class) !void {

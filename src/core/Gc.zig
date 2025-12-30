@@ -1,6 +1,7 @@
 const std = @import("std");
 const Value = @import("../core/Value.zig");
 
+const Generator = @import("../core/Generator.zig");
 const Object = @import("../runtime/Object.zig");
 const ObjectSet = @import("../runtime/ObjectSet.zig");
 const Interpreter = @import("../runtime/Interpreter.zig");
@@ -92,7 +93,13 @@ inline fn allocImpl(
 
     const block = gc.findSuitableBlock(.first_fit, cell_size) orelse try gc.createBlock(cell_size);
 
-    const cell = block.allocateCell() orelse return std.mem.Allocator.Error.OutOfMemory;
+    const cell = block.allocateCell() orelse {
+        std.debug.print("total blocks allocated:{d}\n", .{gc.blocks.items.len});
+        for (gc.blocks.items, 0..) |blk, i| {
+            std.debug.print("block {d}: {d} cells allocated out of {d}\n", .{ i, blk.bitmap.count(), blk.cell_count });
+        }
+        return std.mem.Allocator.Error.OutOfMemory;
+    };
 
     gc.bytes_allocated_since_last_gc += cell_size;
 
@@ -147,7 +154,7 @@ inline fn findSuitableBlock(gc: *Gc, comptime strategy: AllocationStrategy, cell
     switch (strategy) {
         .first_fit => {
             for (gc.blocks.items) |blk| {
-                if (blk.cell_size >= cell_size) {
+                if (blk.cell_size >= cell_size and blk.free_list != null) {
                     return blk;
                 }
             }
@@ -172,12 +179,37 @@ pub fn collectGarbage(gc: *Gc) !void {
 
 fn collectRoots(gc: *Gc, roots: *ObjectSet) !void {
     try roots.add(Object.from(gc.interpreter.builtins));
+    try roots.add(Object.from(gc.interpreter.base_class));
+    try roots.add(Object.from(gc.interpreter.string_class));
+    try roots.add(Object.from(gc.interpreter.list_class));
+    try roots.add(Object.from(gc.interpreter.list_iterator_class));
+    try roots.add(Object.from(gc.interpreter.dict_class));
+
+    try roots.add(Object.from(gc.interpreter.running_module));
+    if (gc.interpreter.main_module) |main_module| {
+        try roots.add(Object.from(main_module));
+    }
+
     for (gc.interpreter.vm.records.items) |*record| {
+        try roots.add(Object.from(record.executable));
+        if (record.function) |func| {
+            try roots.add(Object.from(func));
+        }
         for (record.registers) |val| {
             if (val.asObject()) |obj| {
                 try roots.add(obj);
             }
         }
+    }
+
+    var generator: ?*Generator = gc.interpreter.generator;
+    while (generator) |gen| {
+        for (gen.constants.items) |constant| {
+            if (constant.asObject()) |obj| {
+                try roots.add(obj);
+            }
+        }
+        generator = gen.enclosing;
     }
 
     var string_iter = gc.interpreter.string_interner.iterator();

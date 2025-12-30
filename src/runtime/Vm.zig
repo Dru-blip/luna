@@ -16,7 +16,7 @@ const NativeFunction = @import("NativeFunction.zig");
 
 const Vm = @This();
 
-const Globals = struct {
+pub const Globals = struct {
     fast_slots: []Value,
     named_slots: *Object,
 

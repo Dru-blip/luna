@@ -135,9 +135,8 @@ pub const Executable = struct {
         try Object.Base.visit(self, live_objects);
         const executable: *Executable = self.as(Executable);
         for (executable.constants) |constant| {
-            if (constant.isObject()) {
-                const object = constant.toObject();
-                try object.type_descriptor.visit(object, live_objects);
+            if (constant.asObject()) |obj| {
+                try obj.type_descriptor.visit(obj, live_objects);
             }
         }
     }

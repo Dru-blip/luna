@@ -1,5 +1,4 @@
 //TODO: should implement a fixed register pool allocation
-//
 const std = @import("std");
 const bytecode = @import("bytecode.zig");
 const Ast = @import("Ast.zig");
@@ -39,6 +38,7 @@ local_variables: Variables = .empty,
 global_variables: Variables = .empty,
 identifiers: Identifiers = .empty,
 loop_stack: LoopStack = .empty,
+enclosing: ?*Generator = null,
 
 const Scope = enum { global, local };
 
@@ -347,6 +347,8 @@ fn genFuncDecl(g: *Generator, node: *const Ast.Node) GenError!void {
 
     var func_gen = try Generator.init(g.gpa, g.ast, g.gc, g.string_interner);
     defer func_gen.deinit();
+    func_gen.enclosing = g;
+    func_gen.gc.interpreter.generator = &func_gen;
     func_gen.global_variables = g.global_variables;
     func_gen.scope_depth = 1;
     for (node.data.fndecl.params) |param| {
@@ -365,6 +367,7 @@ fn genFuncDecl(g: *Generator, node: *const Ast.Node) GenError!void {
     const function_index = g.allocRegister();
     try g.addBin(.build_function, executable_index, function_index, node.loc);
     try g.addBin(if (variable.scope == .global) .store_global_by_index else .mov, function_index, variable.allocated_reg_slot, node.loc);
+    func_gen.gc.interpreter.generator = func_gen.enclosing;
 }
 
 fn genForEachStmt(g: *Generator, node: *const Ast.Node) GenError!void {
@@ -753,6 +756,9 @@ inline fn genFunctionExpr(g: *Generator, node: *const Ast.Node, name: []const u8
     defer func_gen.deinit();
     func_gen.global_variables = g.global_variables;
     func_gen.scope_depth = 1;
+    func_gen.enclosing = g;
+    func_gen.gc.interpreter.generator = &func_gen;
+
     for (node.data.fndecl.params) |param| {
         try func_gen.declareParam(param);
     }
@@ -766,6 +772,7 @@ inline fn genFunctionExpr(g: *Generator, node: *const Ast.Node, name: []const u8
     const executable_index = try g.addConstant(Value.object(Object.from(executable)));
     const function_index = g.allocRegister();
     try g.addBin(.build_function, executable_index, function_index, node.loc);
+    func_gen.gc.interpreter.generator = func_gen.enclosing;
     return function_index;
 }
 

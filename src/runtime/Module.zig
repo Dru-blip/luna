@@ -13,6 +13,7 @@ name: *String,
 pub fn new(gc: *Gc, name: []const u8) !*Module {
     const obj = try gc.alloc(Module);
     const module: *Module = obj.as(Module);
+    obj.class = gc.interpreter.base_class;
     module.* = .{
         .exported = Value.None,
         .name = (try String.new(gc, name)).as(String),
