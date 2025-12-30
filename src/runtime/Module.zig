@@ -9,12 +9,14 @@ const Module = @This();
 
 exported: Value = Value.None,
 name: *String,
+raw_path: []u8,
 
 pub fn new(gc: *Gc, name: []const u8) !*Module {
     const obj = try gc.alloc(Module);
     const module: *Module = obj.as(Module);
     obj.class = gc.interpreter.base_class;
     module.* = .{
+        .raw_path = try gc.gpa.dupe(u8, name),
         .exported = Value.None,
         .name = (try String.new(gc, name)).as(String),
     };
@@ -37,4 +39,7 @@ pub fn visit(self: *Object, live_objects: *ObjectSet) !void {
     try name.type_descriptor.visit(name, live_objects);
 }
 
-pub fn finalize(_: *Object, _: *Gc) void {}
+pub fn finalize(self: *Object, gc: *Gc) void {
+    const module: *Module = self.as(Module);
+    gc.gpa.free(module.raw_path);
+}

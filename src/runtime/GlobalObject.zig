@@ -88,12 +88,10 @@ fn import(vm: *Vm, _: *Object, args: []const Value) Interpreter.Error!Value {
     const path = resolveModulePath(vm, path_string.asSlice()) catch {
         return vm.raiseException(.module_not_found_error, "'{s}'", .{path_string.asSlice()});
     };
-    //TODO: should free module source.
-    // defer vm.gpa.free(path);
 
-    const exported = try vm.interpreter.runFile(path);
+    defer vm.gpa.free(path);
 
-    return exported;
+    return try vm.interpreter.runFile(path);
 }
 
 inline fn resolveModulePath(vm: *Vm, module_path: []const u8) ![]u8 {

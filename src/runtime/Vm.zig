@@ -96,7 +96,6 @@ const default_record_capacity = 2048;
 records: Records = .empty,
 rp: usize = 0,
 interpreter: *Interpreter,
-globals: Globals = undefined,
 gpa: std.mem.Allocator,
 gc: *Gc,
 register_pool: RegisterPool,
@@ -115,7 +114,6 @@ pub fn init(gpa: std.mem.Allocator, interpreter: *Interpreter) !*Vm {
 }
 
 pub fn deinit(vm: *Vm) void {
-    vm.globals.deinit(vm.gpa);
     vm.records.deinit(vm.gpa);
     vm.register_pool.deinit(vm.gpa);
     vm.gpa.destroy(vm);
@@ -123,7 +121,7 @@ pub fn deinit(vm: *Vm) void {
 
 pub fn runExecutable(vm: *Vm, executable: *Executable) Error!Value {
     const record = try ActivationRecord.init(executable, &vm.register_pool);
-    vm.globals.fast_slots = try vm.gpa.alloc(Value, executable.global_variable_count);
+    try vm.interpreter.getRunningModule().allocGlobalSlots(vm.gpa, executable.global_variable_count);
     vm.records.appendAssumeCapacity(record);
     return try vm.runRecord(&vm.records.items[vm.records.items.len - 1], false);
 }
@@ -131,7 +129,7 @@ pub fn runExecutable(vm: *Vm, executable: *Executable) Error!Value {
 pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
     var record = r;
     var registers = record.registers;
-    var globals = &vm.globals;
+    var globals = vm.interpreter.getGlobalSlots();
     var instructions = record.executable.instructions;
     var identifiers = record.executable.identifiers;
     var constants = record.executable.constants;
@@ -590,7 +588,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             },
             .ret => {
                 var callee = vm.records.pop().?;
-                if (vm.records.items.len == 0 or vm.interpreter.running_module != vm.interpreter.main_module.? or as_callback) {
+                if (vm.records.items.len == 0 or !vm.interpreter.isMainModule() or as_callback) {
                     return registers[data.un];
                 }
 
@@ -606,7 +604,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             },
             .ret_none => {
                 var callee = vm.records.pop().?;
-                if (vm.records.items.len == 0 or vm.interpreter.running_module != vm.interpreter.main_module.? or as_callback) {
+                if (vm.records.items.len == 0 or !vm.interpreter.isMainModule() or as_callback) {
                     return Value.None;
                 }
                 record = &vm.records.items[vm.records.items.len - 1];

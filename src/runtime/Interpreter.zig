@@ -36,8 +36,7 @@ dict_class: *Class = undefined,
 list_class: *Class = undefined,
 list_iterator_class: *Class = undefined,
 common_names: Names = undefined,
-running_module: *Module = undefined,
-main_module: ?*Module = null,
+module_stack: std.ArrayList(ModuleContext) = .empty,
 
 pub const Names = struct {
     Class: *String,
@@ -74,6 +73,19 @@ pub const Names = struct {
             .__str__ = try string_interner.intern("__str__"),
             .__init__ = try string_interner.intern("__init__"),
         };
+    }
+};
+
+const ModuleContext = struct {
+    module: *Module,
+    globals: Vm.Globals = undefined,
+
+    pub fn allocGlobalSlots(m: *ModuleContext, gpa: std.mem.Allocator, global_count: usize) !void {
+        m.globals.fast_slots = try gpa.alloc(Value, global_count);
+    }
+
+    pub fn deinit(m: *ModuleContext, gpa: std.mem.Allocator) void {
+        m.globals.fast_slots.deinit(gpa);
     }
 };
 
@@ -143,18 +155,15 @@ pub fn runFile(i: *Interpreter, path: []const u8) Error!Value {
     };
     buffer[file_stats.size] = 0;
 
-    const prev_running_module = i.running_module;
-    defer i.running_module = prev_running_module;
-
     const new_module = try Module.new(&i.gc, path);
 
-    i.running_module = new_module;
+    try i.module_stack.append(i.gpa, .{
+        .module = new_module,
+    });
 
-    if (i.main_module == null) {
-        i.main_module = new_module;
-    }
+    defer _ = i.module_stack.pop();
 
-    var ast = Ast.parse(path, buffer[0..file_stats.size :0], i.gc.gpa) catch {
+    var ast = Ast.parse(new_module.raw_path, buffer[0..file_stats.size :0], i.gc.gpa) catch {
         //TODO: Handle AST parsing error
         return Value.None;
     };
@@ -162,11 +171,12 @@ pub fn runFile(i: *Interpreter, path: []const u8) Error!Value {
 
     var generator = try Generator.init(i.gc.gpa, ast, &i.gc, &i.string_interner);
     defer generator.deinit();
+
     const executable = try generator.generate();
     executable.print() catch {};
 
     const result = i.vm.runExecutable(executable) catch |err| {
-        if (i.running_module != i.main_module.?) {
+        if (!i.isMainModule()) {
             return err;
         }
         switch (err) {
@@ -181,4 +191,24 @@ pub fn runFile(i: *Interpreter, path: []const u8) Error!Value {
     };
 
     return result;
+}
+
+pub inline fn getRunningModule(i: *Interpreter) *ModuleContext {
+    std.debug.assert(i.module_stack.items.len > 0);
+    return &i.module_stack.items[i.module_stack.items.len - 1];
+}
+
+pub inline fn getMainModule(i: *Interpreter) *ModuleContext {
+    std.debug.assert(i.module_stack.items.len > 0);
+    return &i.module_stack.items[0];
+}
+
+pub inline fn getGlobalSlots(i: *Interpreter) *Vm.Globals {
+    std.debug.assert(i.module_stack.items.len > 0);
+    return &i.module_stack.items[i.module_stack.items.len - 1].globals;
+}
+
+pub inline fn isMainModule(i: *Interpreter) bool {
+    std.debug.assert(i.module_stack.items.len > 0);
+    return i.module_stack.items.len == 1;
 }
