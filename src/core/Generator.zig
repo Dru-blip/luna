@@ -84,7 +84,9 @@ pub fn init(gpa: std.mem.Allocator, ast: Ast, gc: *Gc, string_interner: *StringI
 pub fn deinit(g: *Generator) void {
     g.constants.deinit(g.gpa);
     g.free_registers.deinit(g.gpa);
-    // g.global_variables.deinit(g.gpa);
+    if (g.enclosing == null) {
+        g.global_variables.deinit(g.gpa);
+    }
     g.local_variables.deinit(g.gpa);
     g.identifiers.deinit(g.gpa);
     g.blocks.deinit(g.gpa);
@@ -919,7 +921,6 @@ fn linearizeBasicBlocks(g: *Generator, executable: *Executable) !void {
 
     const total_instructions = offset;
     var instructions = try std.ArrayList(Inst).initCapacity(g.gpa, total_instructions);
-
     var spans = try std.ArrayList(Span).initCapacity(g.gpa, total_instructions);
 
     for (g.blocks.items) |block| {

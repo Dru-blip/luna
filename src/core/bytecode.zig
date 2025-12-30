@@ -129,6 +129,7 @@ pub const Executable = struct {
         gc.gpa.free(executable.constants);
         gc.gpa.free(executable.spans);
         gc.gpa.free(executable.instructions);
+        gc.gpa.free(executable.identifiers);
     }
 
     fn visit(self: *Object, live_objects: *ObjectSet) !void {

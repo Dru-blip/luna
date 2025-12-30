@@ -117,6 +117,7 @@ pub fn init(gpa: std.mem.Allocator, interpreter: *Interpreter) !*Vm {
 pub fn deinit(vm: *Vm) void {
     vm.globals.deinit(vm.gpa);
     vm.records.deinit(vm.gpa);
+    vm.register_pool.deinit(vm.gpa);
     vm.gpa.destroy(vm);
 }
 

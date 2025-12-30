@@ -68,9 +68,17 @@ pub fn init(allocator: std.mem.Allocator, interpreter: *Interpreter) Gc {
 }
 
 pub fn deinit(gc: *Gc) void {
-    for (gc.blocks.items) |block| {
-        block.bitmap.deinit();
-        gc.gpa.free(block.data);
+    for (gc.blocks.items) |blk| {
+        for (0..blk.cell_count) |i| {
+            const cell = blk.cell(i);
+            const obj: *Object = @ptrCast(cell);
+            if (blk.bitmap.isSet(i)) {
+                obj.type_descriptor.finalize(obj, gc);
+            }
+        }
+
+        blk.bitmap.deinit();
+        gc.gpa.free(blk.data);
     }
 
     gc.blocks.deinit(gc.gpa);
@@ -230,8 +238,7 @@ fn clearMarkBits(gc: *Gc) void {
     for (gc.blocks.items) |blk| {
         for (0..blk.cell_count) |i| {
             const cell = blk.cell(i);
-            const index = blk.indexOf(cell);
-            if (blk.bitmap.isSet(index)) {
+            if (blk.bitmap.isSet(i)) {
                 const obj: *Object = @ptrCast(cell);
                 obj.marked = false;
             }
@@ -251,11 +258,10 @@ fn sweepDeadObjects(gc: *Gc) void {
     for (gc.blocks.items) |blk| {
         for (0..blk.cell_count) |i| {
             const cell = blk.cell(i);
-            const index = blk.indexOf(cell);
             const obj: *Object = @ptrCast(cell);
-            if (blk.bitmap.isSet(index) and !obj.marked) {
+            if (blk.bitmap.isSet(i) and !obj.marked) {
                 obj.type_descriptor.finalize(obj, gc);
-                blk.deallocateCell(cell, index);
+                blk.deallocateCell(cell, i);
             }
         }
     }

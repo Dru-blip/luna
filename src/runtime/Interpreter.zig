@@ -24,6 +24,7 @@ const Interpreter = @This();
 pub const Error = error{ ExceptionThrown, RegisterPoolExhausted } || std.mem.Allocator.Error || error{ ReadFailed, StreamTooLong };
 
 gc: Gc,
+gpa: std.mem.Allocator,
 generator: ?*Generator = null,
 string_interner: StringInterner = undefined,
 vm: *Vm = undefined,
@@ -82,6 +83,7 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
 
     interpreter.* = .{
         .gc = gc,
+        .gpa = gpa,
     };
 
     interpreter.vm = try Vm.init(gpa, interpreter);
@@ -114,6 +116,12 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     interpreter.list_iterator_class.name = interpreter.common_names.ListIterator;
 
     return interpreter;
+}
+
+pub fn deinit(i: *Interpreter) void {
+    i.vm.deinit();
+    i.gc.deinit();
+    i.gpa.destroy(i);
 }
 
 pub fn runFile(i: *Interpreter, path: []const u8) Error!Value {
@@ -153,6 +161,7 @@ pub fn runFile(i: *Interpreter, path: []const u8) Error!Value {
     defer ast.deinit();
 
     var generator = try Generator.init(i.gc.gpa, ast, &i.gc, &i.string_interner);
+    defer generator.deinit();
     const executable = try generator.generate();
     executable.print() catch {};
 
