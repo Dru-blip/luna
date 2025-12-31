@@ -1,9 +1,6 @@
 let range=import("range")
-let ra=import("range")
 
-
-
-foreach i in range(1,10,2){
+foreach i in range(1,10,3){
     print(i)
 }
 

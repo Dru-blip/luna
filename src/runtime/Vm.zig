@@ -188,6 +188,22 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 registers[data.bin.rhs] = registers[data.bin.lhs];
                 continue :start;
             },
+            .negate => {
+                const value = registers[data.bin.lhs];
+                if (value.isNumeric()) {
+                    registers[data.bin.rhs] = Value.number(-value.asNumber());
+                    continue :start;
+                }
+                return vm.raiseException(.type_error, "invalid operand type for unary operator ('-') :{s}", .{value.getTypeString()});
+            },
+            .not => {
+                const value = registers[data.bin.lhs];
+                registers[data.bin.rhs] = Value.bool(!value.isTruthy());
+                continue :start;
+            },
+            .un_plus => {
+                continue :start;
+            },
             .add => {
                 const lhs = registers[data.tri.op1];
                 const rhs = registers[data.tri.op2];
