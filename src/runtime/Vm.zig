@@ -133,6 +133,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
     var instructions = record.executable.instructions;
     var identifiers = record.executable.identifiers;
     var constants = record.executable.constants;
+    var extra = record.executable.extra;
     var instruction: Inst = undefined;
 
     start: while (true) {
@@ -514,12 +515,14 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 
                 if (method_value) |meth_val| {
                     if (meth_val.asObject()) |meth_obj| {
+                        const args_data = extra[data.super_call.arg_offset .. data.super_call.arg_offset + data.super_call.argc];
+
                         var args: [8]Value = undefined;
-                        for (data.super_call.args, 0..) |arg, i| {
+                        for (args_data, 0..) |arg, i| {
                             args[i] = record.registers[arg];
                         }
 
-                        _ = try meth_obj.callAssumeCallable(vm, this_value.toObject(), args[0..data.super_call.args.len]);
+                        _ = try meth_obj.callAssumeCallable(vm, this_value.toObject(), args[0..data.super_call.argc]);
                         continue :start;
                     }
                 }
@@ -542,33 +545,36 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 
                 const this_value = registers[data.call.this];
 
+                const args_data = extra[data.call.arg_offset .. data.call.arg_offset + data.call.argc];
+
                 if (callee_obj.asNativeFunction()) |native_function| {
-                    _ = try vm.checkArity(NativeFunction, native_function.name, native_function.arity, @intCast(data.call.args.len), native_function.isVariadic);
+                    _ = try vm.checkArity(NativeFunction, native_function.name, native_function.arity, @intCast(data.call.argc), native_function.isVariadic);
 
                     var args: [8]Value = undefined;
-                    for (data.call.args, 0..) |arg, i| {
+
+                    for (args_data, 0..) |arg, i| {
                         args[i] = record.registers[arg];
                     }
 
-                    registers[data.call.ret] = try native_function.function(vm, this_value.toObject(), args[0..data.call.args.len]);
+                    registers[data.call.ret] = try native_function.function(vm, this_value.toObject(), args[0..data.call.argc]);
                     continue :start;
                 }
 
                 if (callee_obj.asClass()) |class| {
                     var args: [8]Value = undefined;
-                    for (data.call.args, 0..) |arg, i| {
+                    for (args_data, 0..) |arg, i| {
                         args[i] = record.registers[arg];
                     }
                     registers[data.call.ret] = Value.object(try class.newInstance(vm.gc));
                     if (class.getField(vm.interpreter.common_names.__init__)) |constructor| {
-                        _ = try constructor.toObject().callAssumeCallable(vm, registers[data.call.ret].toObject(), args[0..data.call.args.len]);
+                        _ = try constructor.toObject().callAssumeCallable(vm, registers[data.call.ret].toObject(), args[0..data.call.argc]);
                     }
                     continue :start;
                 }
 
                 const function: *Function = callee_obj.as(Function);
 
-                _ = try vm.checkArity(Function, function.exe.name, function.arity, @intCast(data.call.args.len), false);
+                _ = try vm.checkArity(Function, function.exe.name, function.arity, @intCast(data.call.argc), false);
 
                 const caller_record = vm.records.getLast();
                 vm.records.appendAssumeCapacity(try ActivationRecord.withFunction(&vm.register_pool, function));
@@ -576,7 +582,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 record.caller_return_reg = data.call.ret;
 
                 record.registers[0] = this_value;
-                for (data.call.args, 0..) |arg, i| {
+                for (args_data, 0..) |arg, i| {
                     record.registers[i + 1] = caller_record.registers[arg];
                 }
 
@@ -584,6 +590,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 instructions = record.executable.instructions;
                 constants = record.executable.constants;
                 identifiers = record.executable.identifiers;
+                extra = record.executable.extra;
                 continue :start;
             },
             .ret => {
@@ -598,6 +605,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 instructions = record.executable.instructions;
                 constants = record.executable.constants;
                 identifiers = record.executable.identifiers;
+                extra = record.executable.extra;
                 record.registers[callee.caller_return_reg] = callee.registers[data.un];
                 callee.deinit(&vm.register_pool);
                 continue :start;
@@ -613,6 +621,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 instructions = record.executable.instructions;
                 constants = record.executable.constants;
                 identifiers = record.executable.identifiers;
+                extra = record.executable.extra;
                 callee.deinit(&vm.register_pool);
                 continue :start;
             },

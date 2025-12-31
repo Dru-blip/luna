@@ -39,6 +39,7 @@ global_variables: Variables = .empty,
 identifiers: Identifiers = .empty,
 loop_stack: LoopStack = .empty,
 enclosing: ?*Generator = null,
+extra: std.ArrayList(u32) = .empty,
 
 const Scope = enum { global, local };
 
@@ -659,10 +660,11 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
         .call => {
             var data: Inst.Data = .{
                 .call = .{
-                    .args = undefined,
                     .callee = 0,
                     .this = 0,
                     .ret = 0,
+                    .arg_offset = 0,
+                    .argc = 0,
                 },
             };
 
@@ -684,13 +686,12 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
                 else => unreachable,
             }
 
-            var args: std.ArrayList(u32) = .empty;
+            data.call.arg_offset = @intCast(g.extra.items.len);
             for (node.data.call.args) |arg| {
                 const arg_value = try g.genExpr(arg);
-                try args.append(g.gpa, arg_value);
+                try g.extra.append(g.gpa, arg_value);
             }
-
-            data.call.args = try args.toOwnedSlice(g.gpa);
+            data.call.argc = @intCast(node.data.call.args.len);
             data.call.ret = g.allocRegister();
 
             try g.addInst(.call, data, node.loc);
@@ -736,20 +737,26 @@ inline fn genSuperCall(g: *Generator, node: *const Ast.Node) GenError!u32 {
 
     const method = try g.addIdentifier(member.property);
 
-    var args: std.ArrayList(u32) = .empty;
-    for (node.data.call.args) |arg| {
-        try args.append(g.gpa, try g.genExpr(arg));
-    }
-
-    const ret = g.allocRegister();
-
-    try g.addInst(.super_call, .{
+    var data: Inst.Data = .{
         .super_call = .{
             .method = method,
-            .args = try args.toOwnedSlice(g.gpa),
-            .ret = ret,
+            .ret = 0,
+            .arg_offset = 0,
+            .argc = 0,
         },
-    }, node.loc);
+    };
+
+    data.super_call.arg_offset = @intCast(g.extra.items.len);
+    for (node.data.call.args) |arg| {
+        const arg_value = try g.genExpr(arg);
+        try g.extra.append(g.gpa, arg_value);
+    }
+    data.super_call.argc = @intCast(node.data.call.args.len);
+
+    const ret = g.allocRegister();
+    data.super_call.ret = ret;
+
+    try g.addInst(.super_call, data, node.loc);
 
     return ret;
 }
@@ -950,4 +957,5 @@ fn linearizeBasicBlocks(g: *Generator, executable: *Executable) !void {
     }
     executable.instructions = try instructions.toOwnedSlice(g.gpa);
     executable.spans = try spans.toOwnedSlice(g.gpa);
+    executable.extra = try g.extra.toOwnedSlice(g.gpa);
 }

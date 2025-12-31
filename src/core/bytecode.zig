@@ -86,14 +86,16 @@ pub const Inst = struct {
             callee: u32,
             this: u32,
             ret: u32,
-            args: []u32,
+            arg_offset: u32,
+            argc: u32,
         },
         //INFO: i dont think i need super_call member, we can just reuse the call member.
         // either way they share the same space.
         super_call: struct {
             method: u32,
             ret: u32,
-            args: []u32,
+            arg_offset: u32,
+            argc: u32,
         },
     };
 };
@@ -111,6 +113,7 @@ pub const Executable = struct {
     name: *String,
     param_count: u8,
     filepath: []const u8,
+    extra: []u32,
 
     pub fn new(gc: *Gc) !*Executable {
         const obj = try gc.alloc(Executable);
@@ -130,6 +133,7 @@ pub const Executable = struct {
         gc.gpa.free(executable.spans);
         gc.gpa.free(executable.instructions);
         gc.gpa.free(executable.identifiers);
+        gc.gpa.free(executable.extra);
     }
 
     fn visit(self: *Object, live_objects: *ObjectSet) !void {
@@ -299,7 +303,7 @@ pub const Executable = struct {
                         "Call r{d} <- r{d}(",
                         .{ inst.data.call.ret, inst.data.call.callee },
                     );
-                    for (inst.data.call.args, 0..) |arg, i| {
+                    for (self.extra[inst.data.call.arg_offset .. inst.data.call.arg_offset + inst.data.call.argc], 0..) |arg, i| {
                         if (i != 0) try out.print(", ", .{});
                         try out.print("r{d}", .{arg});
                     }
@@ -337,10 +341,8 @@ pub const Executable = struct {
 
                 .ret_none => try out.print("ReturnNone", .{}),
             }
-
             try out.print("\n", .{});
         }
-
         try out.flush();
     }
 };
