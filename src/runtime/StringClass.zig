@@ -18,7 +18,6 @@ pub fn new(gc: *Gc) !*Class {
 
 pub fn registerMethods(gc: *Gc, sc: *Class) !void {
     try sc.defineNativeMethod(gc, "to_num", to_number, 0, false);
-
     try sc.defineNativeMethod(gc, "__getattr__", getattr, 1, false);
 }
 

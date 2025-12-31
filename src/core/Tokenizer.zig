@@ -272,7 +272,6 @@ pub fn next(self: *Tokenizer) Token {
                 continue :state .identifier;
             },
             '"', '\'' => {
-                self.advance();
                 result.tag = .string;
                 result.loc.start = self.index;
                 result.loc.col = self.col;

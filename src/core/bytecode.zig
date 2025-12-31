@@ -90,7 +90,6 @@ pub const Inst = struct {
             argc: u32,
         },
         //INFO: i dont think i need super_call member, we can just reuse the call member.
-        // either way they share the same space.
         super_call: struct {
             method: u32,
             ret: u32,
