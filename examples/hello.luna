@@ -1,7 +1,5 @@
 let range=import("range")
 
 foreach i in range(1,10,3){
-    print(i)
+  print(i)
 }
-
-print(!true)

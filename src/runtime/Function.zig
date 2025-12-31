@@ -7,6 +7,7 @@ const String = @import("String.zig");
 
 const Gc = @import("../core/Gc.zig");
 const Executable = @import("../core/bytecode.zig").Executable;
+const ModuleEnvironment = @import("environments/ModuleEnvironment.zig");
 
 const Function = @This();
 
@@ -15,6 +16,7 @@ is_variadic: bool = false,
 module: *Object = undefined,
 exe: *Executable,
 home_class: ?*Class = null,
+module_env: *ModuleEnvironment = undefined,
 
 pub fn withExecutable(gc: *Gc, executable: *Executable) !*Object {
     const obj = try gc.alloc(Function);

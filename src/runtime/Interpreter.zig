@@ -15,6 +15,7 @@ const BaseClass = @import("BaseClass.zig");
 const ListIterator = @import("ListIterator.zig");
 const Module = @import("Module.zig");
 const Dict = @import("Dict.zig");
+const ModuleEnvironment = @import("environments/ModuleEnvironment.zig");
 
 const String = @import("String.zig");
 
@@ -37,7 +38,7 @@ dict_class: *Class = undefined,
 list_class: *Class = undefined,
 list_iterator_class: *Class = undefined,
 common_names: Names = undefined,
-module_stack: std.ArrayList(ModuleContext) = .empty,
+module_stack: std.ArrayList(*ModuleEnvironment) = .empty,
 module_cache: ModuleCache = undefined,
 
 const ModuleCache = std.StringHashMap(*Module);
@@ -77,19 +78,6 @@ pub const Names = struct {
             .__str__ = try string_interner.intern("__str__"),
             .__init__ = try string_interner.intern("__init__"),
         };
-    }
-};
-
-const ModuleContext = struct {
-    module: *Module,
-    globals: Vm.Globals = undefined,
-
-    pub fn allocGlobalSlots(m: *ModuleContext, gpa: std.mem.Allocator, global_count: usize) !void {
-        m.globals.fast_slots = try gpa.alloc(Value, global_count);
-    }
-
-    pub fn deinit(m: *ModuleContext, gpa: std.mem.Allocator) void {
-        m.globals.fast_slots.deinit(gpa);
     }
 };
 
@@ -163,12 +151,6 @@ pub fn runFile(i: *Interpreter, path: []const u8) Error!Value {
 
     const new_module = try Module.new(&i.gc, path);
 
-    try i.module_stack.append(i.gpa, .{
-        .module = new_module,
-    });
-
-    defer _ = i.module_stack.pop();
-
     var ast = Ast.parse(new_module.raw_path, buffer[0..file_stats.size :0], i.gc.gpa) catch {
         //TODO: Handle AST parsing error
         return Value.None;
@@ -180,6 +162,12 @@ pub fn runFile(i: *Interpreter, path: []const u8) Error!Value {
 
     const executable = try generator.generate();
     executable.print() catch {};
+
+    const module_env = try ModuleEnvironment.new(&i.gc, new_module, executable.global_variable_count);
+    new_module.env = module_env;
+
+    try i.module_stack.append(i.gpa, module_env);
+    defer _ = i.module_stack.pop();
 
     const result = i.vm.runExecutable(executable) catch |err| {
         if (!i.isMainModule()) {
@@ -197,19 +185,18 @@ pub fn runFile(i: *Interpreter, path: []const u8) Error!Value {
     };
 
     new_module.exported = result;
-
     try i.module_cache.put(new_module.raw_path, new_module);
     return result;
 }
 
-pub inline fn getRunningModule(i: *Interpreter) *ModuleContext {
+pub inline fn getRunningModule(i: *Interpreter) *ModuleEnvironment {
     std.debug.assert(i.module_stack.items.len > 0);
-    return &i.module_stack.items[i.module_stack.items.len - 1];
+    return i.module_stack.items[i.module_stack.items.len - 1];
 }
 
-pub inline fn getMainModule(i: *Interpreter) *ModuleContext {
+pub inline fn getMainModule(i: *Interpreter) *ModuleEnvironment {
     std.debug.assert(i.module_stack.items.len > 0);
-    return &i.module_stack.items[0];
+    return i.module_stack.items[0];
 }
 
 pub inline fn getGlobalSlots(i: *Interpreter) *Vm.Globals {

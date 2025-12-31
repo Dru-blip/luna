@@ -399,25 +399,28 @@ fn parsePrefixExpr(p: *Parser) ParserError!*Node {
     switch (token.tag) {
         .bang => {
             p.advance();
-            const node = try p.ast.makeNode(.not, token.loc);
+            const arg = try p.parsePrefixExpr();
+            const node = try p.ast.makeNode(.not, token.loc.merge(&arg.loc));
             node.data = .{
-                .un = try p.parsePrefixExpr(),
+                .un = arg,
             };
             return node;
         },
         .plus => {
             p.advance();
-            const node = try p.ast.makeNode(.un_plus, token.loc);
+            const arg = try p.parsePrefixExpr();
+            const node = try p.ast.makeNode(.un_plus, token.loc.merge(&arg.loc));
             node.data = .{
-                .un = try p.parsePrefixExpr(),
+                .un = arg,
             };
             return node;
         },
         .minus => {
             p.advance();
-            const node = try p.ast.makeNode(.un_negate, token.loc);
+            const arg = try p.parsePrefixExpr();
+            const node = try p.ast.makeNode(.un_negate, token.loc.merge(&arg.loc));
             node.data = .{
-                .un = try p.parsePrefixExpr(),
+                .un = arg,
             };
             return node;
         },

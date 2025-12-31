@@ -43,16 +43,6 @@ fn getattr(vm: *Vm, self: *Object, args: []const Value) !Value {
         return value;
     }
 
-    //INFO: we already walk the inheritance chain in class.getField
-    //
-    // var current_class: ?*Class = self.class;
-    // while (current_class) |cls| {
-    //     if (cls.getField(name)) |value| {
-    //         return value;
-    //     }
-    //     current_class = cls.super_class;
-    // }
-
     return try vm.raiseException(
         .attribute_error,
         "'{s}' object has no attribute '{s}'",

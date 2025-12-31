@@ -4,12 +4,14 @@ const Object = @import("Object.zig");
 const String = @import("String.zig");
 const ObjectSet = @import("ObjectSet.zig");
 const Gc = @import("../core/Gc.zig");
+const ModuleEnvironment = @import("environments/ModuleEnvironment.zig");
 
 const Module = @This();
 
 exported: Value = Value.None,
 name: *String,
 raw_path: []u8,
+env: *ModuleEnvironment = undefined,
 
 pub fn new(gc: *Gc, name: []const u8) !*Module {
     const obj = try gc.alloc(Module);
@@ -37,6 +39,8 @@ pub fn visit(self: *Object, live_objects: *ObjectSet) !void {
     }
     const name = Object.from(module.name);
     try name.type_descriptor.visit(name, live_objects);
+
+    //TODO: visit module.env
 }
 
 pub fn finalize(self: *Object, gc: *Gc) void {

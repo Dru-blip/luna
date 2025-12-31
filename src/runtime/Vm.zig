@@ -121,7 +121,6 @@ pub fn deinit(vm: *Vm) void {
 
 pub fn runExecutable(vm: *Vm, executable: *Executable) Error!Value {
     const record = try ActivationRecord.init(executable, &vm.register_pool);
-    try vm.interpreter.getRunningModule().allocGlobalSlots(vm.gpa, executable.global_variable_count);
     vm.records.appendAssumeCapacity(record);
     return try vm.runRecord(&vm.records.items[vm.records.items.len - 1], false);
 }
@@ -129,7 +128,7 @@ pub fn runExecutable(vm: *Vm, executable: *Executable) Error!Value {
 pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
     var record = r;
     var registers = record.registers;
-    var globals = vm.interpreter.getGlobalSlots();
+    var globals = vm.getGlobalSlots();
     var instructions = record.executable.instructions;
     var identifiers = record.executable.identifiers;
     var constants = record.executable.constants;
@@ -194,7 +193,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     registers[data.bin.rhs] = Value.number(-value.asNumber());
                     continue :start;
                 }
-                return vm.raiseException(.type_error, "invalid operand type for unary operator ('-') :{s}", .{value.getTypeString()});
+                return vm.raiseException(.type_error, "invalid operand type for unary operator ('-') : '{s}'", .{value.getTypeString()});
             },
             .not => {
                 const value = registers[data.bin.lhs];
@@ -202,6 +201,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 continue :start;
             },
             .un_plus => {
+                //TODO: should implement.
                 continue :start;
             },
             .add => {
@@ -366,8 +366,10 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 continue :start;
             },
             .build_function => {
-                const func = try Function.withExecutable(vm.gc, constants[data.bin.lhs].toObject().as(Executable));
-                registers[data.bin.rhs] = Value.object(func);
+                const func_obj = try Function.withExecutable(vm.gc, constants[data.bin.lhs].toObject().as(Executable));
+                const function: *Function = func_obj.as(Function);
+                function.module_env = vm.interpreter.getRunningModule();
+                registers[data.bin.rhs] = Value.object(func_obj);
                 continue :start;
             },
             .build_class => {
@@ -607,6 +609,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 constants = record.executable.constants;
                 identifiers = record.executable.identifiers;
                 extra = record.executable.extra;
+                globals = vm.getGlobalSlots();
                 continue :start;
             },
             .ret => {
@@ -622,6 +625,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 constants = record.executable.constants;
                 identifiers = record.executable.identifiers;
                 extra = record.executable.extra;
+                globals = vm.getGlobalSlots();
                 record.registers[callee.caller_return_reg] = callee.registers[data.un];
                 callee.deinit(&vm.register_pool);
                 continue :start;
@@ -638,6 +642,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 constants = record.executable.constants;
                 identifiers = record.executable.identifiers;
                 extra = record.executable.extra;
+                globals = vm.getGlobalSlots();
                 callee.deinit(&vm.register_pool);
                 continue :start;
             },
@@ -720,4 +725,13 @@ pub fn raiseTypeException(vm: *Vm, comptime op: []const u8, lhs: Value, rhs: Val
 pub inline fn raiseException(vm: *Vm, tag: Exception.Tag, comptime fmt: []const u8, args: anytype) Error!Value {
     vm.interpreter.exception = try Exception.withMessage(vm, tag, fmt, args);
     return Error.ExceptionThrown;
+}
+
+pub inline fn getGlobalSlots(vm: *Vm) *Vm.Globals {
+    std.debug.assert(vm.records.items.len > 0);
+    const func = vm.records.getLast().function;
+    if (func) |f| {
+        return &f.module_env.globals;
+    }
+    return vm.interpreter.getGlobalSlots();
 }
