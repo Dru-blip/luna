@@ -397,6 +397,24 @@ fn parsePostfixExpr(p: *Parser, lhs: *Node, tag: Node.Tag) ParserError!*Node {
 fn parsePrefixExpr(p: *Parser) ParserError!*Node {
     const token = p.peek();
     switch (token.tag) {
+        .bang => {
+            p.advance();
+            const node = try p.ast.makeNode(.un_negate, token.loc);
+            node.data.un = try p.parsePrefixExpr();
+            return node;
+        },
+        .plus => {
+            p.advance();
+            const node = try p.ast.makeNode(.un_plus, token.loc);
+            node.data.un = try p.parsePrefixExpr();
+            return node;
+        },
+        .minus => {
+            p.advance();
+            const node = try p.ast.makeNode(.un_negate, token.loc);
+            node.data.un = try p.parsePrefixExpr();
+            return node;
+        },
         .l_brace => {
             const lbrace = try p.expectToken(.l_brace);
             var properties: std.ArrayList(*const Node) = .empty;

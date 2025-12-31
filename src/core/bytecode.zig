@@ -32,6 +32,10 @@ pub const Inst = struct {
         test_neq, // uses tri
         test_eq, // uses tri
 
+        negate,
+        not,
+        un_plus,
+
         mov, // uses bin
         branch, // uses tri
         jmp, // uses un
@@ -200,12 +204,19 @@ pub const Executable = struct {
                     "LoadIdent r{d}, [{d}]",
                     .{ inst.data.bin.rhs, inst.data.bin.lhs },
                 ),
-
                 .mov => try out.print(
                     "Mov r{d}, r{d}",
                     .{ inst.data.bin.lhs, inst.data.bin.rhs },
                 ),
-
+                .negate => {
+                    try out.print("Neg r{d} -r{d}", .{ inst.data.bin.rhs, inst.data.bin.lhs });
+                },
+                .not => {
+                    try out.print("Not r{d} -r{d}", .{ inst.data.bin.rhs, inst.data.bin.lhs });
+                },
+                .un_plus => {
+                    try out.print("UnPlus r{d} +r{d}", .{ inst.data.bin.rhs, inst.data.bin.lhs });
+                },
                 .add => try out.print(
                     "Add r{d}, r{d}, r{d}",
                     .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 },

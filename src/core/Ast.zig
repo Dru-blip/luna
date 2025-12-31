@@ -50,6 +50,10 @@ pub const Node = struct {
         div_assign,
         mod_assign,
 
+        un_negate,
+        un_plus,
+        not,
+
         call,
 
         dict_expr,

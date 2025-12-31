@@ -1,4 +1,3 @@
-
 let range=import("range")
 let ra=import("range")
 
@@ -7,3 +6,5 @@ let ra=import("range")
 foreach i in range(1,10,2){
     print(i)
 }
+
+print(!true)

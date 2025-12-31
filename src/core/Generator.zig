@@ -589,6 +589,24 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
         .identifier => {
             return try g.genIdentifier(node);
         },
+        .un_negate => {
+            const reg = g.allocRegister();
+            const arg = try g.genExpr(node.data.un);
+            try g.addBin(.negate, arg, reg, node.loc);
+            return reg;
+        },
+        .not => {
+            const reg = g.allocRegister();
+            const arg = try g.genExpr(node.data.un);
+            try g.addBin(.not, arg, reg, node.loc);
+            return reg;
+        },
+        .un_plus => {
+            const reg = g.allocRegister();
+            const arg = try g.genExpr(node.data.un);
+            try g.addBin(.un_plus, arg, reg, node.loc);
+            return reg;
+        },
         .add => {
             return try g.genBinOp(.add, node);
         },
