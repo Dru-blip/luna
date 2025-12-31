@@ -7,6 +7,7 @@ const Vm = @import("Vm.zig");
 const Interpreter = @import("Interpreter.zig");
 const Class = @import("Class.zig");
 const String = @import("String.zig");
+const Module = @import("Module.zig");
 
 pub fn new(gc: *Gc) !*Class {
     const class = try Class.new(gc);
@@ -85,6 +86,11 @@ fn import(vm: *Vm, _: *Object, args: []const Value) Interpreter.Error!Value {
     }
     const path_string = path_value.toObject().toString();
 
+    if (try getCachedModuleWithPatterns(vm, path_string.asSlice())) |module| {
+        // std.debug.print("Module Cache hit :{s}\n", .{path_string.asSlice()});
+        return module.exported;
+    }
+
     const path = resolveModulePath(vm, path_string.asSlice()) catch {
         return vm.raiseException(.module_not_found_error, "'{s}'", .{path_string.asSlice()});
     };
@@ -121,4 +127,30 @@ inline fn resolveModulePath(vm: *Vm, module_path: []const u8) ![]u8 {
     }
 
     return error.ModuleNotFound;
+}
+
+fn getCachedModuleWithPatterns(vm: *Vm, module_path: []const u8) !?*Module {
+    var path_buffer = try vm.gpa.alloc(u8, module_path.len);
+    defer vm.gpa.free(path_buffer);
+
+    for (module_path, 0..) |c, i| {
+        path_buffer[i] = if (c == '.') std.fs.path.sep else c;
+    }
+
+    const patterns = [_][]const u8{
+        ".luna",
+        "/__init__.luna",
+        "/index.luna",
+    };
+
+    for (patterns) |pattern| {
+        const candidate = try std.mem.concat(vm.gpa, u8, &[_][]const u8{ path_buffer, pattern });
+        defer vm.gpa.free(candidate);
+
+        if (vm.interpreter.getCachedModule(candidate)) |module| {
+            return module;
+        }
+    }
+
+    return null;
 }

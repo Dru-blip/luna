@@ -14,6 +14,7 @@ const ListClass = @import("ListClass.zig");
 const BaseClass = @import("BaseClass.zig");
 const ListIterator = @import("ListIterator.zig");
 const Module = @import("Module.zig");
+const Dict = @import("Dict.zig");
 
 const String = @import("String.zig");
 
@@ -37,6 +38,9 @@ list_class: *Class = undefined,
 list_iterator_class: *Class = undefined,
 common_names: Names = undefined,
 module_stack: std.ArrayList(ModuleContext) = .empty,
+module_cache: ModuleCache = undefined,
+
+const ModuleCache = std.StringHashMap(*Module);
 
 pub const Names = struct {
     Class: *String,
@@ -127,6 +131,8 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     interpreter.list_class.name = interpreter.common_names.List;
     interpreter.list_iterator_class.name = interpreter.common_names.ListIterator;
 
+    interpreter.module_cache = ModuleCache.init(interpreter.gpa);
+
     return interpreter;
 }
 
@@ -190,6 +196,9 @@ pub fn runFile(i: *Interpreter, path: []const u8) Error!Value {
         }
     };
 
+    new_module.exported = result;
+
+    try i.module_cache.put(new_module.raw_path, new_module);
     return result;
 }
 
@@ -211,4 +220,11 @@ pub inline fn getGlobalSlots(i: *Interpreter) *Vm.Globals {
 pub inline fn isMainModule(i: *Interpreter) bool {
     std.debug.assert(i.module_stack.items.len > 0);
     return i.module_stack.items.len == 1;
+}
+
+pub fn getCachedModule(i: *Interpreter, name: []const u8) ?*Module {
+    if (i.module_cache.get(name)) |module| {
+        return module;
+    }
+    return null;
 }
