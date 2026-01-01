@@ -164,7 +164,7 @@ pub fn eql(a: Value, b: Value) bool {
             const bo = b.toObject();
             if (ao.asString()) |as| {
                 if (bo.asString()) |bs| {
-                    return std.mem.eql(u8, as.asSlice(), bs.asSlice());
+                    return as.eql(bs);
                 }
                 return false;
             }

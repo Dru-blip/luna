@@ -82,6 +82,38 @@ pub fn eql(a: *const String, b: *const String) bool {
     return std.mem.eql(u8, a.asSlice(), b.asSlice());
 }
 
+const Order = enum {
+    l,
+    le,
+    g,
+    ge,
+    eq,
+    ne,
+};
+
+pub fn cmp(a: *const String, b: *const String, comptime order: Order) bool {
+    if (a == b) {
+        return switch (order) {
+            .eq, .le, .ge => true,
+            .ne, .l, .g => false,
+        };
+    }
+
+    const as = a.asSlice();
+    const bs = b.asSlice();
+
+    const diff = std.mem.order(u8, as, bs);
+
+    return switch (order) {
+        .l => diff == .lt or (diff == .eq and as.len < bs.len),
+        .le => diff == .lt or (diff == .eq and as.len <= bs.len),
+        .g => diff == .gt or (diff == .eq and as.len > bs.len),
+        .ge => diff == .gt or (diff == .eq and as.len >= bs.len),
+        .eq => diff == .eq and as.len == bs.len,
+        .ne => diff != .eq or as.len != bs.len,
+    };
+}
+
 fn finalize(self: *Object, gc: *Gc) void {
     const str: *String = self.as(String);
 

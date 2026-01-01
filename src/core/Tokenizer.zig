@@ -422,6 +422,7 @@ pub fn next(self: *Tokenizer) Token {
             self.advance();
             switch (self.buffer[self.index]) {
                 'a'...'z', 'A'...'Z', '_' => continue :state .identifier,
+                '0'...'9' => continue :state .identifier,
                 else => {
                     var ident = self.buffer[result.loc.start..self.index];
                     ident = std.mem.trim(u8, ident, " \t\r\n;");

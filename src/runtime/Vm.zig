@@ -307,6 +307,13 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     continue :start;
                 }
 
+                if (lhs.isString() and rhs.isString()) {
+                    const ls = lhs.toObject().toString();
+                    const rs = rhs.toObject().toString();
+                    registers[data.tri.dst] = Value.bool(ls.cmp(rs, .l));
+                    continue :start;
+                }
+
                 return vm.raiseTypeException("<", lhs, rhs);
             },
             .test_le => {
@@ -315,6 +322,13 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 
                 if (lhs.isNumeric() and rhs.isNumeric()) {
                     registers[data.tri.dst] = Value.bool(lhs.asNumber() <= rhs.asNumber());
+                    continue :start;
+                }
+
+                if (lhs.isString() and rhs.isString()) {
+                    const ls = lhs.toObject().toString();
+                    const rs = rhs.toObject().toString();
+                    registers[data.tri.dst] = Value.bool(ls.cmp(rs, .le));
                     continue :start;
                 }
 
@@ -328,6 +342,14 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     registers[data.tri.dst] = Value.bool(lhs.asNumber() > rhs.asNumber());
                     continue :start;
                 }
+
+                if (lhs.isString() and rhs.isString()) {
+                    const ls = lhs.toObject().toString();
+                    const rs = rhs.toObject().toString();
+                    registers[data.tri.dst] = Value.bool(ls.cmp(rs, .g));
+                    continue :start;
+                }
+
                 return vm.raiseTypeException(">", lhs, rhs);
             },
             .test_ge => {
@@ -336,6 +358,13 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 
                 if (lhs.isNumeric() and rhs.isNumeric()) {
                     registers[data.tri.dst] = Value.bool(lhs.asNumber() >= rhs.asNumber());
+                    continue :start;
+                }
+
+                if (lhs.isString() and rhs.isString()) {
+                    const ls = lhs.toObject().toString();
+                    const rs = rhs.toObject().toString();
+                    registers[data.tri.dst] = Value.bool(ls.cmp(rs, .ge));
                     continue :start;
                 }
 
