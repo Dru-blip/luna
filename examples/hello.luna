@@ -1,9 +1,3 @@
-//let range=import("range")
-
-//foreach i in range(1,10,3){
-  //print(i)
-//}
-
 class vec2 {
     fn __init__(x, y){
         this.x = x
@@ -29,6 +23,22 @@ class vec2 {
         return vec2(this.x+other.x, this.y+other.y)
     }
 
+    fn __sub__(other){
+        return vec2(this.x-other.x, this.y-other.y)
+    }
+
+    fn __mul__(scalar){
+        return vec2(this.x*scalar, this.y*scalar)
+    }
+
+    fn __div__(other){
+        return vec2(this.x/other.x, this.y/other.y)
+    }
+
+    fn __mod__(other){
+        return vec2(this.x%other.x, this.y%other.y)
+    }
+
     fn __str__(){
         return "{x:" + this.x + ",y:" + this.y + "}"
     }
@@ -38,5 +48,5 @@ class vec2 {
 let x=vec2(1, 2)
 let y=vec2(3, 4)
 
-let z=x+y
+let z=y%x
 print(z)

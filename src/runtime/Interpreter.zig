@@ -61,6 +61,14 @@ pub const Names = struct {
     __str__: *String,
     __add__: *String,
     __radd__: *String,
+    __sub__: *String,
+    __rsub__: *String,
+    __mul__: *String,
+    __rmul__: *String,
+    __div__: *String,
+    __rdiv__: *String,
+    __mod__: *String,
+    __rmod__: *String,
 
     pub fn init(string_interner: *StringInterner) !Names {
         return .{
@@ -81,6 +89,14 @@ pub const Names = struct {
             .__init__ = try string_interner.intern("__init__"),
             .__add__ = try string_interner.intern("__add__"),
             .__radd__ = try string_interner.intern("__radd__"),
+            .__sub__ = try string_interner.intern("__sub__"),
+            .__rsub__ = try string_interner.intern("__rsub__"),
+            .__mul__ = try string_interner.intern("__mul__"),
+            .__rmul__ = try string_interner.intern("__rmul__"),
+            .__div__ = try string_interner.intern("__div__"),
+            .__rdiv__ = try string_interner.intern("__rdiv__"),
+            .__mod__ = try string_interner.intern("__mod__"),
+            .__rmod__ = try string_interner.intern("__rmod__"),
         };
     }
 };
