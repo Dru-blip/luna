@@ -59,6 +59,8 @@ pub const Names = struct {
     __next__: *String,
     __init__: *String,
     __str__: *String,
+    __add__: *String,
+    __radd__: *String,
 
     pub fn init(string_interner: *StringInterner) !Names {
         return .{
@@ -77,6 +79,8 @@ pub const Names = struct {
             .__next__ = try string_interner.intern("__next__"),
             .__str__ = try string_interner.intern("__str__"),
             .__init__ = try string_interner.intern("__init__"),
+            .__add__ = try string_interner.intern("__add__"),
+            .__radd__ = try string_interner.intern("__radd__"),
         };
     }
 };

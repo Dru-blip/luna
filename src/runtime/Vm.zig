@@ -242,6 +242,24 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     continue :start;
                 }
 
+                if (lhs.isObject()) {
+                    const class = lhs.toObject().class;
+                    if (class.getField(vm.interpreter.common_names.__add__)) |method| {
+                        //TODO: assumes method is an object.
+                        registers[data.tri.dst] = try method.toObject().callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
+                        continue :start;
+                    }
+                }
+
+                if (rhs.isObject()) {
+                    const class = rhs.toObject().class;
+                    if (class.getField(vm.interpreter.common_names.__radd__)) |method| {
+                        //TODO: assumes method is an object.
+                        registers[data.tri.dst] = try method.toObject().callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
+                        continue :start;
+                    }
+                }
+
                 return vm.raiseTypeException("+", lhs, rhs);
             },
             .sub => {

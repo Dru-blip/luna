@@ -25,8 +25,12 @@ class vec2 {
         }
     }
 
+    fn __add__(other){
+        return vec2(this.x+other.x, this.y+other.y)
+    }
+
     fn __str__(){
-        return "(" + this.x + ", " + this.y + ")"
+        return "{x:" + this.x + ",y:" + this.y + "}"
     }
 }
 
@@ -34,6 +38,5 @@ class vec2 {
 let x=vec2(1, 2)
 let y=vec2(3, 4)
 
-print(x)
-x[0]=2
-print(x)
+let z=x+y
+print(z)
