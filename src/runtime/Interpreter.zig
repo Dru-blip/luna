@@ -209,7 +209,7 @@ pub inline fn isMainModule(i: *Interpreter) bool {
     return i.module_stack.items.len == 1;
 }
 
-pub fn getCachedModule(i: *Interpreter, name: []const u8) ?*Module {
+pub inline fn getCachedModule(i: *Interpreter, name: []const u8) ?*Module {
     if (i.module_cache.get(name)) |module| {
         return module;
     }

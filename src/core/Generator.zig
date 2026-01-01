@@ -652,28 +652,22 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
             return reg;
         },
         .assign => {
-            const value = try g.genExpr(node.data.bin.rhs);
-            switch (node.data.bin.lhs.tag) {
-                .member_expr => {
-                    try g.genAssignMember(node.data.bin.lhs, value);
-                },
-                .computed_member_expr => {
-                    try g.genAssignComputedMember(node.data.bin.lhs, value);
-                },
-                .identifier => {
-                    try g.genAssignSimple(node, value);
-                },
-                else => {
-                    var obj = try Exception.new(g.gc);
-                    var exception: *Exception = obj.as(Exception);
-                    const str_obj = try String.new(g.gc, "Invalid assignment target");
-                    exception.tag = .invalid_assignment_target_error;
-                    exception.message = str_obj.as(String);
-                    const index = try g.addConstant(Value.object(obj));
-                    try g.addUn(.build_trace_and_throw_exception, index, node.loc);
-                },
-            }
-            return value;
+            return try g.genAssign(node, .assign, .add);
+        },
+        .add_assign => {
+            return try g.genAssign(node, .add_assign, .add);
+        },
+        .sub_assign => {
+            return try g.genAssign(node, .sub_assign, .sub);
+        },
+        .mul_assign => {
+            return try g.genAssign(node, .mul_assign, .mul);
+        },
+        .div_assign => {
+            return try g.genAssign(node, .div_assign, .div);
+        },
+        .mod_assign => {
+            return try g.genAssign(node, .mod_assign, .mod);
         },
         .call => {
             var data: Inst.Data = .{
@@ -748,6 +742,25 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
             unreachable;
         },
     }
+}
+
+inline fn genAssign(g: *Generator, node: *const Ast.Node, tag: Ast.Node.Tag, op: Inst.Op) GenError!u32 {
+    const value = try g.genExpr(node.data.bin.rhs);
+    switch (node.data.bin.lhs.tag) {
+        .member_expr => try g.genAssignMember(node.data.bin.lhs, value, tag, op),
+        .computed_member_expr => try g.genAssignComputedMember(node.data.bin.lhs, value, tag, op),
+        .identifier => try g.genAssignSimple(node, value, tag, op),
+        else => {
+            var obj = try Exception.new(g.gc);
+            var exception: *Exception = obj.as(Exception);
+            const str_obj = try String.new(g.gc, "Invalid assignment target");
+            exception.tag = .invalid_assignment_target_error;
+            exception.message = str_obj.as(String);
+            const index = try g.addConstant(Value.object(obj));
+            try g.addUn(.build_trace_and_throw_exception, index, node.loc);
+        },
+    }
+    return value;
 }
 
 inline fn genSuperCall(g: *Generator, node: *const Ast.Node) GenError!u32 {
@@ -853,35 +866,58 @@ inline fn genMemberExpr(g: *Generator, node: *const Ast.Node, this_reg: ?*u32) G
     return dst;
 }
 
-inline fn genAssignSimple(g: *Generator, node: *const Ast.Node, value: u32) GenError!void {
+inline fn genAssignSimple(g: *Generator, node: *const Ast.Node, value: u32, tag: Ast.Node.Tag, op: Inst.Op) GenError!void {
     const name = node.data.bin.lhs.data.string;
+
+    var result_reg = value;
+    if (tag != .assign) {
+        const lhs_val = try g.genExpr(node.data.bin.lhs);
+        result_reg = g.allocRegister();
+        try g.addTri(op, lhs_val, value, result_reg, node.loc);
+    }
 
     var variable: Variable = undefined;
     if (g.findVariable(name, &variable)) {
         try g.addBin(
             if (variable.scope == .global) .store_global_by_index else .mov,
-            value,
+            result_reg,
             variable.allocated_reg_slot,
             node.loc,
         );
     } else {
         const identifier_index = try g.addIdentifier(name);
-        try g.addBin(.store_global_by_name, value, identifier_index, node.loc);
+        try g.addBin(.store_global_by_name, result_reg, identifier_index, node.loc);
     }
 }
 
-inline fn genAssignMember(g: *Generator, node: *const Ast.Node, value: u32) GenError!void {
+inline fn genAssignMember(g: *Generator, node: *const Ast.Node, value: u32, tag: Ast.Node.Tag, op: Inst.Op) GenError!void {
     const obj = try g.genExpr(node.data.member.object);
     const property_ident_index = try g.addIdentifier(node.data.member.property);
+
+    var result_reg = value;
+    if (tag != .assign) {
+        const lhs_val = try g.genExpr(node);
+        result_reg = g.allocRegister();
+        try g.addTri(op, lhs_val, value, result_reg, node.loc);
+    }
+
     const ident_reg = g.allocRegister();
     try g.addBin(.load_ident, property_ident_index, ident_reg, node.loc);
-    try g.addTri(.set_attribute, ident_reg, value, obj, node.loc);
+    try g.addTri(.set_attribute, ident_reg, result_reg, obj, node.loc);
 }
 
-inline fn genAssignComputedMember(g: *Generator, node: *const Ast.Node, value: u32) GenError!void {
+inline fn genAssignComputedMember(g: *Generator, node: *const Ast.Node, value: u32, tag: Ast.Node.Tag, op: Inst.Op) GenError!void {
     const obj = try g.genExpr(node.data.bin.lhs);
     const computed_index = try g.genExpr(node.data.bin.rhs);
-    try g.addTri(.set_item, obj, computed_index, value, node.loc);
+
+    var result_reg = value;
+    if (tag != .assign) {
+        const lhs_val = try g.genExpr(node);
+        result_reg = g.allocRegister();
+        try g.addTri(op, lhs_val, value, result_reg, node.loc);
+    }
+
+    try g.addTri(.set_item, obj, computed_index, result_reg, node.loc);
 }
 
 inline fn genBinOp(g: *Generator, op: Inst.Op, node: *const Ast.Node) GenError!u32 {

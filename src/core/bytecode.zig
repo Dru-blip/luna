@@ -280,12 +280,12 @@ pub const Executable = struct {
                 .jmp => try out.print("Jump {d}", .{inst.data.un}),
 
                 .store_global_by_index => try out.print(
-                    "StoreGlobal [{d}], r{d}",
+                    "StoreGlobalByIndex [{d}], r{d}",
                     .{ inst.data.bin.lhs, inst.data.bin.rhs },
                 ),
 
                 .load_global_by_index => try out.print(
-                    "LoadGlobal r{d}, [{d}]",
+                    "LoadGlobalByIndex r{d}, [{d}]",
                     .{ inst.data.bin.lhs, inst.data.bin.rhs },
                 ),
 

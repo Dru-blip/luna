@@ -94,7 +94,7 @@ inline fn allocImpl(
     const header_size = @sizeOf(Object);
     const cell_size = header_size + obj_size;
 
-    if (gc.bytes_allocated_since_last_gc + cell_size > gc_threshold) {
+    if (gc.bytes_allocated_since_last_gc + cell_size >= gc_threshold) {
         try gc.collectGarbage();
         gc.bytes_allocated_since_last_gc = 0;
     }

@@ -1,5 +1,39 @@
-let range=import("range")
+//let range=import("range")
 
-foreach i in range(1,10,3){
-  print(i)
+//foreach i in range(1,10,3){
+  //print(i)
+//}
+
+class vec {
+    fn __init__(x, y){
+        this.x = x
+        this.y = y
+    }
+
+    fn __getitem__(index){
+        if index == 0 {
+            return this.x
+        }
+        return this.y
+    }
+
+    fn __setitem__(index, value){
+        if index == 0 {
+            this.x = value
+        }else{
+            this.y = value
+        }
+    }
+
+    fn __str__(){
+        return "(" + this.x + ", " + this.y + ")"
+    }
 }
+
+
+let x=vec(1, 2)
+//y=vec2(3, 4)
+
+print(x)
+x[0]+=1
+print(x)
