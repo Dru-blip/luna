@@ -69,6 +69,13 @@ pub const Names = struct {
     __rdiv__: *String,
     __mod__: *String,
     __rmod__: *String,
+    __lt__: *String,
+    __le__: *String,
+    __gt__: *String,
+    __ge__: *String,
+    __eq__: *String,
+    __ne__: *String,
+
 
     pub fn init(string_interner: *StringInterner) !Names {
         return .{
@@ -97,6 +104,12 @@ pub const Names = struct {
             .__rdiv__ = try string_interner.intern("__rdiv__"),
             .__mod__ = try string_interner.intern("__mod__"),
             .__rmod__ = try string_interner.intern("__rmod__"),
+            .__lt__ = try string_interner.intern("__lt__"),
+            .__le__ = try string_interner.intern("__le__"),
+            .__gt__ = try string_interner.intern("__gt__"),
+            .__ge__ = try string_interner.intern("__ge__"),
+            .__eq__ = try string_interner.intern("__eq__"),
+            .__ne__ = try string_interner.intern("__ne__"),
         };
     }
 };

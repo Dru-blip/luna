@@ -245,8 +245,9 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 if (lhs.isObject()) {
                     const class = lhs.toObject().class;
                     if (class.getField(vm.interpreter.common_names.__add__)) |method| {
-                        //TODO: assumes method is an object.
-                        registers[data.tri.dst] = try method.toObject().callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
+                        }
                         continue :start;
                     }
                 }
@@ -254,8 +255,9 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 if (rhs.isObject()) {
                     const class = rhs.toObject().class;
                     if (class.getField(vm.interpreter.common_names.__radd__)) |method| {
-                        //TODO: assumes method is an object.
-                        registers[data.tri.dst] = try method.toObject().callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
+                        }
                         continue :start;
                     }
                 }
@@ -274,8 +276,9 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 if (lhs.isObject()) {
                     const class = lhs.toObject().class;
                     if (class.getField(vm.interpreter.common_names.__sub__)) |method| {
-                        //TODO: assumes method is an object.
-                        registers[data.tri.dst] = try method.toObject().callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
+                        }
                         continue :start;
                     }
                 }
@@ -283,8 +286,9 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 if (rhs.isObject()) {
                     const class = rhs.toObject().class;
                     if (class.getField(vm.interpreter.common_names.__rsub__)) |method| {
-                        //TODO: assumes method is an object.
-                        registers[data.tri.dst] = try method.toObject().callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
+                        }
                         continue :start;
                     }
                 }
@@ -303,8 +307,9 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 if (lhs.isObject()) {
                     const class = lhs.toObject().class;
                     if (class.getField(vm.interpreter.common_names.__mul__)) |method| {
-                        //TODO: assumes method is an object.
-                        registers[data.tri.dst] = try method.toObject().callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
+                        }
                         continue :start;
                     }
                 }
@@ -312,8 +317,9 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 if (rhs.isObject()) {
                     const class = rhs.toObject().class;
                     if (class.getField(vm.interpreter.common_names.__rmul__)) |method| {
-                        //TODO: assumes method is an object.
-                        registers[data.tri.dst] = try method.toObject().callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
+                        }
                         continue :start;
                     }
                 }
@@ -337,8 +343,9 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 if (lhs.isObject()) {
                     const class = lhs.toObject().class;
                     if (class.getField(vm.interpreter.common_names.__div__)) |method| {
-                        //TODO: assumes method is an object.
-                        registers[data.tri.dst] = try method.toObject().callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
+                        }
                         continue :start;
                     }
                 }
@@ -346,8 +353,9 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 if (rhs.isObject()) {
                     const class = rhs.toObject().class;
                     if (class.getField(vm.interpreter.common_names.__rdiv__)) |method| {
-                        //TODO: assumes method is an object.
-                        registers[data.tri.dst] = try method.toObject().callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
+                        }
                         continue :start;
                     }
                 }
@@ -371,8 +379,9 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 if (lhs.isObject()) {
                     const class = lhs.toObject().class;
                     if (class.getField(vm.interpreter.common_names.__mod__)) |method| {
-                        //TODO: assumes method is an object.
-                        registers[data.tri.dst] = try method.toObject().callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
+                        }
                         continue :start;
                     }
                 }
@@ -380,8 +389,9 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 if (rhs.isObject()) {
                     const class = rhs.toObject().class;
                     if (class.getField(vm.interpreter.common_names.__rmod__)) |method| {
-                        //TODO: assumes method is an object.
-                        registers[data.tri.dst] = try method.toObject().callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
+                        }
                         continue :start;
                     }
                 }
@@ -404,6 +414,26 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     continue :start;
                 }
 
+                if (lhs.isObject()) {
+                    const class = lhs.toObject().class;
+                    if (class.getField(vm.interpreter.common_names.__lt__)) |method| {
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
+                        }
+                        continue :start;
+                    }
+                }
+
+                if (rhs.isObject()) {
+                    const class = rhs.toObject().class;
+                    if (class.getField(vm.interpreter.common_names.__gt__)) |method| {
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
+                        }
+                        continue :start;
+                    }
+                }
+
                 return vm.raiseTypeException("<", lhs, rhs);
             },
             .test_le => {
@@ -420,6 +450,26 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     const rs = rhs.toObject().toString();
                     registers[data.tri.dst] = Value.bool(ls.cmp(rs, .le));
                     continue :start;
+                }
+
+                if (lhs.isObject()) {
+                    const class = lhs.toObject().class;
+                    if (class.getField(vm.interpreter.common_names.__le__)) |method| {
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
+                        }
+                        continue :start;
+                    }
+                }
+
+                if (rhs.isObject()) {
+                    const class = rhs.toObject().class;
+                    if (class.getField(vm.interpreter.common_names.__ge__)) |method| {
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
+                        }
+                        continue :start;
+                    }
                 }
 
                 return vm.raiseTypeException("<=", lhs, rhs);
@@ -440,6 +490,26 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     continue :start;
                 }
 
+                if (lhs.isObject()) {
+                    const class = lhs.toObject().class;
+                    if (class.getField(vm.interpreter.common_names.__gt__)) |method| {
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
+                        }
+                        continue :start;
+                    }
+                }
+
+                if (rhs.isObject()) {
+                    const class = rhs.toObject().class;
+                    if (class.getField(vm.interpreter.common_names.__lt__)) |method| {
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
+                        }
+                        continue :start;
+                    }
+                }
+
                 return vm.raiseTypeException(">", lhs, rhs);
             },
             .test_ge => {
@@ -458,6 +528,26 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     continue :start;
                 }
 
+                if (lhs.isObject()) {
+                    const class = lhs.toObject().class;
+                    if (class.getField(vm.interpreter.common_names.__ge__)) |method| {
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
+                        }
+                        continue :start;
+                    }
+                }
+
+                if (rhs.isObject()) {
+                    const class = rhs.toObject().class;
+                    if (class.getField(vm.interpreter.common_names.__le__)) |method| {
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
+                        }
+                        continue :start;
+                    }
+                }
+
                 return vm.raiseTypeException(">=", lhs, rhs);
             },
             .test_eq => {
@@ -467,6 +557,26 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 if (lhs.isNumeric() and rhs.isNumeric()) {
                     registers[data.tri.dst] = Value.bool(lhs.asNumber() == rhs.asNumber());
                     continue :start;
+                }
+
+                if (lhs.isObject()) {
+                    const class = lhs.toObject().class;
+                    if (class.getField(vm.interpreter.common_names.__eq__)) |method| {
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
+                        }
+                        continue :start;
+                    }
+                }
+
+                if (rhs.isObject()) {
+                    const class = rhs.toObject().class;
+                    if (class.getField(vm.interpreter.common_names.__eq__)) |method| {
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
+                        }
+                        continue :start;
+                    }
                 }
 
                 registers[data.tri.dst] = Value.bool(lhs.eql(rhs));
@@ -479,6 +589,26 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 if (lhs.isNumeric() and rhs.isNumeric()) {
                     registers[data.tri.dst] = Value.bool(lhs.asNumber() != rhs.asNumber());
                     continue :start;
+                }
+
+                if (lhs.isObject()) {
+                    const class = lhs.toObject().class;
+                    if (class.getField(vm.interpreter.common_names.__ne__)) |method| {
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
+                        }
+                        continue :start;
+                    }
+                }
+
+                if (rhs.isObject()) {
+                    const class = rhs.toObject().class;
+                    if (class.getField(vm.interpreter.common_names.__ne__)) |method| {
+                        if (method.asObject()) |obj| {
+                            registers[data.tri.dst] = try obj.callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
+                        }
+                        continue :start;
+                    }
                 }
 
                 registers[data.tri.dst] = Value.bool(!lhs.eql(rhs));

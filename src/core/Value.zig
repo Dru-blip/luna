@@ -162,13 +162,14 @@ pub fn eql(a: Value, b: Value) bool {
         .object => {
             const ao = a.toObject();
             const bo = b.toObject();
+            if (ao == bo) return true;
             if (ao.asString()) |as| {
                 if (bo.asString()) |bs| {
                     return as.eql(bs);
                 }
                 return false;
             }
-            return ao == bo;
+            return false;
         },
     };
 }

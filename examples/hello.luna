@@ -1,52 +1,63 @@
-class vec2 {
-    fn __init__(x, y){
-        this.x = x
-        this.y = y
-    }
-
-    fn __getitem__(index){
-        if index == 0 {
-            return this.x
-        }
-        return this.y
-    }
-
-    fn __setitem__(index, value){
-        if index == 0 {
-            this.x = value
-        }else{
-            this.y = value
-        }
+class Pair {
+    fn __init__(a, b){
+        this.a = a
+        this.b = b
     }
 
     fn __add__(other){
-        return vec2(this.x+other.x, this.y+other.y)
+        return Pair(this.a + other.a, this.b + other.b)
+    }
+
+    fn __radd__(other){
+        return Pair(other.a + this.a, other.b + this.b)
     }
 
     fn __sub__(other){
-        return vec2(this.x-other.x, this.y-other.y)
+        return Pair(this.a - other.a, this.b - other.b)
     }
 
-    fn __mul__(scalar){
-        return vec2(this.x*scalar, this.y*scalar)
+    fn __mul__(other){
+        return Pair(this.a * other.a, this.b * other.b)
     }
 
     fn __div__(other){
-        return vec2(this.x/other.x, this.y/other.y)
+        return Pair(this.a / other.a, this.b / other.b)
     }
 
     fn __mod__(other){
-        return vec2(this.x%other.x, this.y%other.y)
+        return Pair(this.a % other.a, this.b % other.b)
+    }
+
+    fn __lt__(other){
+        return this.a < other.a && this.b < other.b
+    }
+
+    fn __gt__(other){
+        return this.a > other.a && this.b > other.b
+    }
+
+    fn __eq__(other){
+        return this.a == other.a && this.b == other.b
+    }
+
+    fn __ne__(other){
+        return this.a != other.a && this.b != other.b
     }
 
     fn __str__(){
-        return "{x:" + this.x + ",y:" + this.y + "}"
+        return "(" + this.a + ", " + this.b + ")"
     }
 }
 
+let x = Pair(10, 20)
+let y = Pair(3, 7)
 
-let x=vec2(1, 2)
-let y=vec2(3, 4)
-
-let z=y%x
+let z = Pair(10,20)
 print(z)
+
+print(x + y)
+print(x * y)
+
+
+print(x == z)
+print(x != z)
