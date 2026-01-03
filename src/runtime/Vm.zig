@@ -670,7 +670,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 const dict: *Dict = registers[data.tri.dst].toObject().as(Dict);
                 const key = registers[data.tri.op1];
                 const value = registers[data.tri.op2];
-                try dict.set(key, value);
+                try dict.set(vm, key, value);
                 continue :start;
             },
             .build_list => {
