@@ -10,7 +10,7 @@ const ModuleEnvironment = @This();
 module: *Module,
 globals: Vm.Globals,
 
-pub const type_descriptor: Object.TypeDescriptor = .{
+pub const gc_hooks: Object.GcHooks = .{
     .name = "ModuleEnvironment",
     .visit = visit,
     .finalize = finalize,
@@ -31,11 +31,11 @@ pub fn visit(self: *Object, live_objects: *ObjectSet) !void {
     try Object.Base.visit(self, live_objects);
     const env: *ModuleEnvironment = self.as(ModuleEnvironment);
     const module_obj = Object.from(env.module);
-    try module_obj.type_descriptor.visit(module_obj, live_objects);
+    try module_obj.gc_hooks.visit(module_obj, live_objects);
 
     for (env.globals.fast_slots) |global| {
         if (global.asObject()) |obj| {
-            try obj.type_descriptor.visit(obj, live_objects);
+            try obj.gc_hooks.visit(obj, live_objects);
         }
     }
 }

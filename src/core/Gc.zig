@@ -73,7 +73,7 @@ pub fn deinit(gc: *Gc) void {
             const cell = blk.cell(i);
             const obj: *Object = @ptrCast(cell);
             if (blk.bitmap.isSet(i)) {
-                obj.type_descriptor.finalize(obj, gc);
+                obj.gc_hooks.finalize(obj, gc);
             }
         }
 
@@ -115,11 +115,11 @@ inline fn allocImpl(
     const header: *Object = @ptrFromInt(obj_base);
     const obj_ptr: *T = @ptrFromInt(obj_base + header_size);
 
-    if (!@hasDecl(T, "type_descriptor")) {
-        @compileError("type_descriptor  must be present");
+    if (!@hasDecl(T, "gc_hooks")) {
+        @compileError("gc_hooks must be present");
     }
 
-    header.type_descriptor = &T.type_descriptor;
+    header.gc_hooks = &T.gc_hooks;
     header.ptr = obj_ptr;
 
     return header;
@@ -229,7 +229,7 @@ fn collectLiveObjects(_: *Gc, roots: *ObjectSet, live_objects: *ObjectSet) !void
     var iter = roots.iterator();
     while (iter.next()) |s| {
         const obj = s.*;
-        try obj.type_descriptor.visit(obj, live_objects);
+        try obj.gc_hooks.visit(obj, live_objects);
     }
 }
 
@@ -259,7 +259,7 @@ fn sweepDeadObjects(gc: *Gc) void {
             const cell = blk.cell(i);
             const obj: *Object = @ptrCast(cell);
             if (blk.bitmap.isSet(i) and !obj.marked) {
-                obj.type_descriptor.finalize(obj, gc);
+                obj.gc_hooks.finalize(obj, gc);
                 blk.deallocateCell(cell, i);
             }
         }

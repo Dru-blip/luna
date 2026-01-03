@@ -137,7 +137,7 @@ pub inline fn isNumeric(value: Value) bool {
 }
 
 pub inline fn isString(value: Value) bool {
-    return value.type == .object and value.toObject().type_descriptor == &String.type_descriptor;
+    return value.type == .object and value.toObject().gc_hooks == &String.gc_hooks;
 }
 
 pub inline fn getTypeString(v: Value) []const u8 {

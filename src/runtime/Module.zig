@@ -25,7 +25,7 @@ pub fn new(gc: *Gc, name: []const u8) !*Module {
     return module;
 }
 
-pub const type_descriptor: Object.TypeDescriptor = .{
+pub const gc_hooks: Object.GcHooks = .{
     .name = "Module",
     .visit = visit,
     .finalize = finalize,
@@ -35,10 +35,10 @@ pub fn visit(self: *Object, live_objects: *ObjectSet) !void {
     try Object.Base.visit(self, live_objects);
     const module: *Module = self.as(Module);
     if (module.exported.asObject()) |obj| {
-        try obj.type_descriptor.visit(obj, live_objects);
+        try obj.gc_hooks.visit(obj, live_objects);
     }
     const name = Object.from(module.name);
-    try name.type_descriptor.visit(name, live_objects);
+    try name.gc_hooks.visit(name, live_objects);
 
     //TODO: visit module.env
 }

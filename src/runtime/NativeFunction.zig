@@ -31,7 +31,7 @@ pub fn new(gc: *Gc, home_class: *Class, func: Function, name: *String, arity: u8
     return obj;
 }
 
-pub const type_descriptor: Object.TypeDescriptor = .{
+pub const gc_hooks: Object.GcHooks = .{
     .name = "NativeFunction",
     .visit = visit,
     .finalize = Object.Base.finalize,
@@ -45,5 +45,5 @@ fn visit(self: *Object, live_objects: *ObjectSet) !void {
     try Object.Base.visit(self, live_objects);
     const native: *NativeFunction = self.as(NativeFunction);
     const class_obj = Object.from(native.home_class);
-    try class_obj.type_descriptor.visit(class_obj, live_objects);
+    try class_obj.gc_hooks.visit(class_obj, live_objects);
 }

@@ -11,7 +11,7 @@ const List = @This();
 items: std.ArrayList(Value),
 gpa: std.mem.Allocator,
 
-pub const type_descriptor = Object.TypeDescriptor{
+pub const gc_hooks = Object.GcHooks{
     .name = "List",
     .visit = visit,
     .finalize = finalize,
@@ -102,7 +102,7 @@ fn visit(self: *Object, live_objects: *ObjectSet) !void {
     for (list.items.items) |item| {
         if (item.asObject()) |obj| {
             if (!live_objects.contains(obj)) {
-                try obj.type_descriptor.visit(obj, live_objects);
+                try obj.gc_hooks.visit(obj, live_objects);
             }
         }
     }

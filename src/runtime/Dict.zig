@@ -34,7 +34,7 @@ const ValueContext = struct {
 
 map: Map,
 
-pub const type_descriptor = Object.TypeDescriptor{
+pub const gc_hooks = Object.GcHooks{
     .name = "Dict",
     .visit = visit,
     .finalize = finalize,
@@ -81,12 +81,12 @@ fn visit(self: *Object, live_objects: *ObjectSet) !void {
     while (iterator.next()) |entry| {
         if (entry.key_ptr.asObject()) |key_obj| {
             if (!live_objects.contains(key_obj)) {
-                try key_obj.type_descriptor.visit(key_obj, live_objects);
+                try key_obj.gc_hooks.visit(key_obj, live_objects);
             }
         }
         if (entry.value_ptr.asObject()) |value_obj| {
             if (!live_objects.contains(value_obj)) {
-                try value_obj.type_descriptor.visit(value_obj, live_objects);
+                try value_obj.gc_hooks.visit(value_obj, live_objects);
             }
         }
     }

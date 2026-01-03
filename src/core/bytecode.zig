@@ -124,7 +124,7 @@ pub const Executable = struct {
         return obj.as(Executable);
     }
 
-    pub const type_descriptor = Object.TypeDescriptor{
+    pub const gc_hooks = Object.GcHooks{
         .name = "Executable",
         .visit = visit,
         .finalize = finalize,
@@ -144,7 +144,7 @@ pub const Executable = struct {
         const executable: *Executable = self.as(Executable);
         for (executable.constants) |constant| {
             if (constant.asObject()) |obj| {
-                try obj.type_descriptor.visit(obj, live_objects);
+                try obj.gc_hooks.visit(obj, live_objects);
             }
         }
     }
@@ -156,7 +156,7 @@ pub const Executable = struct {
 
         for (self.constants) |constant| {
             if (constant.asObject()) |obj| {
-                if (obj.type_descriptor == &Executable.type_descriptor) {
+                if (obj.gc_hooks == &Executable.gc_hooks) {
                     const child_executable: *Executable = obj.as(Executable);
                     try child_executable.print();
                 }

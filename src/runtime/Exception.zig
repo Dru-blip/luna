@@ -74,7 +74,7 @@ tag: Tag,
 message: *String = undefined,
 traceback: std.ArrayList(TracebackFrame) = .empty,
 
-pub const type_descriptor: Object.TypeDescriptor = .{
+pub const gc_hooks: Object.GcHooks = .{
     .name = "Exception",
     .visit = visit,
     .finalize = finalize,
@@ -155,13 +155,13 @@ fn visit(self: *Object, live_objects: *ObjectSet) !void {
     const err: *Exception = self.as(Exception);
     const message = Object.from(err.message);
     if (!live_objects.contains(message)) {
-        try message.type_descriptor.visit(message, live_objects);
+        try message.gc_hooks.visit(message, live_objects);
     }
 
     for (err.traceback.items) |frame| {
         const func_name_obj = Object.from(frame.function_name);
         if (!live_objects.contains(func_name_obj)) {
-            try func_name_obj.type_descriptor.visit(func_name_obj, live_objects);
+            try func_name_obj.gc_hooks.visit(func_name_obj, live_objects);
         }
     }
 }

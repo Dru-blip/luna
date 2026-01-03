@@ -58,7 +58,7 @@ pub fn addMethod(class: *Class, name: *String, function: Value) !void {
     try class.methods.fields.put(name, function);
 }
 
-pub const type_descriptor: Object.TypeDescriptor = .{
+pub const gc_hooks: Object.GcHooks = .{
     .name = "Class",
     .visit = visit,
     .finalize = finalize,
@@ -71,7 +71,7 @@ pub fn visit(self: *Object, live_objects: *ObjectSet) !void {
     if (class.super_class) |sc| {
         const super_class_obj = Object.from(sc);
         if (!live_objects.contains(super_class_obj)) {
-            try super_class_obj.type_descriptor.visit(super_class_obj, live_objects);
+            try super_class_obj.gc_hooks.visit(super_class_obj, live_objects);
         }
     }
 
@@ -81,13 +81,13 @@ pub fn visit(self: *Object, live_objects: *ObjectSet) !void {
         const key = entry.key_ptr.*;
         const key_obj = Object.from(key);
         if (!live_objects.contains(key_obj)) {
-            try key_obj.type_descriptor.visit(key_obj, live_objects);
+            try key_obj.gc_hooks.visit(key_obj, live_objects);
         }
 
         const value = entry.value_ptr;
         if (value.asObject()) |obj| {
             if (!live_objects.contains(obj)) {
-                try obj.type_descriptor.visit(obj, live_objects);
+                try obj.gc_hooks.visit(obj, live_objects);
             }
         }
     }

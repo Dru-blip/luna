@@ -19,7 +19,7 @@ const Storage = union(enum) {
     heap: []const u8,
 };
 
-pub const type_descriptor = Object.TypeDescriptor{
+pub const gc_hooks = Object.GcHooks{
     .name = "String",
     .visit = Object.Base.visit,
     .finalize = finalize,

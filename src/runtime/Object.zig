@@ -13,10 +13,10 @@ const Vm = @import("Vm.zig");
 
 marked: bool = false,
 ptr: *anyopaque, // do i really need this ?
-type_descriptor: *const TypeDescriptor,
+gc_hooks: *const GcHooks,
 class: *Class,
 
-pub const TypeDescriptor = struct {
+pub const GcHooks = struct {
     name: []const u8,
     finalize: *const fn (*Object, *Gc) void,
     visit: *const fn (*Object, *ObjectSet) std.mem.Allocator.Error!void,
@@ -33,13 +33,13 @@ pub inline fn from(ptr: *anyopaque) *Object {
 
 pub inline fn isFunction(obj: *Object) bool {
     //TODO: should switch to class based
-    return obj.type_descriptor == &Function.type_descriptor or
-        obj.type_descriptor == &NativeFunction.type_descriptor or
-        obj.type_descriptor == &Class.type_descriptor;
+    return obj.gc_hooks == &Function.gc_hooks or
+        obj.gc_hooks == &NativeFunction.gc_hooks or
+        obj.gc_hooks == &Class.gc_hooks;
 }
 
 pub inline fn isString(obj: *Object) bool {
-    return obj.type_descriptor == &String.type_descriptor;
+    return obj.gc_hooks == &String.gc_hooks;
 }
 
 pub inline fn toString(obj: *Object) *String {
@@ -47,22 +47,22 @@ pub inline fn toString(obj: *Object) *String {
 }
 
 pub inline fn asString(obj: *Object) ?*String {
-    if (obj.type_descriptor == &String.type_descriptor) {
+    if (obj.gc_hooks == &String.gc_hooks) {
         return obj.as(String);
     }
     return null;
 }
 
 pub inline fn asFunction(obj: *Object) ?*Function {
-    return if (obj.type_descriptor == &Function.type_descriptor) obj.as(Function) else null;
+    return if (obj.gc_hooks == &Function.gc_hooks) obj.as(Function) else null;
 }
 
 pub inline fn asNativeFunction(obj: *Object) ?*NativeFunction {
-    return if (obj.type_descriptor == &NativeFunction.type_descriptor) obj.as(NativeFunction) else null;
+    return if (obj.gc_hooks == &NativeFunction.gc_hooks) obj.as(NativeFunction) else null;
 }
 
 pub inline fn asClass(obj: *Object) ?*Class {
-    return if (obj.type_descriptor == &Class.type_descriptor) obj.as(Class) else null;
+    return if (obj.gc_hooks == &Class.gc_hooks) obj.as(Class) else null;
 }
 
 pub inline fn getClassName(obj: *Object) []const u8 {
@@ -70,7 +70,7 @@ pub inline fn getClassName(obj: *Object) []const u8 {
 }
 
 pub const Base = struct {
-    pub const type_descriptor: Object.TypeDescriptor = .{
+    pub const gc_hooks: Object.GcHooks = .{
         .name = "Object",
         .visit = visit,
         .finalize = finalize,
@@ -80,7 +80,7 @@ pub const Base = struct {
         if (live_objects.contains(self)) return;
         try live_objects.add(self);
         const class = Object.from(self.class);
-        try class.type_descriptor.visit(class, live_objects);
+        try class.gc_hooks.visit(class, live_objects);
     }
 
     pub fn finalize(_: *Object, _: *Gc) void {}

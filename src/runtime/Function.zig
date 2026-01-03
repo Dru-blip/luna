@@ -29,7 +29,7 @@ pub fn withExecutable(gc: *Gc, executable: *Executable) !*Object {
     return obj;
 }
 
-pub const type_descriptor: Object.TypeDescriptor = .{
+pub const gc_hooks: Object.GcHooks = .{
     .name = "Function",
     .visit = visit,
     .finalize = finalize,
@@ -44,9 +44,9 @@ fn visit(self: *Object, live_objects: *ObjectSet) !void {
     const function: *Function = self.as(Function);
     const exe_obj = Object.from(function.exe);
     if (!live_objects.contains(exe_obj)) {
-        try exe_obj.type_descriptor.visit(exe_obj, live_objects);
+        try exe_obj.gc_hooks.visit(exe_obj, live_objects);
     }
     if (function.home_class) |home_class| {
-        try Object.from(home_class).type_descriptor.visit(Object.from(home_class), live_objects);
+        try Object.from(home_class).gc_hooks.visit(Object.from(home_class), live_objects);
     }
 }

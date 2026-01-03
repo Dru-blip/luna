@@ -13,7 +13,7 @@ const ListIterator = @This();
 list: *Object,
 index: usize,
 
-pub const type_descriptor = Object.TypeDescriptor{
+pub const gc_hooks = Object.GcHooks{
     .name = "ListIterator",
     .visit = visit,
     .finalize = finalize,
@@ -40,7 +40,7 @@ fn visit(self: *Object, live_objects: *ObjectSet) !void {
     const iterator: *ListIterator = self.as(ListIterator);
 
     if (!live_objects.contains(iterator.list)) {
-        try iterator.list.type_descriptor.visit(iterator.list, live_objects);
+        try iterator.list.gc_hooks.visit(iterator.list, live_objects);
     }
 }
 
