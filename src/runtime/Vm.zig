@@ -40,6 +40,7 @@ const RegisterPool = struct {
     }
 
     pub fn allocate(self: *RegisterPool, count: usize) ![]Value {
+        std.debug.print("registers used: {d}\n", .{self.used});
         const start = self.used;
         const end = start + count;
         if (end > self.buffer.len) {
@@ -93,7 +94,9 @@ const Records = std.ArrayList(ActivationRecord);
 const default_register_pool_size = 100_000;
 const default_record_capacity = 2048;
 
-records: Records = .empty,
+const max_records = 1024;
+
+records: Records,
 rp: usize = 0,
 interpreter: *Interpreter,
 gpa: std.mem.Allocator,
@@ -107,7 +110,7 @@ pub fn init(gpa: std.mem.Allocator, interpreter: *Interpreter) !*Vm {
         .interpreter = interpreter,
         .gpa = gpa,
         .gc = &interpreter.gc,
-        .records = try Records.initCapacity(gpa, default_record_capacity),
+        .records = try Records.initCapacity(gpa, max_records),
         .register_pool = register_pool,
     };
     return vm;
@@ -119,9 +122,23 @@ pub fn deinit(vm: *Vm) void {
     vm.gpa.destroy(vm);
 }
 
+pub fn pushRecord(vm: *Vm, record: ActivationRecord) Error!Value {
+    std.debug.print("stack size: {d}\n", .{vm.records.items.len});
+    if (vm.records.items.len >= max_records) {
+        return vm.raiseException(
+            .stack_overflow,
+            "maximum call stack size ({d}) exceeded",
+            .{max_records},
+        );
+    }
+
+    vm.records.appendAssumeCapacity(record);
+    return Value.None;
+}
+
 pub fn runExecutable(vm: *Vm, executable: *Executable) Error!Value {
     const record = try ActivationRecord.init(executable, &vm.register_pool);
-    vm.records.appendAssumeCapacity(record);
+    _ = try vm.pushRecord(record);
     return try vm.runRecord(&vm.records.items[vm.records.items.len - 1], false);
 }
 
@@ -840,11 +857,9 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 }
 
                 const function: *Function = callee_obj.as(Function);
-
                 _ = try vm.checkArity(Function, function.exe.name, function.arity, @intCast(data.call.argc), false);
-
                 const caller_record = vm.records.getLast();
-                vm.records.appendAssumeCapacity(try ActivationRecord.withFunction(&vm.register_pool, function));
+                _ = try vm.pushRecord(try ActivationRecord.withFunction(&vm.register_pool, function));
                 record = &vm.records.items[vm.records.items.len - 1];
                 record.caller_return_reg = data.call.ret;
 

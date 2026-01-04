@@ -15,6 +15,7 @@ pub fn new(gc: *Gc) !*Class {
     try class.defineNativeMethod(gc, "print", print, 10, true);
     try class.defineNativeMethod(gc, "input", input, 0, true);
     try class.defineNativeMethod(gc, "import", import, 1, false);
+    try class.defineNativeMethod(gc, "hash", hash, 1, false);
 
     return class;
 }
@@ -36,6 +37,7 @@ fn input(vm: *Vm, _: *Object, args: []const Value) !Value {
 }
 
 fn print(vm: *Vm, _: *Object, args: []const Value) !Value {
+    //TODO: switch to writer instead of default debug print.
     for (args) |arg| {
         switch (arg.type) {
             .number => {
@@ -153,4 +155,52 @@ fn getCachedModuleWithPatterns(vm: *Vm, module_path: []const u8) !?*Module {
     }
 
     return null;
+}
+
+fn hash(vm: *Vm, _: *Object, args: []const Value) !Value {
+    if (args.len == 0) {
+        return vm.raiseException(.type_error, "hash() requires at least 1 argument", .{});
+    }
+
+    const value = args[0];
+    var hash_value: u64 = undefined;
+
+    switch (value.type) {
+        .number => {
+            const num_bits = @as(u64, @bitCast(value.data.number));
+            hash_value = std.hash.Wyhash.hash(0, std.mem.asBytes(&num_bits));
+        },
+        .bool => {
+            const bool_val: u8 = if (value.data.bool) 1 else 0;
+            hash_value = std.hash.Wyhash.hash(0, &[_]u8{bool_val});
+        },
+        .none => {
+            hash_value = 0;
+        },
+        .undefined => {
+            hash_value = 1;
+        },
+        .object => {
+            if (value.toObject().asString()) |str| {
+                hash_value = str.hash;
+            } else {
+                const class = value.toObject().class;
+                const hash_method_value = class.getField(vm.interpreter.common_names.__hash__);
+
+                if (hash_method_value) |hash_method_object| {
+                    if (hash_method_object.asObject()) |hash_obj| {
+                        const result = try hash_obj.callAssumeCallable(vm, value.toObject(), &[_]Value{});
+                        if (result.type != .number) {
+                            return vm.raiseException(.type_error, "__hash__() must return a number", .{});
+                        }
+                        return result;
+                    }
+                }
+                return vm.raiseException(.type_error, "unhashable type: {s}", .{class.name.asSlice()});
+            }
+        },
+    }
+
+    const hash_as_f64 = @as(f64, @floatFromInt(hash_value));
+    return Value.number(hash_as_f64);
 }

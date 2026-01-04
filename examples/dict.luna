@@ -5,7 +5,7 @@ class Pair {
     }
 
     fn __hash__(){
-        return this.a + this.b
+        return hash(this)
     }
 
     fn __eq__(other){
