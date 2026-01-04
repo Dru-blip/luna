@@ -9,30 +9,7 @@ const Vm = @import("Vm.zig");
 
 const Dict = @This();
 
-// const Map = std.HashMap(Value, Value, ValueContext, std.hash_map.default_max_load_percentage);
-
 const Map = HashMap;
-
-const ValueContext = struct {
-    pub fn hash(_: @This(), key: Value) u64 {
-        switch (key.type) {
-            .number => return @as(u64, @bitCast(key.data.number)),
-            .bool => return @as(u64, @intFromBool(key.data.bool)),
-            .none, .undefined => return 0,
-            .object => {
-                if (key.toObject().asString()) |str| {
-                    return str.hash;
-                }
-                //TODO: should call __hash__ function of object.
-                return @intFromPtr(key.toObject());
-            },
-        }
-    }
-
-    pub fn eql(_: @This(), a: Value, b: Value) bool {
-        return a.eql(b);
-    }
-};
 
 map: Map,
 
@@ -59,12 +36,12 @@ pub fn get(dict: *Dict, vm: *Vm, key: Value) !?Value {
     return dict.map.get(vm, key);
 }
 
-// pub fn remove(dict: *Dict, key: Value) bool {
-//     return dict.map.remove(key);
-// }
+pub fn remove(dict: *Dict, vm: *Vm, key: Value) ?Value {
+    return dict.map.remove(vm, key);
+}
 
-pub fn contains(dict: *Dict, key: Value) !bool {
-    return dict.map.contains(key);
+pub fn contains(dict: *Dict, vm: *Vm, key: Value) !bool {
+    return dict.map.contains(vm, key);
 }
 
 // pub fn clear(dict: *Dict) void {
@@ -116,6 +93,7 @@ const HashMap = struct {
         value: Value,
         next: u32,
         prev: u32,
+        free: bool,
 
         const empty: u32 = std.math.maxInt(u32);
     };
@@ -202,6 +180,21 @@ const HashMap = struct {
         self.putAssumeCapacity(vm, key, value);
     }
 
+    pub fn remove(self: *Self, vm: *Vm, key: Value) ?Value {
+        const index = self.getIndex(vm, key) orelse return null;
+        const entry = &self.buckets.items[index];
+
+        if (self.free_list == Entry.empty) {
+            self.free_list = index;
+        } else {
+            const next = self.free_list;
+            self.free_list = index;
+            self.buckets.items[index].next = next;
+        }
+        self.free_count += 1;
+        return entry.value;
+    }
+
     pub fn putAssumeCapacity(self: *Self, vm: *Vm, key: Value, value: Value) void {
         if (self.getIndex(vm, key)) |entry_index| {
             self.buckets.items[entry_index].value = value;
@@ -229,7 +222,10 @@ const HashMap = struct {
         };
 
         const new_entry = &self.buckets.items[new_bucket_index];
+        new_entry.key = key;
+        new_entry.value = value;
         new_entry.next = self.indices[index];
+        new_entry.prev = Entry.empty;
 
         if (self.indices[index] != Entry.empty) {
             self.buckets.items[self.indices[index]].prev = new_bucket_index;
@@ -240,8 +236,8 @@ const HashMap = struct {
     }
 
     pub fn growIfNeeded(self: *Self, vm: *Vm, additional: usize) !void {
-        //TODO: should account for free list.
-        const target_count = self.count + additional - self.free_count;
+        if (self.free_count >= additional) return;
+        const target_count = self.count + additional;
         const capacity = self.indices.len;
 
         //TODO: find a better way to calculate the load factor.
@@ -302,7 +298,8 @@ const HashMap = struct {
 
             self.indices[idx] = @intCast(i);
         }
+        self.capacity = new_capacity;
 
-        try self.buckets.ensureUnusedCapacity(self.allocator, 1);
+        try self.buckets.ensureUnusedCapacity(self.allocator, self.capacity - self.buckets.items.len);
     }
 };

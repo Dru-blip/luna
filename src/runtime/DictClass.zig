@@ -42,10 +42,11 @@ fn get(vm: *Vm, self: *Object, args: []const Value) !Value {
     return try dict.get(vm, key) orelse Value.None;
 }
 
-fn remove(_: *Vm, _: *Object, _: []const Value) !Value {
-    // const dict = self.as(Dict);
-    // const key = args[0];
-    return Value.bool(true);
+fn remove(vm: *Vm, self: *Object, args: []const Value) !Value {
+    const dict: *Dict = self.as(Dict);
+    const key = args[0];
+    //TODO: should raise key error,if not found.
+    return dict.remove(vm, key) orelse Value.None;
 }
 
 fn contains(vm: *Vm, self: *Object, args: []const Value) !Value {
@@ -91,6 +92,7 @@ fn getitem(vm: *Vm, self: *Object, args: []const Value) !Value {
     const dict: *Dict = self.as(Dict);
     const key = args[0];
     const res = try dict.get(vm, key);
+    //TODO: should raise key error,if not found.
     return res orelse Value.None;
 }
 
