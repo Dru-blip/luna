@@ -46,7 +46,7 @@ fn remove(vm: *Vm, self: *Object, args: []const Value) !Value {
     const dict: *Dict = self.as(Dict);
     const key = args[0];
     //TODO: should raise key error,if not found.
-    return dict.remove(vm, key) orelse Value.None;
+    return try dict.remove(vm, key) orelse Value.None;
 }
 
 fn contains(vm: *Vm, self: *Object, args: []const Value) !Value {

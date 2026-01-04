@@ -33,15 +33,15 @@ pub fn set(dict: *Dict, vm: *Vm, key: Value, value: Value) !void {
 }
 
 pub fn get(dict: *Dict, vm: *Vm, key: Value) !?Value {
-    return dict.map.get(vm, key);
+    return try dict.map.get(vm, key);
 }
 
-pub fn remove(dict: *Dict, vm: *Vm, key: Value) ?Value {
-    return dict.map.remove(vm, key);
+pub fn remove(dict: *Dict, vm: *Vm, key: Value) !?Value {
+    return try dict.map.remove(vm, key);
 }
 
 pub fn contains(dict: *Dict, vm: *Vm, key: Value) !bool {
-    return dict.map.contains(vm, key);
+    return try dict.map.contains(vm, key);
 }
 
 // pub fn clear(dict: *Dict) void {
@@ -93,7 +93,7 @@ const HashMap = struct {
         value: Value,
         next: u32,
         prev: u32,
-        free: bool,
+        free: bool = false,
 
         const empty: u32 = std.math.maxInt(u32);
     };
@@ -110,78 +110,98 @@ const HashMap = struct {
         self.buckets.deinit(self.allocator);
     }
 
-    fn hash(_: *const Self, vm: *Vm, key: Value) u64 {
-        _ = vm;
-        return switch (key.type) {
-            .number => blk: {
+    fn hash(_: *const Self, vm: *Vm, key: Value) !Value {
+        switch (key.type) {
+            .number => {
                 const bits = @as(u64, @bitCast(key.data.number));
-                break :blk std.hash.Wyhash.hash(0, std.mem.asBytes(&bits));
+                return Value.number(@floatFromInt(std.hash.Wyhash.hash(0, std.mem.asBytes(&bits))));
             },
-            .bool => @intFromBool(key.data.bool),
-            .none => 0,
-            .undefined => 1,
-            .object => blk: {
+            .bool => return Value.number(@floatFromInt(@intFromBool(key.data.bool))),
+            .none => return Value.number(0),
+            .undefined => return Value.number(1),
+            .object => {
                 const obj = key.toObject();
 
                 if (obj.asString()) |str| {
-                    return str.hash;
+                    return Value.number(@floatFromInt(str.hash));
                 }
-                // TODO: Call __hash__ method on object.
-                const addr = @intFromPtr(obj);
-                break :blk std.hash.Wyhash.hash(0, std.mem.asBytes(&addr));
+
+                const class = obj.class;
+                if (class.getField(vm.interpreter.common_names.__hash__)) |method| {
+                    if (method.asObject()) |func| {
+                        const hash_value = try func.callAssumeCallable(vm, obj, &[_]Value{});
+                        if (hash_value.isNumber()) {
+                            return hash_value;
+                        }
+                        return vm.raiseException(.value_error, "__hash__ must return a number", .{});
+                    }
+                }
+
+                return vm.raiseException(.type_error, "unhashable type: {s}", .{class.name.asSlice()});
             },
-        };
+        }
     }
 
-    inline fn hashIndex(self: *const Self, vm: *Vm, key: Value) u32 {
-        const h = self.hash(vm, key);
-        return @intCast(h & (self.indices.len - 1));
+    inline fn hashIndex(self: *const Self, vm: *Vm, key: Value) !u64 {
+        const h = try self.hash(vm, key);
+        const val = @as(u64, @intFromFloat(h.data.number));
+        return @intCast(val & (self.indices.len - 1));
     }
 
-    fn eql(_: *Self, a: Value, b: Value) bool {
-        if (a.type != b.type) return false;
-        return switch (a.type) {
-            .number => a.data.number == b.data.number,
-            .bool => a.data.bool == b.data.bool,
-            .none, .undefined => true,
-            .object => blk: {
+    fn eql(_: *Self, vm: *Vm, a: Value, b: Value) !Value {
+        if (a.type != b.type) return Value.bool(false);
+        switch (a.type) {
+            .number => return Value.bool(a.data.number == b.data.number),
+            .bool => return Value.bool(a.data.bool == b.data.bool),
+            .none, .undefined => return Value.bool(true),
+            .object => {
                 const ao = a.toObject();
                 const bo = b.toObject();
-                if (ao == bo) break :blk true;
+                if (ao == bo) return Value.bool(true);
                 if (ao.asString()) |as| {
                     if (bo.asString()) |bs| {
-                        break :blk as.eql(bs);
+                        return Value.bool(as.eql(bs));
                     }
-                    break :blk false;
+                    return Value.bool(false);
                 }
-                // TODO: Call __eql__ method on object
-                break :blk false;
+                const aclass = ao.class;
+                if (aclass.getField(vm.interpreter.common_names.__eq__)) |method| {
+                    if (method.asObject()) |func| {
+                        const hash_value = try func.callAssumeCallable(vm, ao, &[_]Value{b});
+                        if (hash_value.isBool()) {
+                            return hash_value;
+                        }
+                        return vm.raiseException(.value_error, "__eq__ must return a boolean", .{});
+                    }
+                }
+
+                return Value.bool(false);
             },
-        };
+        }
     }
 
-    pub fn get(self: *Self, vm: *Vm, key: Value) ?Value {
-        const index = self.getIndex(vm, key) orelse return null;
+    pub fn get(self: *Self, vm: *Vm, key: Value) !?Value {
+        const index = try self.getIndex(vm, key) orelse return null;
         return self.buckets.items[index].value;
     }
 
-    pub fn getPtr(self: *Self, vm: *Vm, key: Value) ?*Value {
-        const entry_index = self.getIndex(vm, key) orelse return null;
+    pub fn getPtr(self: *Self, vm: *Vm, key: Value) !?*Value {
+        const entry_index = try self.getIndex(vm, key) orelse return null;
         return &self.buckets.items[entry_index].value;
     }
 
-    pub fn contains(self: *Self, vm: *Vm, key: Value) bool {
-        _ = self.getIndex(vm, key) orelse return false;
+    pub fn contains(self: *Self, vm: *Vm, key: Value) !bool {
+        _ = try self.getIndex(vm, key) orelse return false;
         return true;
     }
 
     pub fn put(self: *Self, vm: *Vm, key: Value, value: Value) !void {
         try self.growIfNeeded(vm, 1);
-        self.putAssumeCapacity(vm, key, value);
+        try self.putAssumeCapacity(vm, key, value);
     }
 
-    pub fn remove(self: *Self, vm: *Vm, key: Value) ?Value {
-        const index = self.getIndex(vm, key) orelse return null;
+    pub fn remove(self: *Self, vm: *Vm, key: Value) !?Value {
+        const index = try self.getIndex(vm, key) orelse return null;
         const entry = &self.buckets.items[index];
 
         if (self.free_list == Entry.empty) {
@@ -195,14 +215,14 @@ const HashMap = struct {
         return entry.value;
     }
 
-    pub fn putAssumeCapacity(self: *Self, vm: *Vm, key: Value, value: Value) void {
-        if (self.getIndex(vm, key)) |entry_index| {
+    pub fn putAssumeCapacity(self: *Self, vm: *Vm, key: Value, value: Value) !void {
+        if (try self.getIndex(vm, key)) |entry_index| {
             self.buckets.items[entry_index].value = value;
             return;
         }
 
         //TODO: recalculating the hash is a waste of time , just retrieve the hash generated from getIndex call.
-        const index = self.hashIndex(vm, key);
+        const index = try self.hashIndex(vm, key);
 
         const new_bucket_index: u32 = if (self.free_list != Entry.empty) blk: {
             const idx = self.free_list;
@@ -251,12 +271,12 @@ const HashMap = struct {
         }
     }
 
-    pub fn getIndex(self: *Self, vm: *Vm, key: Value) ?u32 {
-        const index = self.hashIndex(vm, key);
+    pub fn getIndex(self: *Self, vm: *Vm, key: Value) !?u32 {
+        const index = try self.hashIndex(vm, key);
         var entry_index = self.indices[index];
         while (entry_index != Entry.empty) {
             const entry = &self.buckets.items[entry_index];
-            if (self.eql(entry.key, key)) {
+            if ((try self.eql(vm, entry.key, key)).data.bool) {
                 return entry_index;
             }
             entry_index = entry.next;
@@ -288,7 +308,7 @@ const HashMap = struct {
             }
 
             if (in_free_list) continue;
-            const idx = self.hashIndex(vm, entry.key);
+            const idx = try self.hashIndex(vm, entry.key);
             entry.next = self.indices[idx];
             entry.prev = Entry.empty;
 

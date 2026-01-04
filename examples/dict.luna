@@ -1,2 +1,25 @@
-let a ={"a":1}
-print(a["a"])
+class Pair {
+    fn __init__(a, b){
+        this.a = a
+        this.b = b
+    }
+
+    fn __hash__(){
+        return this.a + this.b
+    }
+
+    fn __eq__(other){
+        return this.a == other.a and this.b == other.b
+    }
+
+    fn __str__(){
+        return "(" + this.a + ", " + this.b + ")"
+    }
+}
+
+let a=Pair(1, 2)
+let b=Pair(1, 2)
+
+
+let c={a:b,b:a}
+print(c[a])
