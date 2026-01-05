@@ -5,7 +5,7 @@ class Pair {
     }
 
     fn __hash__(){
-        return hash(this)
+        return hash(this.a) ^ hash(this.b)
     }
 
     fn __eq__(other){
@@ -19,7 +19,6 @@ class Pair {
 
 let a=Pair(1, 2)
 let b=Pair(1, 2)
-
 
 let c={a:b,b:a}
 print(c[a])

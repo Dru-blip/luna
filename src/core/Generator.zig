@@ -640,6 +640,15 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
         .bang_equal => {
             return try g.genBinOp(.test_neq, node);
         },
+        .bitwise_and => {
+            return try g.genBinOp(.@"and", node);
+        },
+        .bitwise_or => {
+            return try g.genBinOp(.@"or", node);
+        },
+        .bitwise_xor => {
+            return try g.genBinOp(.xor, node);
+        },
         .@"and" => {
             return try g.genLogicalOp(.@"and", node);
         },

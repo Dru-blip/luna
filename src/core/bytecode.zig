@@ -36,6 +36,10 @@ pub const Inst = struct {
         not,
         un_plus,
 
+        @"and",
+        @"or",
+        xor,
+
         mov, // uses bin
         branch, // uses tri
         jmp, // uses un
@@ -271,7 +275,19 @@ pub const Executable = struct {
                     "TestGe r{d}, r{d}, r{d}",
                     .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 },
                 ),
+                .@"and" => try out.print(
+                    "And r{d}, r{d}, r{d}",
+                    .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 },
+                ),
 
+                .@"or" => try out.print(
+                    "Or r{d}, r{d}, r{d}",
+                    .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 },
+                ),
+                .xor => try out.print(
+                    "Xor r{d}, r{d}, r{d}",
+                    .{ inst.data.tri.dst, inst.data.tri.op1, inst.data.tri.op2 },
+                ),
                 .branch => try out.print(
                     "JumpIf r{d} ? {d} : {d}",
                     .{ inst.data.tri.op1, inst.data.tri.op2, inst.data.tri.dst },

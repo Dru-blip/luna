@@ -40,7 +40,7 @@ const RegisterPool = struct {
     }
 
     pub fn allocate(self: *RegisterPool, count: usize) ![]Value {
-        std.debug.print("registers used: {d}\n", .{self.used});
+        // std.debug.print("registers used: {d}\n", .{self.used});
         const start = self.used;
         const end = start + count;
         if (end > self.buffer.len) {
@@ -92,9 +92,9 @@ pub const ActivationRecord = struct {
 const Records = std.ArrayList(ActivationRecord);
 
 const default_register_pool_size = 100_000;
-const default_record_capacity = 2048;
+const default_record_capacity = 4096;
 
-const max_records = 1024;
+const max_records = 4096;
 
 records: Records,
 rp: usize = 0,
@@ -123,7 +123,7 @@ pub fn deinit(vm: *Vm) void {
 }
 
 pub fn pushRecord(vm: *Vm, record: ActivationRecord) Error!Value {
-    std.debug.print("stack size: {d}\n", .{vm.records.items.len});
+    // std.debug.print("stack size: {d}\n", .{vm.records.items.len});
     if (vm.records.items.len >= max_records) {
         return vm.raiseException(
             .stack_overflow,
@@ -414,6 +414,33 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 }
 
                 return vm.raiseTypeException("%", lhs, rhs);
+            },
+            .@"and" => {
+                const lhs = registers[data.tri.op1];
+                const rhs = registers[data.tri.op2];
+                if (lhs.isNumeric() and rhs.isNumeric()) {
+                    registers[data.tri.dst] = Value.number(@floatFromInt(lhs.asInt() & rhs.asInt()));
+                    continue :start;
+                }
+                return vm.raiseTypeException("&", lhs, rhs);
+            },
+            .@"or" => {
+                const lhs = registers[data.tri.op1];
+                const rhs = registers[data.tri.op2];
+                if (lhs.isNumeric() and rhs.isNumeric()) {
+                    registers[data.tri.dst] = Value.number(@floatFromInt(lhs.asInt() | rhs.asInt()));
+                    continue :start;
+                }
+                return vm.raiseTypeException("|", lhs, rhs);
+            },
+            .xor => {
+                const lhs = registers[data.tri.op1];
+                const rhs = registers[data.tri.op2];
+                if (lhs.isNumeric() and rhs.isNumeric()) {
+                    registers[data.tri.dst] = Value.number(@floatFromInt(lhs.asInt() ^ rhs.asInt()));
+                    continue :start;
+                }
+                return vm.raiseTypeException("^", lhs, rhs);
             },
             .test_lt => {
                 const lhs = registers[data.tri.op1];
@@ -879,6 +906,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             .ret => {
                 var callee = vm.records.pop().?;
                 if (vm.records.items.len == 0 or !vm.interpreter.isMainModule() or as_callback) {
+                    callee.deinit(&vm.register_pool);
                     return registers[data.un];
                 }
 
@@ -897,6 +925,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             .ret_none => {
                 var callee = vm.records.pop().?;
                 if (vm.records.items.len == 0 or !vm.interpreter.isMainModule() or as_callback) {
+                    callee.deinit(&vm.register_pool);
                     return Value.None;
                 }
                 record = &vm.records.items[vm.records.items.len - 1];
@@ -943,7 +972,7 @@ pub inline fn checkArity(vm: *Vm, comptime T: anytype, name: *String, expected: 
     return Value.None;
 }
 
-fn invokeSpecialMethod(
+inline fn invokeSpecialMethod(
     vm: *Vm,
     target: Value,
     method_name: *String,

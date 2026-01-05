@@ -124,6 +124,14 @@ pub inline fn asNumber(value: Value) f64 {
     };
 }
 
+pub inline fn asInt(value: Value) i64 {
+    return switch (value.type) {
+        .number => @as(i64, @bitCast(@round(value.data.number))),
+        .bool => @as(i64, @intFromBool(value.data.bool)),
+        else => unreachable,
+    };
+}
+
 pub inline fn isFalsy(v: Value) bool {
     return v.type == .none or v.type == .undefined or (v.type == .bool and v.data.bool == false);
 }
