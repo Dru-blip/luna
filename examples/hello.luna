@@ -49,15 +49,7 @@ class Pair {
     }
 }
 
-let x = Pair(10, 20)
-let y = Pair(3, 7)
 
-let z = Pair(10,20)
-print(z)
-
-print(x + y)
-print(x * y)
-
-
-print(x == z)
-print(x != z)
+foreach c in "hello"{
+    print(c)
+}

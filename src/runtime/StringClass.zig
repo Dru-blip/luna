@@ -5,6 +5,7 @@ const Class = @import("Class.zig");
 const Vm = @import("Vm.zig");
 const Object = @import("Object.zig");
 const String = @import("String.zig");
+const StringIterator = @import("StringIterator.zig");
 
 const StringClass = @This();
 
@@ -19,6 +20,7 @@ pub fn new(gc: *Gc) !*Class {
 pub fn registerMethods(gc: *Gc, sc: *Class) !void {
     try sc.defineNativeMethod(gc, "to_num", to_number, 0, false);
     try sc.defineNativeMethod(gc, "__getattr__", getattr, 1, false);
+    try sc.defineNativeMethod(gc, "__iter__", iter, 0, false);
 }
 
 fn to_number(vm: *Vm, self: *Object, _: []const Value) !Value {
@@ -37,4 +39,8 @@ fn getattr(vm: *Vm, self: *Object, args: []const Value) !Value {
         "'{s}' object has no attribute '{s}'",
         .{ self.class.name.asSlice(), name.asSlice() },
     );
+}
+
+fn iter(vm: *Vm, self: *Object, _: []const Value) !Value {
+    return Value.object(try StringIterator.newInstance(vm.gc, self));
 }
