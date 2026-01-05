@@ -54,6 +54,10 @@ pub const Node = struct {
         un_plus,
         not,
 
+        bitwise_or,
+        bitwise_xor,
+        bitwise_and,
+
         call,
 
         dict_expr,

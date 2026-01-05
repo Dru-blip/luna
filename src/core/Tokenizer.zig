@@ -50,6 +50,8 @@ pub const Token = struct {
         pipe,
         pipe_pipe,
 
+        caret,
+
         l_paren,
         r_paren,
         l_brace,
@@ -245,6 +247,10 @@ pub fn next(self: *Tokenizer) Token {
             '.' => {
                 self.advance();
                 result.tag = .dot;
+            },
+            '^' => {
+                self.advance();
+                result.tag = .caret;
             },
             '+' => continue :state .plus,
             '-' => continue :state .minus,

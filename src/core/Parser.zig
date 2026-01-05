@@ -311,8 +311,12 @@ const operTable = std.enums.directEnumArrayDefault(Token.Tag, OperInfo, .{ .lbp 
     .slash_equal = .{ .lbp = 1, .rbp = 1, .tag = .div_assign },
     .modulus_equal = .{ .lbp = 1, .rbp = 1, .tag = .mod_assign },
 
-    .pipe_pipe = .{ .lbp = 20, .rbp = 21, .tag = .@"or" },
-    .ampersand_ampersand = .{ .lbp = 23, .rbp = 24, .tag = .@"and" },
+    .pipe_pipe = .{ .lbp = 15, .rbp = 16, .tag = .@"or" },
+    .ampersand_ampersand = .{ .lbp = 17, .rbp = 18, .tag = .@"and" },
+
+    .pipe = .{ .lbp = 20, .rbp = 21, .tag = .bitwise_or },
+    .caret = .{ .lbp = 22, .rbp = 23, .tag = .bitwise_xor },
+    .ampersand = .{ .lbp = 24, .rbp = 25, .tag = .bitwise_and },
 
     .equal_equal = .{ .lbp = 30, .rbp = 31, .tag = .equal_equal },
     .bang_equal = .{ .lbp = 30, .rbp = 31, .tag = .bang_equal },
