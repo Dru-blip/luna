@@ -20,6 +20,8 @@ pub fn new(gc: *Gc) !*Class {
 pub fn registerMethods(gc: *Gc, sc: *Class) !void {
     try sc.defineNativeMethod(gc, "to_num", to_number, 0, false);
     try sc.defineNativeMethod(gc, "__getattr__", getattr, 1, false);
+    try sc.defineNativeMethod(gc, "__getitem__", getitem, 1, false);
+    try sc.defineNativeMethod(gc, "__setitem__", setitem, 1, false);
     try sc.defineNativeMethod(gc, "__iter__", iter, 0, false);
 }
 
@@ -43,4 +45,33 @@ fn getattr(vm: *Vm, self: *Object, args: []const Value) !Value {
 
 fn iter(vm: *Vm, self: *Object, _: []const Value) !Value {
     return Value.object(try StringIterator.newInstance(vm.gc, self));
+}
+
+fn getitem(vm: *Vm, self: *Object, args: []const Value) !Value {
+    const string: *String = self.as(String);
+    const index_value = args[0];
+
+    if (index_value.type != .number) {
+        return try vm.raiseException(
+            .type_error,
+            "string index must be a number",
+            .{},
+        );
+    }
+
+    const index = @as(usize, @intFromFloat(index_value.data.number));
+    if (index >= string.length) {
+        return try vm.raiseException(
+            .index_error,
+            "string index out of range",
+            .{},
+        );
+    }
+
+    const byte = string.asSlice()[index];
+    return Value.object(try String.new(vm.gc, &[1]u8{byte}));
+}
+
+fn setitem(vm: *Vm, _: *Object, _: []const Value) !Value {
+    return vm.raiseException(.type_error, "'str' object does not support item assignment", .{});
 }

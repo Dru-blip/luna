@@ -49,7 +49,5 @@ class Pair {
     }
 }
 
-
-foreach c in "hello"{
-    print(c)
-}
+let a="hello"
+a[1]="1"

@@ -17,9 +17,7 @@ const StringIterator = @import("StringIterator.zig");
 const Module = @import("Module.zig");
 const Dict = @import("Dict.zig");
 const ModuleEnvironment = @import("environments/ModuleEnvironment.zig");
-
 const String = @import("String.zig");
-
 const GlobalObject = @import("GlobalObject.zig");
 
 const Interpreter = @This();

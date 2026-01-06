@@ -6,9 +6,6 @@ pub fn main() !void {
     var gpa = std.heap.DebugAllocator(.{}){};
     defer {
         // _ = gpa.deinit();
-        // if (deinit_status == .leak) {
-        //     std.debug.print("Memory leak detected\n", .{});
-        // }
     }
 
     const allocator = gpa.allocator();
