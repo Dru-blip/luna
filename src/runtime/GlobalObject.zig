@@ -16,6 +16,7 @@ pub fn new(gc: *Gc) !*Class {
     try class.defineNativeMethod(gc, "input", input, 0, true);
     try class.defineNativeMethod(gc, "import", import, 1, false);
     try class.defineNativeMethod(gc, "hash", hash, 1, false);
+    try class.defineNativeMethod(gc, "len", len, 1, false);
 
     return class;
 }
@@ -203,4 +204,27 @@ fn hash(vm: *Vm, _: *Object, args: []const Value) !Value {
 
     const hash_as_f64 = @as(f64, @floatFromInt(hash_value));
     return Value.number(hash_as_f64);
+}
+
+fn len(vm: *Vm, _: *Object, args: []const Value) !Value {
+    const value = args[0];
+    if (value.asObject()) |obj| {
+        if (obj.asString()) |str| {
+            return Value.number(@as(f64, @floatFromInt(str.length)));
+        }
+
+        const class = obj.class;
+        if (class.getField(vm.interpreter.common_names.__len__)) |len_val| {
+            if (len_val.asObject()) |len_obj| {
+                const result = try len_obj.callAssumeCallable(vm, obj, &[_]Value{});
+                if (result.type != .number) {
+                    return vm.raiseException(.type_error, "__len__ must return a number", .{});
+                }
+                return result;
+            }
+            //TODO: raise error if __len__ is not a function
+        }
+    }
+
+    return vm.raiseException(.type_error, "type '{s}' does not support len()", .{value.getTypeString()});
 }

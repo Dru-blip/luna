@@ -78,6 +78,7 @@ pub const Names = struct {
     __eq__: *String,
     __ne__: *String,
     __hash__: *String,
+    __len__: *String,
 
     pub fn init(string_interner: *StringInterner) !Names {
         return .{
@@ -114,6 +115,7 @@ pub const Names = struct {
             .__eq__ = try string_interner.intern("__eq__"),
             .__ne__ = try string_interner.intern("__ne__"),
             .__hash__ = try string_interner.intern("__hash__"),
+            .__len__ = try string_interner.intern("__len__"),
         };
     }
 };

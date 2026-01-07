@@ -47,7 +47,11 @@ class Pair {
     fn __str__(){
         return "(" + this.a + ", " + this.b + ")"
     }
+
+    fn __len__(){
+        return 2
+    }
 }
 
-let a="hello"
-a[1]="1"
+let a=Pair(1, 2)
+print(print(print(len(a))))
