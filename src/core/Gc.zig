@@ -192,6 +192,22 @@ fn collectRoots(gc: *Gc, roots: *ObjectSet) !void {
     try roots.add(Object.from(gc.interpreter.dict_class));
     try roots.add(Object.from(gc.interpreter.string_iterator_class));
 
+    try roots.add(Object.from(gc.interpreter.base_exception_class));
+    try roots.add(Object.from(gc.interpreter.type_error_class));
+    try roots.add(Object.from(gc.interpreter.reference_error_class));
+    try roots.add(Object.from(gc.interpreter.zero_division_error_class));
+    try roots.add(Object.from(gc.interpreter.index_error_class));
+    try roots.add(Object.from(gc.interpreter.value_error_class));
+    try roots.add(Object.from(gc.interpreter.attribute_error_class));
+    try roots.add(Object.from(gc.interpreter.module_not_found_error_class));
+    try roots.add(Object.from(gc.interpreter.invalid_assignment_target_error_class));
+    try roots.add(Object.from(gc.interpreter.stack_overflow_error_class));
+
+    var module_cache_iter = gc.interpreter.module_cache.valueIterator();
+    while (module_cache_iter.next()) |module| {
+        try roots.add(Object.from(module.*));
+    }
+
     for (gc.interpreter.module_stack.items) |module_environment| {
         try roots.add(Object.from(module_environment));
     }
