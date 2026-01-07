@@ -20,6 +20,7 @@ const Dict = @import("Dict.zig");
 const ModuleEnvironment = @import("environments/ModuleEnvironment.zig");
 const String = @import("String.zig");
 const GlobalObject = @import("GlobalObject.zig");
+const BaseExceptionClass = @import("BaseExceptionClass.zig");
 
 const Interpreter = @This();
 
@@ -32,13 +33,28 @@ string_interner: StringInterner = undefined,
 vm: *Vm = undefined,
 exception: ?*Exception = null,
 builtins: *Class = undefined,
+
+//Built-in-types
 string_class: *Class = undefined,
 base_class: *Class = undefined,
 dict_class: *Class = undefined,
 list_class: *Class = undefined,
+
+//Iterator classes.
 list_iterator_class: *Class = undefined,
 string_iterator_class: *Class = undefined,
 dict_iterator_class: *Class = undefined,
+
+//Error classes.
+base_exception_class: *Class = undefined,
+type_error_class: *Class = undefined,
+reference_error_class: *Class = undefined,
+zero_division_error_class: *Class = undefined,
+index_error_class: *Class = undefined,
+value_error_class: *Class = undefined,
+attribute_error_class: *Class = undefined,
+module_not_found_error_class: *Class = undefined,
+stack_overflow_error_class: *Class = undefined,
 
 common_names: Names = undefined,
 module_stack: std.ArrayList(*ModuleEnvironment) = .empty,
@@ -83,6 +99,16 @@ pub const Names = struct {
     __hash__: *String,
     __len__: *String,
 
+    BaseException: *String,
+    TypeError: *String,
+    ReferenceError: *String,
+    ZeroDivisionError: *String,
+    IndexError: *String,
+    ValueError: *String,
+    AttributeError: *String,
+    ModuleNotFoundError: *String,
+    StackOverflowError: *String,
+
     pub fn init(string_interner: *StringInterner) !Names {
         return .{
             .Class = try string_interner.intern("Class"),
@@ -120,6 +146,16 @@ pub const Names = struct {
             .__ne__ = try string_interner.intern("__ne__"),
             .__hash__ = try string_interner.intern("__hash__"),
             .__len__ = try string_interner.intern("__len__"),
+
+            .BaseException = try string_interner.intern("BaseException"),
+            .TypeError = try string_interner.intern("TypeError"),
+            .ReferenceError = try string_interner.intern("ReferenceError"),
+            .ZeroDivisionError = try string_interner.intern("ZeroDivisionError"),
+            .IndexError = try string_interner.intern("IndexError"),
+            .ValueError = try string_interner.intern("ValueError"),
+            .AttributeError = try string_interner.intern("AttributeError"),
+            .ModuleNotFoundError = try string_interner.intern("ModuleNotFoundError"),
+            .StackOverflowError = try string_interner.intern("StackOverflowError"),
         };
     }
 };
@@ -144,6 +180,7 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     interpreter.string_iterator_class = try StringIterator.new(&interpreter.gc);
     interpreter.dict_iterator_class = try DictIterator.new(&interpreter.gc);
 
+    //TODO: should remove unnecessary assignments.
     Object.from(interpreter.base_class).class = interpreter.base_class;
     Object.from(interpreter.builtins).class = interpreter.base_class;
     Object.from(interpreter.dict_class).class = interpreter.base_class;
@@ -160,7 +197,6 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     try DictIterator.registerMethods(&interpreter.gc, interpreter.dict_iterator_class);
 
     interpreter.common_names = try Names.init(&interpreter.string_interner);
-
     interpreter.string_class.name = interpreter.common_names.String;
     interpreter.dict_class.name = interpreter.common_names.Dict;
     interpreter.base_class.name = interpreter.common_names.Class;
@@ -168,8 +204,10 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     interpreter.list_iterator_class.name = interpreter.common_names.ListIterator;
     interpreter.string_iterator_class.name = interpreter.common_names.StringIterator;
     interpreter.dict_iterator_class.name = interpreter.common_names.DictIterator;
-
     interpreter.module_cache = ModuleCache.init(interpreter.gpa);
+
+    //Make Exception classes
+    try interpreter.initializeExceptionClasses();
 
     return interpreter;
 }
@@ -178,6 +216,62 @@ pub fn deinit(i: *Interpreter) void {
     i.vm.deinit();
     i.gc.deinit();
     i.gpa.destroy(i);
+}
+
+pub fn initializeExceptionClasses(interpreter: *Interpreter) !void {
+    interpreter.base_exception_class = try BaseExceptionClass.MakeExceptionClass(
+        &interpreter.gc,
+        interpreter.common_names.BaseException,
+        interpreter.base_class,
+    );
+
+    interpreter.type_error_class = try BaseExceptionClass.MakeExceptionClass(
+        &interpreter.gc,
+        interpreter.common_names.TypeError,
+        interpreter.base_exception_class,
+    );
+
+    interpreter.reference_error_class = try BaseExceptionClass.MakeExceptionClass(
+        &interpreter.gc,
+        interpreter.common_names.ReferenceError,
+        interpreter.base_exception_class,
+    );
+
+    interpreter.zero_division_error_class = try BaseExceptionClass.MakeExceptionClass(
+        &interpreter.gc,
+        interpreter.common_names.ZeroDivisionError,
+        interpreter.base_exception_class,
+    );
+
+    interpreter.index_error_class = try BaseExceptionClass.MakeExceptionClass(
+        &interpreter.gc,
+        interpreter.common_names.IndexError,
+        interpreter.base_exception_class,
+    );
+
+    interpreter.value_error_class = try BaseExceptionClass.MakeExceptionClass(
+        &interpreter.gc,
+        interpreter.common_names.ValueError,
+        interpreter.base_exception_class,
+    );
+
+    interpreter.attribute_error_class = try BaseExceptionClass.MakeExceptionClass(
+        &interpreter.gc,
+        interpreter.common_names.AttributeError,
+        interpreter.base_exception_class,
+    );
+
+    interpreter.module_not_found_error_class = try BaseExceptionClass.MakeExceptionClass(
+        &interpreter.gc,
+        interpreter.common_names.ModuleNotFoundError,
+        interpreter.base_exception_class,
+    );
+
+    interpreter.stack_overflow_error_class = try BaseExceptionClass.MakeExceptionClass(
+        &interpreter.gc,
+        interpreter.common_names.StackOverflowError,
+        interpreter.base_exception_class,
+    );
 }
 
 pub fn runFile(i: *Interpreter, path: []const u8) Error!Value {
