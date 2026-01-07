@@ -54,4 +54,4 @@ class Pair {
 }
 
 let a=Pair(1, 2)
-print(print(print(len(a))))
+print(len(a))

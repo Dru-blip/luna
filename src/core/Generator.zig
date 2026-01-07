@@ -40,6 +40,7 @@ identifiers: Identifiers = .empty,
 loop_stack: LoopStack = .empty,
 enclosing: ?*Generator = null,
 extra: std.ArrayList(u32) = .empty,
+arg_stack: std.ArrayList(u32) = .empty,
 
 const Scope = enum { global, local };
 
@@ -53,6 +54,10 @@ const Variable = struct {
 const LoopInfo = struct {
     start_block: u32,
     end_block: u32,
+};
+
+const ArgFrame = struct {
+    base: usize,
 };
 
 pub const BasicBlock = struct {
@@ -91,6 +96,7 @@ pub fn deinit(g: *Generator) void {
     g.local_variables.deinit(g.gpa);
     g.identifiers.deinit(g.gpa);
     g.blocks.deinit(g.gpa);
+    g.arg_stack.deinit(g.gpa);
     g.arena.deinit();
 }
 
@@ -157,6 +163,34 @@ fn endScope(g: *Generator) void {
         break;
     }
     g.scope_depth -= 1;
+}
+
+pub fn beginArgFrame(g: *Generator) !ArgFrame {
+    return ArgFrame{ .base = g.arg_stack.items.len };
+}
+
+pub fn pushArg(g: *Generator, arg: u32) !void {
+    try g.arg_stack.append(g.gpa, arg);
+}
+
+pub fn endArgFrame(g: *Generator, frame: *ArgFrame) void {
+    g.arg_stack.shrinkRetainingCapacity(frame.base);
+}
+
+fn commitArgs(
+    g: *Generator,
+    frame: ArgFrame,
+) !struct { offset: u32, argc: u32 } {
+    const start = frame.base;
+    const count = g.arg_stack.items.len - start;
+
+    const offset = g.extra.items.len;
+    try g.extra.appendSlice(g.gpa, g.arg_stack.items[start..]);
+
+    return .{
+        .offset = @intCast(offset),
+        .argc = @intCast(count),
+    };
 }
 
 fn declareVariable(g: *Generator, name: []const u8, out: *Variable) !void {
@@ -689,6 +723,9 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
                 },
             };
 
+            var frame = try g.beginArgFrame();
+            defer g.endArgFrame(&frame);
+
             if (node.data.call.callee.tag == .member_expr and node.data.call.callee.data.member.object.tag == .super_expr) {
                 return try g.genSuperCall(node);
             }
@@ -707,11 +744,14 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
                 else => unreachable,
             }
 
-            data.call.arg_offset = @intCast(g.extra.items.len);
             for (node.data.call.args) |arg| {
                 const arg_value = try g.genExpr(arg);
-                try g.extra.append(g.gpa, arg_value);
+                try g.pushArg(arg_value);
             }
+
+            const info = try g.commitArgs(frame);
+
+            data.call.arg_offset = info.offset;
             data.call.argc = @intCast(node.data.call.args.len);
             data.call.ret = g.allocRegister();
 
