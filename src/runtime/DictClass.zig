@@ -12,7 +12,13 @@ const DictClass = @This();
 
 pub fn new(gc: *Gc) !*Class {
     const dc = try Class.new(gc);
+    dc.constructor = constructor;
     return dc;
+}
+
+fn constructor(vm: *Vm, _: *Object, _: []const Value) !Value {
+    const dict = try Dict.new(vm.gc);
+    return Value.object(dict);
 }
 
 pub fn registerMethods(gc: *Gc, dc: *Class) !void {

@@ -12,6 +12,7 @@ const Class = @This();
 super_class: ?*Class = null,
 name: *String,
 methods: FieldMap,
+constructor: ?NativeFunction.Function = null,
 
 pub inline fn new(gc: *Gc) !*Class {
     const obj = try gc.alloc(Class);

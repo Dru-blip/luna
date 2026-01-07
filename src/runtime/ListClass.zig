@@ -12,7 +12,13 @@ const ListClass = @This();
 
 pub fn new(gc: *Gc) !*Class {
     const lc = try Class.new(gc);
+    lc.constructor = constructor;
     return lc;
+}
+
+fn constructor(vm: *Vm, _: *Object, _: []const Value) !Value {
+    const list = try List.new(vm.gc);
+    return Value.object(list);
 }
 
 pub fn registerMethods(gc: *Gc, lc: *Class) !void {

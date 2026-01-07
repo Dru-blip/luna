@@ -179,13 +179,11 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     interpreter.dict_class = try DictClass.new(&interpreter.gc);
     interpreter.list_class = try ListClass.new(&interpreter.gc);
     interpreter.list_iterator_class = try ListIterator.new(&interpreter.gc);
-    interpreter.builtins = try GlobalObject.new(&interpreter.gc);
     interpreter.string_iterator_class = try StringIterator.new(&interpreter.gc);
     interpreter.dict_iterator_class = try DictIterator.new(&interpreter.gc);
 
     //TODO: should remove unnecessary assignments.
     Object.from(interpreter.base_class).class = interpreter.base_class;
-    Object.from(interpreter.builtins).class = interpreter.base_class;
     Object.from(interpreter.dict_class).class = interpreter.base_class;
     Object.from(interpreter.list_class).class = interpreter.base_class;
     Object.from(interpreter.list_iterator_class).class = interpreter.base_class;
@@ -211,6 +209,9 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
 
     //Make Exception classes
     try interpreter.initializeExceptionClasses();
+
+    interpreter.builtins = try GlobalObject.new(&interpreter.gc);
+    Object.from(interpreter.builtins).class = interpreter.base_class;
 
     return interpreter;
 }

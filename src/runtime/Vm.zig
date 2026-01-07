@@ -875,7 +875,13 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     for (args_data, 0..) |arg, i| {
                         args[i] = record.registers[arg];
                     }
-                    registers[data.call.ret] = Value.object(try class.newInstance(vm.gc));
+
+                    if (class.constructor) |constructor| {
+                        registers[data.call.ret] = try constructor(vm, this_value.toObject(), args[0..data.call.argc]);
+                        continue :start;
+                    } else {
+                        registers[data.call.ret] = Value.object(try class.newInstance(vm.gc));
+                    }
                     if (class.getField(vm.interpreter.common_names.__init__)) |constructor| {
                         _ = try constructor.toObject().callAssumeCallable(vm, registers[data.call.ret].toObject(), args[0..data.call.argc]);
                     }
