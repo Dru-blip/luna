@@ -44,6 +44,8 @@ pub const Token = struct {
         equal_equal,
         bang_equal,
 
+        equal_greater,
+
         ampersand,
         ampersand_ampersand,
 
@@ -86,6 +88,9 @@ pub const Token = struct {
         keyword_class,
         keyword_undefined,
         keyword_super,
+        keyword_guard,
+        keyword_rescue,
+        keyword_ensure,
 
         eof,
     };
@@ -110,6 +115,9 @@ pub const Token = struct {
         .{ "class", .keyword_class },
         .{ "undefined", .keyword_undefined },
         .{ "super", .keyword_super },
+        .{ "guard", .keyword_guard },
+        .{ "rescue", .keyword_rescue },
+        .{ "ensure", .keyword_ensure },
     });
 
     pub fn getKeyword(bytes: []const u8) ?Tag {
@@ -389,6 +397,10 @@ pub fn next(self: *Tokenizer) Token {
             switch (self.buffer[self.index]) {
                 '=' => {
                     result.tag = .equal_equal;
+                    self.advance();
+                },
+                '>' => {
+                    result.tag = .equal_greater;
                     self.advance();
                 },
                 else => result.tag = .equal,

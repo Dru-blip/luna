@@ -1,0 +1,12 @@
+guard {
+}
+rescue FileNotFoundError => e {
+}
+rescue ParseError {
+}
+rescue Error {
+}
+else {
+}
+ensure {
+}

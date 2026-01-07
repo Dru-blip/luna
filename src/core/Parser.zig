@@ -153,6 +153,7 @@ fn parseStmt(p: *Parser) ParserError!*Node {
         .keyword_for => return p.parseForStmt(),
         .keyword_foreach => return p.parseForEachStmt(),
         .keyword_class => return p.parseClassDecl(),
+        .keyword_guard => return p.parseGuardStmt(),
         else => {
             const expr = try p.parseExpr(0);
             return p.ast.makeExprStmt(expr);
@@ -180,6 +181,48 @@ fn parseClassDecl(p: *Parser) ParserError!*Node {
     }
     const rbrace = try p.expectToken(.r_brace);
     return p.ast.makeClassDecl(token.loc.merge(&rbrace.loc), p.source[name.loc.start..name.loc.end], super_class, try methods.toOwnedSlice(p.ast.arena.allocator()));
+}
+
+fn parseGuardStmt(p: *Parser) ParserError!*Node {
+    const token = try p.expectToken(.keyword_guard);
+    const body = try p.parseBlockStmt();
+
+    var handlers: std.ArrayList(Ast.Node.RescueClause) = .empty;
+
+    while (p.peek().tag == .keyword_rescue) {
+        p.advance();
+        const class_token = try p.expectToken(.identifier);
+        const class = p.source[class_token.loc.start..class_token.loc.end];
+
+        var binding: ?[]const u8 = null;
+        if (p.peek().tag == .equal_greater) {
+            p.advance();
+            const var_token = try p.expectToken(.identifier);
+            binding = p.source[var_token.loc.start..var_token.loc.end];
+        }
+
+        const block = try p.parseBlockStmt();
+        try handlers.append(p.ast.arena.allocator(), .{
+            .class = class,
+            .binding = binding,
+            .block = block,
+        });
+    }
+
+    var alternate: ?*Node = null;
+    if (p.peek().tag == .keyword_else) {
+        p.advance();
+        alternate = try p.parseBlockStmt();
+    }
+
+    var ensure_block: ?*Node = null;
+    if (p.peek().tag == .keyword_ensure) {
+        p.advance();
+        ensure_block = try p.parseBlockStmt();
+    }
+
+    const end_loc = if (ensure_block) |eb| eb.loc else if (alternate) |eb| eb.loc else handlers.items[handlers.items.len - 1].block.loc;
+    return p.ast.makeGuardStmt(token.loc.merge(&end_loc), body, try handlers.toOwnedSlice(p.ast.arena.allocator()), alternate, ensure_block);
 }
 
 fn parseFunctionDecl(p: *Parser) ParserError!*Node {

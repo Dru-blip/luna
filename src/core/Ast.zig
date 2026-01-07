@@ -26,6 +26,7 @@ pub const Node = struct {
         let_decl,
         function_decl,
         class_decl,
+        guard_stmt,
 
         add,
         sub,
@@ -140,6 +141,18 @@ pub const Node = struct {
             super_class: ?[]const u8,
             methods: []const *Node,
         },
+        guard_stmt: struct {
+            body: *Node,
+            handlers: []const RescueClause,
+            alternate: ?*Node,
+            ensure: ?*Node,
+        },
+    };
+
+    pub const RescueClause = struct {
+        class: []const u8,
+        binding: ?[]const u8,
+        block: *Node,
     };
 };
 
@@ -382,13 +395,39 @@ pub fn makeFunctionExpr(ast: *Ast, loc: Token.Loc, params: [][]const u8, body: *
     return node;
 }
 
-pub fn makeClassDecl(ast: *Ast, loc: Token.Loc, name: []const u8, super_class: ?[]const u8, methods: []const *Node) !*Node {
+pub fn makeClassDecl(
+    ast: *Ast,
+    loc: Token.Loc,
+    name: []const u8,
+    super_class: ?[]const u8,
+    methods: []const *Node,
+) !*Node {
     var node = try makeNode(ast, .class_decl, loc);
     node.data = .{
         .class_decl = .{
             .name = name,
             .super_class = super_class,
             .methods = methods,
+        },
+    };
+    return node;
+}
+
+pub fn makeGuardStmt(
+    ast: *Ast,
+    loc: Token.Loc,
+    body: *Node,
+    handlers: []const Node.RescueClause,
+    alternate: ?*Node,
+    ensure: ?*Node,
+) !*Node {
+    var node = try makeNode(ast, .guard_stmt, loc);
+    node.data = .{
+        .guard_stmt = .{
+            .body = body,
+            .handlers = handlers,
+            .alternate = alternate,
+            .ensure = ensure,
         },
     };
     return node;
