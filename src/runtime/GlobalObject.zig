@@ -191,7 +191,7 @@ fn hash(vm: *Vm, _: *Object, args: []const Value) !Value {
                     if (hash_method_object.asObject()) |hash_obj| {
                         const result = try hash_obj.callAssumeCallable(vm, value.toObject(), &[_]Value{});
                         if (result.type != .number) {
-                            return vm.raiseException(.type_error, "__hash__() must return a number", .{});
+                            return vm.raiseException(.type_error, "__hash__ must return a number", .{});
                         }
                         return result;
                     }

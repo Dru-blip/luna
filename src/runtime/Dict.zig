@@ -54,21 +54,21 @@ pub fn size(dict: *Dict) usize {
 
 fn visit(self: *Object, live_objects: *ObjectSet) !void {
     try Object.Base.visit(self, live_objects);
-    //  const dict: *Dict = self.as(Dict);
+    const dict: *Dict = self.as(Dict);
 
-    // var iterator = dict.map.iterator();
-    // while (iterator.next()) |entry| {
-    //     if (entry.key_ptr.asObject()) |key_obj| {
-    //         if (!live_objects.contains(key_obj)) {
-    //             try key_obj.gc_hooks.visit(key_obj, live_objects);
-    //         }
-    //     }
-    //     if (entry.value_ptr.asObject()) |value_obj| {
-    //         if (!live_objects.contains(value_obj)) {
-    //             try value_obj.gc_hooks.visit(value_obj, live_objects);
-    //         }
-    //     }
-    // }
+    var iterator = dict.map.iterator();
+    while (iterator.next()) |entry| {
+        if (entry.key.asObject()) |key_obj| {
+            if (!live_objects.contains(key_obj)) {
+                try key_obj.gc_hooks.visit(key_obj, live_objects);
+            }
+        }
+        if (entry.value.asObject()) |value_obj| {
+            if (!live_objects.contains(value_obj)) {
+                try value_obj.gc_hooks.visit(value_obj, live_objects);
+            }
+        }
+    }
 }
 
 fn finalize(self: *Object, _: *Gc) void {
@@ -98,6 +98,24 @@ const HashMap = struct {
         const empty: u32 = std.math.maxInt(u32);
     };
 
+    const Iterator = struct {
+        map: *const Self,
+        index: usize = 0,
+
+        pub fn next(self: *Iterator) ?Entry {
+            while (self.index < self.map.capacity) {
+                const current_index = self.index;
+                self.index += 1;
+
+                const entry = self.map.buckets.items[current_index];
+                if (!entry.free) {
+                    return entry;
+                }
+            }
+            return null;
+        }
+    };
+
     pub fn init(allocator: std.mem.Allocator) Self {
         return .{
             .allocator = allocator,
@@ -106,6 +124,8 @@ const HashMap = struct {
     }
 
     pub fn deinit(self: *Self) void {
+        self.count = 0;
+        self.capacity = 0;
         self.allocator.free(self.indices);
         self.buckets.deinit(self.allocator);
     }
@@ -180,6 +200,12 @@ const HashMap = struct {
         }
     }
 
+    pub fn iterator(self: *Self) Iterator {
+        return .{
+            .map = self,
+        };
+    }
+
     pub fn get(self: *Self, vm: *Vm, key: Value) !?Value {
         const index = try self.getIndex(vm, key) orelse return null;
         return self.buckets.items[index].value;
@@ -211,6 +237,7 @@ const HashMap = struct {
             self.free_list = index;
             self.buckets.items[index].next = next;
         }
+        entry.free = true;
         self.free_count += 1;
         return entry.value;
     }
@@ -245,6 +272,7 @@ const HashMap = struct {
         new_entry.key = key;
         new_entry.value = value;
         new_entry.next = self.indices[index];
+        new_entry.free = false;
         new_entry.prev = Entry.empty;
 
         if (self.indices[index] != Entry.empty) {
