@@ -14,6 +14,8 @@ const Inst = bytecode.Inst;
 const Constants = bytecode.Constants;
 const Executable = bytecode.Executable;
 const Instructions = bytecode.Instructions;
+const ExceptionHandlerBlock = bytecode.ExceptionHandlerBlock;
+const RescueHandler = bytecode.RescueHandler;
 
 const Generator = @This();
 
@@ -30,6 +32,7 @@ string_interner: *StringInterner,
 current_block: *BasicBlock = undefined,
 register_count: u32 = 1,
 free_registers: std.ArrayList(u32),
+exception_handlers: std.ArrayList(ExceptionHandlerBlock) = .empty,
 ast: Ast,
 gc: *Gc,
 scope_depth: u32 = 0,
@@ -116,6 +119,7 @@ pub fn finalize(g: *Generator) !*Executable {
     executable.filepath = g.ast.filepath;
     executable.max_register_count = g.register_count;
     executable.global_variable_count = @intCast(g.global_variables.items.len);
+    executable.exception_handlers = try g.exception_handlers.toOwnedSlice(g.gpa);
     try g.linearizeBasicBlocks(executable);
     return executable;
 }
@@ -287,6 +291,9 @@ fn genNodes(g: *Generator, nodes: Ast.Nodes) GenError!void {
 
 fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
     switch (node.tag) {
+        .guard_stmt => {
+            try g.genGuardStmt(node);
+        },
         .class_decl => {
             try g.genClassDecl(node);
         },
@@ -332,6 +339,63 @@ fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
             unreachable;
         },
     }
+}
+
+fn genGuardStmt(g: *Generator, node: *const Ast.Node) !void {
+    const guard_block = try g.makeBasicBlock();
+    var exeception_handler: ExceptionHandlerBlock = .{
+        .start_offset = guard_block.id,
+        .end_offset = guard_block.id,
+        .rescues = &.{},
+    };
+
+    var rescue_handlers: std.ArrayList(RescueHandler) = .empty;
+    try g.addUn(.jmp, guard_block.id, node.data.guard_stmt.body.loc);
+
+    g.switchBasicBlock(guard_block);
+    try g.genBlockStmt(node.data.guard_stmt.body);
+    exeception_handler.end_offset = @intCast(guard_block.instructions.items.len);
+
+    for (node.data.guard_stmt.handlers) |handler| {
+        const handler_block = try g.makeBasicBlock();
+        const execetion_type = try g.addIdentifier(handler.class);
+        var exeception_reg: ?u32 = null;
+
+        var exeception_variable: Variable = undefined;
+        if (handler.binding) |exeception_variable_name| {
+            try g.declareVariable(exeception_variable_name, &exeception_variable);
+            exeception_reg = exeception_variable.allocated_reg_slot;
+        }
+
+        const rescue_handler: RescueHandler = .{
+            .exception_type = execetion_type,
+            .handler_offset = handler_block.id,
+            .exception_register = exeception_reg,
+        };
+        try rescue_handlers.append(g.gpa, rescue_handler);
+        try g.addUn(.jmp, handler_block.id, handler.block.loc);
+        g.switchBasicBlock(handler_block);
+        try g.genBlockStmt(handler.block);
+    }
+
+    if (node.data.guard_stmt.alternate) |alternate| {
+        const alternate_block = try g.makeBasicBlock();
+        try g.addUn(.jmp, alternate_block.id, alternate.loc);
+        exeception_handler.else_offset = alternate_block.id;
+        g.switchBasicBlock(alternate_block);
+        try g.genBlockStmt(alternate);
+    }
+
+    if (node.data.guard_stmt.ensure) |ensure| {
+        const ensure_block = try g.makeBasicBlock();
+        try g.addUn(.jmp, ensure_block.id, ensure.loc);
+        exeception_handler.ensure_offset = ensure_block.id;
+        g.switchBasicBlock(ensure_block);
+        try g.genBlockStmt(ensure);
+    }
+
+    exeception_handler.rescues = try rescue_handlers.toOwnedSlice(g.gpa);
+    try g.exception_handlers.append(g.gpa, exeception_handler);
 }
 
 fn genClassDecl(g: *Generator, node: *const Ast.Node) !void {

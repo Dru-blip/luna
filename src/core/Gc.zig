@@ -119,7 +119,6 @@ inline fn allocImpl(
     }
 
     header.gc_hooks = &T.gc_hooks;
-
     return header;
 }
 

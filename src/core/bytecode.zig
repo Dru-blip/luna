@@ -110,6 +110,20 @@ pub const Inst = struct {
 pub const Instructions = std.ArrayList(Inst);
 pub const Constants = std.ArrayList(Value);
 
+pub const RescueHandler = struct {
+    exception_type: u32,
+    handler_offset: u32,
+    exception_register: ?u32 = null,
+};
+
+pub const ExceptionHandlerBlock = struct {
+    start_offset: u32,
+    end_offset: u32,
+    rescues: []RescueHandler,
+    else_offset: ?u32 = null,
+    ensure_offset: ?u32 = null,
+};
+
 pub const Executable = struct {
     instructions: []Inst,
     spans: []Span,
@@ -121,6 +135,7 @@ pub const Executable = struct {
     param_count: u8,
     filepath: []const u8,
     extra: []u32,
+    exception_handlers: []ExceptionHandlerBlock,
 
     pub fn new(gc: *Gc) !*Executable {
         const obj = try gc.alloc(Executable);
@@ -141,6 +156,7 @@ pub const Executable = struct {
         gc.gpa.free(executable.instructions);
         gc.gpa.free(executable.identifiers);
         gc.gpa.free(executable.extra);
+        gc.gpa.free(executable.exception_handlers);
     }
 
     fn visit(self: *Object, live_objects: *ObjectSet) !void {
