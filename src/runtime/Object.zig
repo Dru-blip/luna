@@ -12,7 +12,6 @@ const Class = @import("Class.zig");
 const Vm = @import("Vm.zig");
 
 marked: bool = false,
-ptr: *anyopaque, // do i really need this ?
 gc_hooks: *const GcHooks,
 class: *Class,
 
@@ -23,7 +22,9 @@ pub const GcHooks = struct {
 };
 
 pub inline fn as(obj: *Object, comptime T: anytype) *T {
-    return @ptrCast(@alignCast(obj.ptr));
+    const obj_base = @intFromPtr(obj);
+    const ptr: *T = @ptrFromInt(obj_base + @sizeOf(Object));
+    return @ptrCast(@alignCast(ptr));
 }
 
 pub inline fn from(ptr: *anyopaque) *Object {

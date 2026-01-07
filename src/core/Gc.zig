@@ -113,14 +113,12 @@ inline fn allocImpl(
 
     const obj_base = @intFromPtr(cell);
     const header: *Object = @ptrFromInt(obj_base);
-    const obj_ptr: *T = @ptrFromInt(obj_base + header_size);
 
     if (!@hasDecl(T, "gc_hooks")) {
         @compileError("gc_hooks must be present");
     }
 
     header.gc_hooks = &T.gc_hooks;
-    header.ptr = obj_ptr;
 
     return header;
 }
