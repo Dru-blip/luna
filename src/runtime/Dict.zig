@@ -77,7 +77,7 @@ fn finalize(self: *Object, _: *Gc) void {
     // Object.Base.finalize(self, gc);
 }
 
-const HashMap = struct {
+pub const HashMap = struct {
     const Self = @This();
 
     allocator: std.mem.Allocator,
@@ -98,12 +98,12 @@ const HashMap = struct {
         const empty: u32 = std.math.maxInt(u32);
     };
 
-    const Iterator = struct {
+    pub const Iterator = struct {
         map: *const Self,
         index: usize = 0,
 
         pub fn next(self: *Iterator) ?Entry {
-            while (self.index < self.map.capacity) {
+            while (self.index < self.map.buckets.items.len) {
                 const current_index = self.index;
                 self.index += 1;
 

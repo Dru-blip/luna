@@ -14,6 +14,7 @@ const ListClass = @import("ListClass.zig");
 const BaseClass = @import("BaseClass.zig");
 const ListIterator = @import("ListIterator.zig");
 const StringIterator = @import("StringIterator.zig");
+const DictIterator = @import("DictIterator.zig");
 const Module = @import("Module.zig");
 const Dict = @import("Dict.zig");
 const ModuleEnvironment = @import("environments/ModuleEnvironment.zig");
@@ -37,6 +38,7 @@ dict_class: *Class = undefined,
 list_class: *Class = undefined,
 list_iterator_class: *Class = undefined,
 string_iterator_class: *Class = undefined,
+dict_iterator_class: *Class = undefined,
 
 common_names: Names = undefined,
 module_stack: std.ArrayList(*ModuleEnvironment) = .empty,
@@ -51,6 +53,7 @@ pub const Names = struct {
     List: *String,
     ListIterator: *String,
     StringIterator: *String,
+    DictIterator: *String,
     String: *String,
     module: *String,
     __getitem__: *String,
@@ -88,6 +91,7 @@ pub const Names = struct {
             .List = try string_interner.intern("List"),
             .ListIterator = try string_interner.intern("ListIterator"),
             .StringIterator = try string_interner.intern("StringIterator"),
+            .DictIterator = try string_interner.intern("DictIterator"),
             .String = try string_interner.intern("String"),
             .module = try string_interner.intern("<module>"),
             .__getitem__ = try string_interner.intern("__getitem__"),
@@ -138,6 +142,7 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     interpreter.list_iterator_class = try ListIterator.new(&interpreter.gc);
     interpreter.builtins = try GlobalObject.new(&interpreter.gc);
     interpreter.string_iterator_class = try StringIterator.new(&interpreter.gc);
+    interpreter.dict_iterator_class = try DictIterator.new(&interpreter.gc);
 
     Object.from(interpreter.base_class).class = interpreter.base_class;
     Object.from(interpreter.builtins).class = interpreter.base_class;
@@ -152,6 +157,7 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     try ListClass.registerMethods(&interpreter.gc, interpreter.list_class);
     try ListIterator.registerMethods(&interpreter.gc, interpreter.list_iterator_class);
     try StringIterator.registerMethods(&interpreter.gc, interpreter.string_iterator_class);
+    try DictIterator.registerMethods(&interpreter.gc, interpreter.dict_iterator_class);
 
     interpreter.common_names = try Names.init(&interpreter.string_interner);
 
@@ -161,6 +167,7 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     interpreter.list_class.name = interpreter.common_names.List;
     interpreter.list_iterator_class.name = interpreter.common_names.ListIterator;
     interpreter.string_iterator_class.name = interpreter.common_names.StringIterator;
+    interpreter.dict_iterator_class.name = interpreter.common_names.DictIterator;
 
     interpreter.module_cache = ModuleCache.init(interpreter.gpa);
 

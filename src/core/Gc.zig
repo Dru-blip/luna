@@ -192,6 +192,7 @@ fn collectRoots(gc: *Gc, roots: *ObjectSet) !void {
     try roots.add(Object.from(gc.interpreter.list_class));
     try roots.add(Object.from(gc.interpreter.list_iterator_class));
     try roots.add(Object.from(gc.interpreter.dict_class));
+    try roots.add(Object.from(gc.interpreter.string_iterator_class));
 
     for (gc.interpreter.module_stack.items) |module_environment| {
         try roots.add(Object.from(module_environment));

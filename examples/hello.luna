@@ -53,5 +53,8 @@ class Pair {
     }
 }
 
-let a=Pair(1, 2)
-print(len(a))
+
+let a={"msg":"hello"}
+foreach k in a {
+    print(k + ":" + a[k])
+}

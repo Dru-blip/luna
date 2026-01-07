@@ -6,6 +6,7 @@ const Vm = @import("Vm.zig");
 const Object = @import("Object.zig");
 const Dict = @import("Dict.zig");
 const String = @import("String.zig");
+const DictIterator = @import("DictIterator.zig");
 
 const DictClass = @This();
 
@@ -26,6 +27,7 @@ pub fn registerMethods(gc: *Gc, dc: *Class) !void {
     try dc.defineNativeMethod(gc, "__setattr__", setattr, 2, false);
     try dc.defineNativeMethod(gc, "__getitem__", getitem, 1, false);
     try dc.defineNativeMethod(gc, "__setitem__", setitem, 2, false);
+    try dc.defineNativeMethod(gc, "__iter__", iter, 0, false);
 }
 
 fn set(vm: *Vm, self: *Object, args: []const Value) !Value {
@@ -102,4 +104,8 @@ fn setitem(vm: *Vm, self: *Object, args: []const Value) !Value {
     const value = args[1];
     try dict.set(vm, key, value);
     return Value.None;
+}
+
+fn iter(vm: *Vm, self: *Object, _: []const Value) !Value {
+    return Value.object(try DictIterator.newInstance(vm.gc, self));
 }
