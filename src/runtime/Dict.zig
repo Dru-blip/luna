@@ -153,11 +153,11 @@ pub const HashMap = struct {
                         if (hash_value.isNumber()) {
                             return hash_value;
                         }
-                        return vm.raiseException(vm.interpreter.value_error_class, "__hash__ must return a number", .{});
+                        return vm.raiseValueError("__hash__ must return a number", .{});
                     }
                 }
 
-                return vm.raiseException(vm.interpreter.type_error_class, "unhashable type: {s}", .{class.name.asSlice()});
+                return vm.raiseTypeError("unhashable type: {s}", .{class.name.asSlice()});
             },
         }
     }

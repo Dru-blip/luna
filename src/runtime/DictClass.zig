@@ -75,8 +75,7 @@ fn getattr(vm: *Vm, self: *Object, args: []const Value) !Value {
         return value;
     }
     const name = key.toObject().asString().?;
-    return self.class.getField(name) orelse try vm.raiseException(
-        vm.interpreter.attribute_error_class,
+    return self.class.getField(name) orelse try vm.raiseAttributeError(
         "'{s}' object has no attribute '{s}'",
         .{ self.class.name.asSlice(), name.asSlice() },
     );

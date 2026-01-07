@@ -24,8 +24,7 @@ fn getattr(vm: *Vm, self: *Object, args: []const Value) !Value {
         if (class.getField(name)) |val| {
             return val;
         }
-        return try vm.raiseException(
-            vm.interpreter.attribute_error_class,
+        return try vm.raiseAttributeError(
             "'{s}' object has no attribute '{s}'",
             .{ class.name.asSlice(), name.asSlice() },
         );
@@ -43,8 +42,7 @@ fn getattr(vm: *Vm, self: *Object, args: []const Value) !Value {
         return value;
     }
 
-    return try vm.raiseException(
-        vm.interpreter.attribute_error_class,
+    return try vm.raiseAttributeError(
         "'{s}' object has no attribute '{s}'",
         .{ class.name.asSlice(), name.asSlice() },
     );

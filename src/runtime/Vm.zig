@@ -195,7 +195,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     registers[data.bin.rhs] = field;
                     continue :start;
                 }
-                return vm.raiseException(vm.interpreter.reference_error_class, "undeclared identifier '{s}'", .{name.asSlice()});
+                return vm.raiseReferenceError("undeclared identifier '{s}'", .{name.asSlice()});
             },
             .store_global_by_name => {
                 continue :start;
@@ -210,7 +210,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     registers[data.bin.rhs] = Value.number(-value.asNumber());
                     continue :start;
                 }
-                return vm.raiseException(vm.interpreter.type_error_class, "invalid operand type for unary operator ('-') : '{s}'", .{value.getTypeString()});
+                return vm.raiseTypeError("invalid operand type for unary operator ('-') : '{s}'", .{value.getTypeString()});
             },
             .not => {
                 const value = registers[data.bin.lhs];
@@ -251,7 +251,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                         if (s.isString()) {
                             other_str = s.toObject().toString();
                         }
-                        _ = try vm.raiseException(vm.interpreter.type_error_class, "__str__ method returned non-string value", .{});
+                        _ = try vm.raiseTypeError("__str__ method returned non-string value", .{});
                     } else {
                         other_str = (try String.new(vm.gc, other_value.toString())).asString().?;
                     }
@@ -351,7 +351,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     const lvalue = lhs.asNumber();
                     const rvalue = rhs.asNumber();
                     if (rvalue == 0.0) {
-                        return vm.raiseException(vm.interpreter.zero_division_error_class, "modulo by zero", .{});
+                        return vm.raiseZeroDivisionError("division by zero");
                     }
                     registers[data.tri.dst] = Value.number(@divFloor(lvalue, rvalue));
                     continue :start;
@@ -387,7 +387,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     const lvalue = lhs.asNumber();
                     const rvalue = rhs.asNumber();
                     if (rvalue == 0.0) {
-                        return vm.raiseException(vm.interpreter.zero_division_error_class, "modulo by zero", .{});
+                        return vm.raiseZeroDivisionError("modulo by zero");
                     }
                     registers[data.tri.dst] = Value.number(@mod(lvalue, rvalue));
                     continue :start;
@@ -684,7 +684,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     continue :start;
                 }
 
-                return vm.raiseException(vm.interpreter.type_error_class, "Expected a class", .{});
+                return vm.raiseTypeError("Expected a class", .{});
             },
             .get_super_class => {
                 //ERROR: this is useless.
@@ -837,8 +837,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                         continue :start;
                     }
                 }
-                return try vm.raiseException(
-                    vm.interpreter.attribute_error_class,
+                return try vm.raiseAttributeError(
                     "'{s}' has no method '{s}'",
                     .{ super_class.name.asSlice(), method_name.asSlice() },
                 );
@@ -846,12 +845,12 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             .call => {
                 const callee = registers[data.call.callee];
                 if (!callee.isObject()) {
-                    return vm.raiseException(vm.interpreter.type_error_class, "'{s}' is not callable", .{callee.getTypeString()});
+                    return vm.raiseTypeError("'{s}' is not callable", .{callee.getTypeString()});
                 }
                 const callee_obj = callee.toObject();
 
                 if (!callee_obj.isFunction()) {
-                    return vm.raiseException(vm.interpreter.type_error_class, "'{s}' object is not callable", .{callee_obj.getClassName()});
+                    return vm.raiseTypeError("'{s}' object is not callable", .{callee_obj.getClassName()});
                 }
 
                 const this_value = registers[data.call.this];
@@ -962,8 +961,7 @@ pub inline fn checkArity(vm: *Vm, comptime T: anytype, name: *String, expected: 
     };
 
     if (check) {
-        return try vm.raiseException(
-            vm.interpreter.type_error_class,
+        return try vm.raiseTypeError(
             "'{s}' expects {d} arguments but got {d}",
             .{ name.asSlice(), expected, actual },
         );
@@ -980,25 +978,22 @@ inline fn invokeSpecialMethod(
 ) Error!Value {
     //TODO: refactor
     if (!target.isObject()) {
-        return vm.raiseException(
-            vm.interpreter.type_error_class,
-            "invalid type '{s}' for operation '{s}'",
+        return vm.raiseTypeError(
+            "'invalid type '{s}' for operation '{s}'",
             .{ target.getTypeString(), method_name.asSlice() },
         );
     }
 
     const cls = target.toObject().class;
     const method = cls.getField(method_name) orelse {
-        return vm.raiseException(
-            vm.interpreter.type_error_class,
+        return vm.raiseTypeError(
             "'{s}' object does not support special method '{s}'",
             .{ target.getTypeString(), method_name.asSlice() },
         );
     };
 
     const callable = method.asObject() orelse {
-        return vm.raiseException(
-            vm.interpreter.type_error_class,
+        return vm.raiseTypeError(
             "{s} has to be callable object",
             .{method.getTypeString()},
         );
@@ -1011,7 +1006,7 @@ inline fn invokeSpecialMethod(
     );
 }
 
-pub fn raiseTypeException(vm: *Vm, comptime op: []const u8, lhs: Value, rhs: Value) Error!Value {
+pub inline fn raiseTypeException(vm: *Vm, comptime op: []const u8, lhs: Value, rhs: Value) Error!Value {
     return vm.raiseException(vm.interpreter.type_error_class, "invalid operand types for operation (\"{s}\"): {s} and {s}", .{ op, lhs.getTypeString(), rhs.getTypeString() });
 }
 
@@ -1027,4 +1022,60 @@ pub inline fn getGlobalSlots(vm: *Vm) *Vm.Globals {
         return &f.module_env.globals;
     }
     return vm.interpreter.getGlobalSlots();
+}
+
+pub inline fn raiseTypeError(
+    vm: *Vm,
+    comptime fmt: []const u8,
+    args: anytype,
+) Error!Value {
+    return vm.raiseException(vm.interpreter.type_error_class, fmt, args);
+}
+
+pub inline fn raiseAttributeError(
+    vm: *Vm,
+    comptime fmt: []const u8,
+    args: anytype,
+) Error!Value {
+    return vm.raiseException(vm.interpreter.attribute_error_class, fmt, args);
+}
+
+pub inline fn raiseZeroDivisionError(vm: *Vm, comptime msg: []const u8) Error!Value {
+    return vm.raiseException(
+        vm.interpreter.zero_division_error_class,
+        msg,
+        .{},
+    );
+}
+
+pub inline fn raiseReferenceError(
+    vm: *Vm,
+    comptime fmt: []const u8,
+    args: anytype,
+) Error!Value {
+    return vm.raiseException(vm.interpreter.reference_error_class, fmt, args);
+}
+
+pub inline fn raiseValueError(
+    vm: *Vm,
+    comptime fmt: []const u8,
+    args: anytype,
+) Error!Value {
+    return vm.raiseException(vm.interpreter.value_error_class, fmt, args);
+}
+
+pub inline fn raiseModuleNotFoundError(
+    vm: *Vm,
+    comptime fmt: []const u8,
+    args: anytype,
+) Error!Value {
+    return vm.raiseException(vm.interpreter.module_not_found_error_class, fmt, args);
+}
+
+pub inline fn raiseIndexError(
+    vm: *Vm,
+    comptime fmt: []const u8,
+    args: anytype,
+) Error!Value {
+    return vm.raiseException(vm.interpreter.index_error_class, fmt, args);
 }
