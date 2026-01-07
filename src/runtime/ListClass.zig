@@ -45,7 +45,7 @@ fn get(vm: *Vm, self: *Object, args: []const Value) !Value {
 
     if (index_value.type != .number) {
         return try vm.raiseException(
-            .type_error,
+            vm.interpreter.type_error_class,
             "list index must be a number",
             .{},
         );
@@ -53,7 +53,7 @@ fn get(vm: *Vm, self: *Object, args: []const Value) !Value {
 
     const index = @as(isize, @intFromFloat(index_value.data.number));
     return list.get(index) orelse try vm.raiseException(
-        .index_error,
+        vm.interpreter.index_error_class,
         "list index out of range",
         .{},
     );
@@ -66,7 +66,7 @@ fn set_method(vm: *Vm, self: *Object, args: []const Value) !Value {
 
     if (index_value.type != .number) {
         return try vm.raiseException(
-            .type_error,
+            vm.interpreter.type_error_class,
             "list index must be a number",
             .{},
         );
@@ -75,7 +75,7 @@ fn set_method(vm: *Vm, self: *Object, args: []const Value) !Value {
     const index = @as(isize, @intFromFloat(index_value.data.number));
     if (!list.set(index, value)) {
         return try vm.raiseException(
-            .index_error,
+            vm.interpreter.index_error_class,
             "list index out of range",
             .{},
         );
@@ -90,7 +90,7 @@ fn insert(vm: *Vm, self: *Object, args: []const Value) !Value {
 
     if (index_value.type != .number) {
         return try vm.raiseException(
-            .type_error,
+            vm.interpreter.type_error_class,
             "list index must be a number",
             .{},
         );
@@ -107,7 +107,7 @@ fn remove(vm: *Vm, self: *Object, args: []const Value) !Value {
 
     if (index_value.type != .number) {
         return try vm.raiseException(
-            .type_error,
+            vm.interpreter.type_error_class,
             "list index must be a number",
             .{},
         );
@@ -115,7 +115,7 @@ fn remove(vm: *Vm, self: *Object, args: []const Value) !Value {
 
     const index = @as(isize, @intFromFloat(index_value.data.number));
     return list.remove(index) orelse try vm.raiseException(
-        .index_error,
+        vm.interpreter.index_error_class,
         "list index out of range",
         .{},
     );
@@ -124,7 +124,7 @@ fn remove(vm: *Vm, self: *Object, args: []const Value) !Value {
 fn pop(vm: *Vm, self: *Object, _: []const Value) !Value {
     const list: *List = self.as(List);
     return list.pop() orelse try vm.raiseException(
-        .index_error,
+        vm.interpreter.index_error_class,
         "pop from empty list",
         .{},
     );
@@ -151,7 +151,7 @@ fn getattr(vm: *Vm, self: *Object, args: []const Value) !Value {
     const key = args[0];
     const name = key.toObject().asString().?;
     return self.class.getField(name) orelse try vm.raiseException(
-        .attribute_error,
+        vm.interpreter.attribute_error_class,
         "'{s}' object has no attribute '{s}'",
         .{ self.class.name.asSlice(), name.asSlice() },
     );
@@ -163,7 +163,7 @@ fn getitem(vm: *Vm, self: *Object, args: []const Value) !Value {
 
     if (index_value.type != .number) {
         return try vm.raiseException(
-            .type_error,
+            vm.interpreter.type_error_class,
             "list index must be a number",
             .{},
         );
@@ -171,7 +171,7 @@ fn getitem(vm: *Vm, self: *Object, args: []const Value) !Value {
 
     const index = @as(isize, @intFromFloat(index_value.data.number));
     return list.get(index) orelse try vm.raiseException(
-        .index_error,
+        vm.interpreter.index_error_class,
         "list index out of range",
         .{},
     );
@@ -184,7 +184,7 @@ fn setitem(vm: *Vm, self: *Object, args: []const Value) !Value {
 
     if (index_value.type != .number) {
         return try vm.raiseException(
-            .type_error,
+            vm.interpreter.type_error_class,
             "list index must be a number",
             .{},
         );
@@ -193,7 +193,7 @@ fn setitem(vm: *Vm, self: *Object, args: []const Value) !Value {
     const index = @as(isize, @intFromFloat(index_value.data.number));
     if (!list.set(index, value)) {
         return try vm.raiseException(
-            .index_error,
+            vm.interpreter.index_error_class,
             "list index out of range",
             .{},
         );

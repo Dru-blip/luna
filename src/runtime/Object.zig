@@ -118,7 +118,7 @@ pub fn callAssumeCallable(
     }
 
     return vm.raiseException(
-        .type_error,
+        vm.interpreter.type_error_class,
         "{s} object is not callable",
         .{self.getClassName()},
     );

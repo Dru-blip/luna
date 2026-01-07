@@ -54,6 +54,7 @@ index_error_class: *Class = undefined,
 value_error_class: *Class = undefined,
 attribute_error_class: *Class = undefined,
 module_not_found_error_class: *Class = undefined,
+invalid_assignment_target_error_class: *Class = undefined,
 stack_overflow_error_class: *Class = undefined,
 
 common_names: Names = undefined,
@@ -108,6 +109,7 @@ pub const Names = struct {
     AttributeError: *String,
     ModuleNotFoundError: *String,
     StackOverflowError: *String,
+    InvalidAssignmentTargetError: *String,
 
     pub fn init(string_interner: *StringInterner) !Names {
         return .{
@@ -156,6 +158,7 @@ pub const Names = struct {
             .AttributeError = try string_interner.intern("AttributeError"),
             .ModuleNotFoundError = try string_interner.intern("ModuleNotFoundError"),
             .StackOverflowError = try string_interner.intern("StackOverflowError"),
+            .InvalidAssignmentTargetError = try string_interner.intern("InvalidAssignmentTargetError"),
         };
     }
 };
@@ -272,18 +275,24 @@ pub fn initializeExceptionClasses(interpreter: *Interpreter) !void {
         interpreter.common_names.StackOverflowError,
         interpreter.base_exception_class,
     );
+
+    interpreter.invalid_assignment_target_error_class = try BaseExceptionClass.MakeExceptionClass(
+        &interpreter.gc,
+        interpreter.common_names.InvalidAssignmentTargetError,
+        interpreter.base_exception_class,
+    );
 }
 
 pub fn runFile(i: *Interpreter, path: []const u8) Error!Value {
     var file = std.fs.cwd().openFile(path, .{}) catch {
         //TODO: Handle file opening error
-        return i.vm.raiseException(.module_not_found_error, "Module not found: {s}", .{path});
+        return i.vm.raiseException(i.module_not_found_error_class, "Module not found: {s}", .{path});
     };
 
     defer file.close();
     const file_stats = file.stat() catch {
         //TODO: Handle file stat error
-        return i.vm.raiseException(.module_not_found_error, "Module not found: {s}", .{path});
+        return i.vm.raiseException(i.module_not_found_error_class, "Module not found: {s}", .{path});
     };
     var buffer = try i.gc.gpa.alloc(u8, file_stats.size + 1);
 

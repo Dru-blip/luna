@@ -28,7 +28,7 @@ pub fn registerMethods(gc: *Gc, sc: *Class) !void {
 fn to_number(vm: *Vm, self: *Object, _: []const Value) !Value {
     const str: *String = self.as(String);
     const number = std.fmt.parseFloat(f64, str.asSlice()) catch {
-        return try vm.raiseException(.value_error, "invalid number format", .{});
+        return try vm.raiseException(vm.interpreter.value_error_class, "invalid number format", .{});
     };
     return Value.number(number);
 }
@@ -37,7 +37,7 @@ fn getattr(vm: *Vm, self: *Object, args: []const Value) !Value {
     const key = args[0];
     const name = key.toObject().asString().?;
     return self.class.getField(name) orelse try vm.raiseException(
-        .attribute_error,
+        vm.interpreter.attribute_error_class,
         "'{s}' object has no attribute '{s}'",
         .{ self.class.name.asSlice(), name.asSlice() },
     );
@@ -53,7 +53,7 @@ fn getitem(vm: *Vm, self: *Object, args: []const Value) !Value {
 
     if (index_value.type != .number) {
         return try vm.raiseException(
-            .type_error,
+            vm.interpreter.type_error_class,
             "string index must be a number",
             .{},
         );
@@ -62,7 +62,7 @@ fn getitem(vm: *Vm, self: *Object, args: []const Value) !Value {
     const index = @as(usize, @intFromFloat(index_value.data.number));
     if (index >= string.length) {
         return try vm.raiseException(
-            .index_error,
+            vm.interpreter.index_error_class,
             "string index out of range",
             .{},
         );
@@ -73,5 +73,5 @@ fn getitem(vm: *Vm, self: *Object, args: []const Value) !Value {
 }
 
 fn setitem(vm: *Vm, _: *Object, _: []const Value) !Value {
-    return vm.raiseException(.type_error, "'str' object does not support item assignment", .{});
+    return vm.raiseException(vm.interpreter.type_error_class, "'str' object does not support item assignment", .{});
 }

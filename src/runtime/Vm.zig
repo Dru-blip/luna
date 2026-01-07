@@ -126,7 +126,7 @@ pub fn pushRecord(vm: *Vm, record: ActivationRecord) Error!Value {
     // std.debug.print("stack size: {d}\n", .{vm.records.items.len});
     if (vm.records.items.len >= max_records) {
         return vm.raiseException(
-            .stack_overflow,
+            vm.interpreter.stack_overflow_error_class,
             "maximum call stack size ({d}) exceeded",
             .{max_records},
         );
@@ -195,7 +195,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     registers[data.bin.rhs] = field;
                     continue :start;
                 }
-                return vm.raiseException(.reference_error, "undeclared identifier '{s}'", .{name.asSlice()});
+                return vm.raiseException(vm.interpreter.reference_error_class, "undeclared identifier '{s}'", .{name.asSlice()});
             },
             .store_global_by_name => {
                 continue :start;
@@ -210,7 +210,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     registers[data.bin.rhs] = Value.number(-value.asNumber());
                     continue :start;
                 }
-                return vm.raiseException(.type_error, "invalid operand type for unary operator ('-') : '{s}'", .{value.getTypeString()});
+                return vm.raiseException(vm.interpreter.type_error_class, "invalid operand type for unary operator ('-') : '{s}'", .{value.getTypeString()});
             },
             .not => {
                 const value = registers[data.bin.lhs];
@@ -251,7 +251,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                         if (s.isString()) {
                             other_str = s.toObject().toString();
                         }
-                        _ = try vm.raiseException(.type_error, "__str__ method returned non-string value", .{});
+                        _ = try vm.raiseException(vm.interpreter.type_error_class, "__str__ method returned non-string value", .{});
                     } else {
                         other_str = (try String.new(vm.gc, other_value.toString())).asString().?;
                     }
@@ -351,7 +351,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     const lvalue = lhs.asNumber();
                     const rvalue = rhs.asNumber();
                     if (rvalue == 0.0) {
-                        return vm.raiseException(.zero_division_error, "division by zero", .{});
+                        return vm.raiseException(vm.interpreter.zero_division_error_class, "modulo by zero", .{});
                     }
                     registers[data.tri.dst] = Value.number(@divFloor(lvalue, rvalue));
                     continue :start;
@@ -387,7 +387,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     const lvalue = lhs.asNumber();
                     const rvalue = rhs.asNumber();
                     if (rvalue == 0.0) {
-                        return vm.raiseException(.zero_division_error, "modulo by zero", .{});
+                        return vm.raiseException(vm.interpreter.zero_division_error_class, "modulo by zero", .{});
                     }
                     registers[data.tri.dst] = Value.number(@mod(lvalue, rvalue));
                     continue :start;
@@ -684,7 +684,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     continue :start;
                 }
 
-                return vm.raiseException(.type_error, "Expected a class", .{});
+                return vm.raiseException(vm.interpreter.type_error_class, "Expected a class", .{});
             },
             .get_super_class => {
                 //ERROR: this is useless.
@@ -838,7 +838,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     }
                 }
                 return try vm.raiseException(
-                    .attribute_error,
+                    vm.interpreter.attribute_error_class,
                     "'{s}' has no method '{s}'",
                     .{ super_class.name.asSlice(), method_name.asSlice() },
                 );
@@ -846,12 +846,12 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             .call => {
                 const callee = registers[data.call.callee];
                 if (!callee.isObject()) {
-                    return vm.raiseException(.type_error, "'{s}' is not callable", .{callee.getTypeString()});
+                    return vm.raiseException(vm.interpreter.type_error_class, "'{s}' is not callable", .{callee.getTypeString()});
                 }
                 const callee_obj = callee.toObject();
 
                 if (!callee_obj.isFunction()) {
-                    return vm.raiseException(.type_error, "'{s}' object is not callable", .{callee_obj.getClassName()});
+                    return vm.raiseException(vm.interpreter.type_error_class, "'{s}' object is not callable", .{callee_obj.getClassName()});
                 }
 
                 const this_value = registers[data.call.this];
@@ -963,7 +963,7 @@ pub inline fn checkArity(vm: *Vm, comptime T: anytype, name: *String, expected: 
 
     if (check) {
         return try vm.raiseException(
-            .type_error,
+            vm.interpreter.type_error_class,
             "'{s}' expects {d} arguments but got {d}",
             .{ name.asSlice(), expected, actual },
         );
@@ -981,7 +981,7 @@ inline fn invokeSpecialMethod(
     //TODO: refactor
     if (!target.isObject()) {
         return vm.raiseException(
-            .type_error,
+            vm.interpreter.type_error_class,
             "invalid type '{s}' for operation '{s}'",
             .{ target.getTypeString(), method_name.asSlice() },
         );
@@ -990,7 +990,7 @@ inline fn invokeSpecialMethod(
     const cls = target.toObject().class;
     const method = cls.getField(method_name) orelse {
         return vm.raiseException(
-            .type_error,
+            vm.interpreter.type_error_class,
             "'{s}' object does not support special method '{s}'",
             .{ target.getTypeString(), method_name.asSlice() },
         );
@@ -998,7 +998,7 @@ inline fn invokeSpecialMethod(
 
     const callable = method.asObject() orelse {
         return vm.raiseException(
-            .type_error,
+            vm.interpreter.type_error_class,
             "{s} has to be callable object",
             .{method.getTypeString()},
         );
@@ -1012,11 +1012,11 @@ inline fn invokeSpecialMethod(
 }
 
 pub fn raiseTypeException(vm: *Vm, comptime op: []const u8, lhs: Value, rhs: Value) Error!Value {
-    return vm.raiseException(.type_error, "invalid operand types for operation (\"{s}\"): {s} and {s}", .{ op, lhs.getTypeString(), rhs.getTypeString() });
+    return vm.raiseException(vm.interpreter.type_error_class, "invalid operand types for operation (\"{s}\"): {s} and {s}", .{ op, lhs.getTypeString(), rhs.getTypeString() });
 }
 
-pub inline fn raiseException(vm: *Vm, tag: Exception.Tag, comptime fmt: []const u8, args: anytype) Error!Value {
-    vm.interpreter.exception = try Exception.withMessage(vm, tag, fmt, args);
+pub inline fn raiseException(vm: *Vm, class: *Class, comptime fmt: []const u8, args: anytype) Error!Value {
+    vm.interpreter.exception = try Exception.withMessage(vm, class, fmt, args);
     return Error.ExceptionThrown;
 }
 

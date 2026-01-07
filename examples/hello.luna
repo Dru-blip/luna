@@ -54,7 +54,4 @@ class Pair {
 }
 
 
-let a={"msg":"hello"}
-foreach k in a {
-    print(k + ":" + a[k])
-}
+print([1,2,3][5])

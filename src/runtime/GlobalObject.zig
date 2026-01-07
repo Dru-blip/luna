@@ -95,7 +95,7 @@ fn import(vm: *Vm, _: *Object, args: []const Value) Interpreter.Error!Value {
     }
 
     const path = resolveModulePath(vm, path_string.asSlice()) catch {
-        return vm.raiseException(.module_not_found_error, "'{s}'", .{path_string.asSlice()});
+        return vm.raiseException(vm.interpreter.module_not_found_error_class, "'{s}'", .{path_string.asSlice()});
     };
 
     defer vm.gpa.free(path);
@@ -160,7 +160,7 @@ fn getCachedModuleWithPatterns(vm: *Vm, module_path: []const u8) !?*Module {
 
 fn hash(vm: *Vm, _: *Object, args: []const Value) !Value {
     if (args.len == 0) {
-        return vm.raiseException(.type_error, "hash() requires at least 1 argument", .{});
+        return vm.raiseException(vm.interpreter.type_error_class, "hash() requires at least 1 argument", .{});
     }
 
     const value = args[0];
@@ -192,12 +192,12 @@ fn hash(vm: *Vm, _: *Object, args: []const Value) !Value {
                     if (hash_method_object.asObject()) |hash_obj| {
                         const result = try hash_obj.callAssumeCallable(vm, value.toObject(), &[_]Value{});
                         if (result.type != .number) {
-                            return vm.raiseException(.type_error, "__hash__ must return a number", .{});
+                            return vm.raiseException(vm.interpreter.type_error_class, "__hash__ must return a number", .{});
                         }
                         return result;
                     }
                 }
-                return vm.raiseException(.type_error, "unhashable type: {s}", .{class.name.asSlice()});
+                return vm.raiseException(vm.interpreter.type_error_class, "unhashable type: {s}", .{class.name.asSlice()});
             }
         },
     }
@@ -218,7 +218,7 @@ fn len(vm: *Vm, _: *Object, args: []const Value) !Value {
             if (len_val.asObject()) |len_obj| {
                 const result = try len_obj.callAssumeCallable(vm, obj, &[_]Value{});
                 if (result.type != .number) {
-                    return vm.raiseException(.type_error, "__len__ must return a number", .{});
+                    return vm.raiseException(vm.interpreter.type_error_class, "__len__ must return a number", .{});
                 }
                 return result;
             }
@@ -226,5 +226,5 @@ fn len(vm: *Vm, _: *Object, args: []const Value) !Value {
         }
     }
 
-    return vm.raiseException(.type_error, "type '{s}' does not support len()", .{value.getTypeString()});
+    return vm.raiseException(vm.interpreter.type_error_class, "type '{s}' does not support len()", .{value.getTypeString()});
 }

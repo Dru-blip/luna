@@ -800,12 +800,9 @@ inline fn genAssign(g: *Generator, node: *const Ast.Node, tag: Ast.Node.Tag, op:
         .computed_member_expr => try g.genAssignComputedMember(node.data.bin.lhs, value, tag, op),
         .identifier => try g.genAssignSimple(node, value, tag, op),
         else => {
-            var obj = try Exception.new(g.gc);
-            var exception: *Exception = obj.as(Exception);
             const str_obj = try String.new(g.gc, "Invalid assignment target");
-            exception.tag = .invalid_assignment_target_error;
-            exception.message = str_obj.as(String);
-            const index = try g.addConstant(Value.object(obj));
+            const exception = try Exception.new(g.gc, g.gc.interpreter.invalid_assignment_target_error_class, str_obj.as(String));
+            const index = try g.addConstant(Value.object(Object.from(exception)));
             try g.addUn(.build_trace_and_throw_exception, index, node.loc);
         },
     }

@@ -5,36 +5,9 @@ const Object = @import("Object.zig");
 const ObjectSet = @import("ObjectSet.zig");
 const Gc = @import("../core/Gc.zig");
 const Vm = @import("Vm.zig");
+const Class = @import("Class.zig");
 
 const Exception = @This();
-
-pub const Tag = enum {
-    type_error,
-    reference_error,
-    property_error, //TODO: remove
-    zero_division_error,
-    invalid_assignment_target_error,
-    attribute_error,
-    index_error,
-    value_error,
-    module_not_found_error,
-    stack_overflow,
-
-    pub fn toString(self: Tag) []const u8 {
-        return switch (self) {
-            .type_error => "TypeError",
-            .property_error => "PropertyError",
-            .zero_division_error => "ZeroDivisionError",
-            .reference_error => "ReferenceError",
-            .invalid_assignment_target_error => "InvalidAssignmentTargetError",
-            .attribute_error => "AttributeError",
-            .index_error => "IndexError",
-            .value_error => "ValueError",
-            .module_not_found_error => "ModuleNotFoundError",
-            .stack_overflow => "StackOverflowError",
-        };
-    }
-};
 
 const SourceCache = struct {
     map: std.StringHashMap([]const u8),
@@ -72,7 +45,6 @@ pub const TracebackFrame = struct {
     location: Loc,
 };
 
-tag: Tag,
 message: *String = undefined,
 traceback: std.ArrayList(TracebackFrame) = .empty,
 
@@ -82,23 +54,30 @@ pub const gc_hooks: Object.GcHooks = .{
     .finalize = finalize,
 };
 
-pub fn new(gc: *Gc) !*Object {
-    const ex = try gc.alloc(Exception);
-    //TODO: should change class to base exception class
-    ex.class = gc.interpreter.base_class;
-    var exception: *Exception = ex.as(Exception);
-    exception.traceback = .empty;
+pub fn new(
+    gc: *Gc,
+    class: *Class,
+    message: *String,
+) !*Exception {
+    const obj = try gc.alloc(Exception);
+    obj.class = class;
+
+    const ex: *Exception = obj.as(Exception);
+    ex.* = .{
+        .message = message,
+        .traceback = .empty,
+    };
     return ex;
 }
 
-pub fn withMessage(vm: *Vm, tag: Tag, comptime fmt: []const u8, args: anytype) !*Exception {
+pub fn withMessage(vm: *Vm, exception_class: *Class, comptime fmt: []const u8, args: anytype) !*Exception {
     const obj = try vm.gc.alloc(Exception);
+    obj.class = exception_class;
     const ex: *Exception = obj.as(Exception);
     const raw_msg = try std.fmt.allocPrint(vm.gpa, fmt, args);
     defer vm.gpa.free(raw_msg);
     const message_obj = try String.new(vm.gc, raw_msg);
     ex.* = .{
-        .tag = tag,
         .message = message_obj.as(String),
     };
     try ex.buildTraceback(vm);
@@ -142,7 +121,8 @@ pub fn traceString(exception: *Exception, gpa: std.mem.Allocator) ![]const u8 {
         try writer.print("\n", .{});
     }
 
-    try writer.print("{s}: {s}", .{ exception.tag.toString(), exception.message.asSlice() });
+    const class = Object.from(exception).class;
+    try writer.print("{s}: {s}", .{ class.name.asSlice(), exception.message.asSlice() });
     return try buffer.toOwnedSlice(gpa);
 }
 
