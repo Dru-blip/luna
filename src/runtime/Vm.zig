@@ -473,6 +473,36 @@ fn handleModulus(ctx: *HandlerContext, inst: Inst) Error!void {
     _ = try ctx.vm.raiseTypeException("%", lhs, rhs);
 }
 
+fn handleAnd(ctx: *HandlerContext, inst: Inst) Error!void {
+    const lhs = ctx.registers[inst.data.tri.op1];
+    const rhs = ctx.registers[inst.data.tri.op2];
+    if (lhs.isNumeric() and rhs.isNumeric()) {
+        ctx.registers[inst.data.tri.dst] = Value.number(@floatFromInt(lhs.asInt() & rhs.asInt()));
+        return;
+    }
+    _ = try ctx.vm.raiseTypeException("&", lhs, rhs);
+}
+
+fn handleOr(ctx: *HandlerContext, inst: Inst) Error!void {
+    const lhs = ctx.registers[inst.data.tri.op1];
+    const rhs = ctx.registers[inst.data.tri.op2];
+    if (lhs.isNumeric() and rhs.isNumeric()) {
+        ctx.registers[inst.data.tri.dst] = Value.number(@floatFromInt(lhs.asInt() | rhs.asInt()));
+        return;
+    }
+    _ = try ctx.vm.raiseTypeException("|", lhs, rhs);
+}
+
+fn handleXor(ctx: *HandlerContext, inst: Inst) Error!void {
+    const lhs = ctx.registers[inst.data.tri.op1];
+    const rhs = ctx.registers[inst.data.tri.op2];
+    if (lhs.isNumeric() and rhs.isNumeric()) {
+        ctx.registers[inst.data.tri.dst] = Value.number(@floatFromInt(lhs.asInt() ^ rhs.asInt()));
+        return;
+    }
+    _ = try ctx.vm.raiseTypeException("^", lhs, rhs);
+}
+
 // pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 //     var record = r;
 //     var ctx.registers = record.registers;
@@ -519,100 +549,6 @@ fn handleModulus(ctx: *HandlerContext, inst: Inst) Error!void {
 //         instruction = instructions[record.ip];
 //         const data = instruction.data;
 //         record.ip += 1;
-//             .div => {
-//                 const lhs = registers[data.tri.op1];
-//                 const rhs = registers[data.tri.op2];
-
-//                 if (lhs.isNumeric() and rhs.isNumeric()) {
-
-//                     continue :start;
-//                 }
-
-//                 if (lhs.isObject()) {
-//                     const class = lhs.toObject().class;
-//                     if (class.getField(vm.interpreter.common_names.__div__)) |method| {
-//                         if (method.asObject()) |obj| {
-//                             registers[data.tri.dst] = try obj.callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
-//                         }
-//                         continue :start;
-//                     }
-//                 }
-
-//                 if (rhs.isObject()) {
-//                     const class = rhs.toObject().class;
-//                     if (class.getField(vm.interpreter.common_names.__rdiv__)) |method| {
-//                         if (method.asObject()) |obj| {
-//                             registers[data.tri.dst] = try obj.callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
-//                         }
-//                         continue :start;
-//                     }
-//                 }
-
-//                 return vm.raiseTypeException("/", lhs, rhs);
-//             },
-//             .mod => {
-//                 const lhs = registers[data.tri.op1];
-//                 const rhs = registers[data.tri.op2];
-
-//                 if (lhs.isNumeric() and rhs.isNumeric()) {
-//                     const lvalue = lhs.asNumber();
-//                     const rvalue = rhs.asNumber();
-//                     if (rvalue == 0.0) {
-//                         return vm.raiseZeroDivisionError("modulo by zero");
-//                     }
-//                     registers[data.tri.dst] = Value.number(@mod(lvalue, rvalue));
-//                     continue :start;
-//                 }
-
-//                 if (lhs.isObject()) {
-//                     const class = lhs.toObject().class;
-//                     if (class.getField(vm.interpreter.common_names.__mod__)) |method| {
-//                         if (method.asObject()) |obj| {
-//                             registers[data.tri.dst] = try obj.callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
-//                         }
-//                         continue :start;
-//                     }
-//                 }
-
-//                 if (rhs.isObject()) {
-//                     const class = rhs.toObject().class;
-//                     if (class.getField(vm.interpreter.common_names.__rmod__)) |method| {
-//                         if (method.asObject()) |obj| {
-//                             registers[data.tri.dst] = try obj.callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
-//                         }
-//                         continue :start;
-//                     }
-//                 }
-
-//                 return vm.raiseTypeException("%", lhs, rhs);
-//             },
-//             .@"and" => {
-//                 const lhs = registers[data.tri.op1];
-//                 const rhs = registers[data.tri.op2];
-//                 if (lhs.isNumeric() and rhs.isNumeric()) {
-//                     registers[data.tri.dst] = Value.number(@floatFromInt(lhs.asInt() & rhs.asInt()));
-//                     continue :start;
-//                 }
-//                 return vm.raiseTypeException("&", lhs, rhs);
-//             },
-//             .@"or" => {
-//                 const lhs = registers[data.tri.op1];
-//                 const rhs = registers[data.tri.op2];
-//                 if (lhs.isNumeric() and rhs.isNumeric()) {
-//                     registers[data.tri.dst] = Value.number(@floatFromInt(lhs.asInt() | rhs.asInt()));
-//                     continue :start;
-//                 }
-//                 return vm.raiseTypeException("|", lhs, rhs);
-//             },
-//             .xor => {
-//                 const lhs = registers[data.tri.op1];
-//                 const rhs = registers[data.tri.op2];
-//                 if (lhs.isNumeric() and rhs.isNumeric()) {
-//                     registers[data.tri.dst] = Value.number(@floatFromInt(lhs.asInt() ^ rhs.asInt()));
-//                     continue :start;
-//                 }
-//                 return vm.raiseTypeException("^", lhs, rhs);
-//             },
 //             .test_lt => {
 //                 const lhs = registers[data.tri.op1];
 //                 const rhs = registers[data.tri.op2];
