@@ -26,7 +26,7 @@ pub const Data = union(Type) {
     object: *Object,
 };
 
-pub inline fn number(value: f64) Value {
+pub fn number(value: f64) Value {
     return .{
         .type = .number,
         .data = .{
@@ -35,7 +35,7 @@ pub inline fn number(value: f64) Value {
     };
 }
 
-pub inline fn @"bool"(value: bool) Value {
+pub fn @"bool"(value: bool) Value {
     return if (value) True else False;
 }
 
@@ -67,7 +67,7 @@ pub const False: Value = .{
     },
 };
 
-pub inline fn object(obj: *Object) Value {
+pub fn object(obj: *Object) Value {
     return .{
         .type = .object,
         .data = .{
@@ -76,47 +76,47 @@ pub inline fn object(obj: *Object) Value {
     };
 }
 
-pub inline fn isNumber(value: Value) bool {
+pub fn isNumber(value: Value) bool {
     return value.type == .number;
 }
 
-pub inline fn isBool(value: Value) bool {
+pub fn isBool(value: Value) bool {
     return value.type == .bool;
 }
 
-pub inline fn isObject(value: Value) bool {
+pub fn isObject(value: Value) bool {
     return value.type == .object;
 }
 
-pub inline fn isNone(value: Value) bool {
+pub fn isNone(value: Value) bool {
     return value.type == .none;
 }
 
-pub inline fn isUndefined(value: Value) bool {
+pub fn isUndefined(value: Value) bool {
     return value.type == .undefined;
 }
 
-pub inline fn toNumber(value: Value) i64 {
+pub fn toNumber(value: Value) i64 {
     return value.data.number;
 }
 
-pub inline fn toBool(value: Value) bool {
+pub fn toBool(value: Value) bool {
     return value.data.bool;
 }
 
-pub inline fn toObject(value: Value) *Object {
+pub fn toObject(value: Value) *Object {
     return value.data.object;
 }
 
-pub inline fn asObject(value: Value) ?*Object {
+pub fn asObject(value: Value) ?*Object {
     return if (value.type == .object) value.data.object else null;
 }
 
-pub inline fn asClass(value: Value) ?*Class {
+pub fn asClass(value: Value) ?*Class {
     return if (value.type == .object) value.toObject().asClass() else null;
 }
 
-pub inline fn asNumber(value: Value) f64 {
+pub fn asNumber(value: Value) f64 {
     return switch (value.type) {
         .number => value.data.number,
         .bool => @as(f64, @floatFromInt(@intFromBool(value.data.bool))),
@@ -124,7 +124,7 @@ pub inline fn asNumber(value: Value) f64 {
     };
 }
 
-pub inline fn asInt(value: Value) i64 {
+pub fn asInt(value: Value) i64 {
     return switch (value.type) {
         .number => @as(i64, @bitCast(@round(value.data.number))),
         .bool => @as(i64, @intFromBool(value.data.bool)),
@@ -132,23 +132,23 @@ pub inline fn asInt(value: Value) i64 {
     };
 }
 
-pub inline fn isFalsy(v: Value) bool {
+pub fn isFalsy(v: Value) bool {
     return v.type == .none or v.type == .undefined or (v.type == .bool and v.data.bool == false);
 }
 
-pub inline fn isTruthy(v: Value) bool {
+pub fn isTruthy(v: Value) bool {
     return !isFalsy(v);
 }
 
-pub inline fn isNumeric(value: Value) bool {
+pub fn isNumeric(value: Value) bool {
     return value.type == .number or value.type == .bool;
 }
 
-pub inline fn isString(value: Value) bool {
+pub fn isString(value: Value) bool {
     return value.type == .object and value.toObject().gc_hooks == &String.gc_hooks;
 }
 
-pub inline fn getTypeString(v: Value) []const u8 {
+pub fn getTypeString(v: Value) []const u8 {
     return switch (v.type) {
         .number => "number",
         .bool => "bool",
