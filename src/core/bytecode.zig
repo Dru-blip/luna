@@ -12,7 +12,6 @@ pub const Inst = struct {
     data: Data,
 
     pub const Op = enum {
-        hlt, //uses none
         load_const, // uses bin
         load_true, // uses un
         load_false, // uses un
@@ -53,9 +52,6 @@ pub const Inst = struct {
         build_trace_and_throw_exception, //uses un
         raise_exception, // uses un
 
-        call, // uses call
-        super_call, //uses super_call,
-
         build_dict,
         add_dict_entry,
 
@@ -75,8 +71,11 @@ pub const Inst = struct {
         set_super_class,
         get_super_class,
 
+        call, // uses call
+        super_call, //uses super_call,
         ret, // uses un
         ret_none, // uses un
+        hlt, //uses none
     };
 
     pub const Data = union {
