@@ -54,6 +54,4 @@ class Pair {
 }
 
 
-let a = List()
-a.append(1)
-print(a[5])
+raise Exception("Guard failed")

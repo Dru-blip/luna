@@ -330,7 +330,12 @@ fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
         .return_stmt => {
             const val = try g.genExpr(node.data.opt.?);
             try g.addUn(.ret, val, node.loc);
-            try g.freeRegister(val);
+            // try g.freeRegister(val);
+        },
+        .raise_stmt => {
+            const exception = try g.genExpr(node.data.opt.?);
+            try g.addUn(.raise_exception, exception, node.loc);
+            // try g.freeRegister(exception);
         },
         .expr_stmt => {
             _ = try g.genExpr(node.data.un);

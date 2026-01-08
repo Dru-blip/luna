@@ -51,6 +51,7 @@ pub const Inst = struct {
 
         build_function, // uses bin
         build_trace_and_throw_exception, //uses un
+        raise_exception, // uses un
 
         call, // uses call
         super_call, //uses super_call,
@@ -378,6 +379,8 @@ pub const Executable = struct {
                 .iter_next => try out.print("IterNext", .{}),
 
                 .build_trace_and_throw_exception => try out.print("Throw", .{}),
+
+                .raise_exception => try out.print("RaiseException r{d}", .{inst.data.un}),
 
                 .ret => try out.print("Return r{d}", .{inst.data.un}),
 

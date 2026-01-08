@@ -10,6 +10,7 @@ const ObjectSet = @import("ObjectSet.zig");
 const Interpreter = @import("Interpreter.zig");
 const Class = @import("Class.zig");
 const Vm = @import("Vm.zig");
+const Exception = @import("Exception.zig");
 
 marked: bool = false,
 gc_hooks: *const GcHooks,
@@ -60,6 +61,10 @@ pub inline fn asFunction(obj: *Object) ?*Function {
 
 pub inline fn asNativeFunction(obj: *Object) ?*NativeFunction {
     return if (obj.gc_hooks == &NativeFunction.gc_hooks) obj.as(NativeFunction) else null;
+}
+
+pub inline fn asException(obj: *Object) ?*Exception {
+    return if (obj.gc_hooks == &Exception.gc_hooks) obj.as(Exception) else null;
 }
 
 pub inline fn asClass(obj: *Object) ?*Class {

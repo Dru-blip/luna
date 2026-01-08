@@ -945,6 +945,17 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                 callee.deinit(&vm.register_pool);
                 continue :start;
             },
+            .raise_exception => {
+                const exception_val = registers[data.un];
+                if (exception_val.asObject()) |exception_object| {
+                    if (exception_object.asException()) |exception| {
+                        vm.interpreter.exception = exception;
+                    }
+                    //TODO: raise error if exception_object is not an exception
+                }
+                //TODO: raise error if exception_val is not an object
+                return Error.ExceptionThrown;
+            },
             .hlt => {
                 return Value.None;
             },

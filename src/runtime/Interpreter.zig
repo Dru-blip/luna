@@ -149,7 +149,7 @@ pub const Names = struct {
             .__hash__ = try string_interner.intern("__hash__"),
             .__len__ = try string_interner.intern("__len__"),
 
-            .BaseException = try string_interner.intern("BaseException"),
+            .BaseException = try string_interner.intern("Exception"),
             .TypeError = try string_interner.intern("TypeError"),
             .ReferenceError = try string_interner.intern("ReferenceError"),
             .ZeroDivisionError = try string_interner.intern("ZeroDivisionError"),

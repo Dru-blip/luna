@@ -19,6 +19,7 @@ pub inline fn new(gc: *Gc) !*Class {
     obj.class = undefined;
     var class: *Class = obj.as(Class);
     class.super_class = null;
+    class.constructor = null;
     class.methods = FieldMap.init(gc);
     return class;
 }

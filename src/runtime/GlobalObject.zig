@@ -19,6 +19,7 @@ pub fn new(gc: *Gc) !*Class {
     try class.defineNativeMethod(gc, "len", len, 1, false);
 
     try class.putField(gc.interpreter.common_names.List, Value.object(Object.from(gc.interpreter.list_class)));
+    try class.putField(gc.interpreter.common_names.BaseException, Value.object(Object.from(gc.interpreter.base_exception_class)));
 
     return class;
 }
