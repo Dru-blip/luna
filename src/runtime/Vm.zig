@@ -89,18 +89,6 @@ pub const ActivationRecord = struct {
     }
 };
 
-const HandlerContext = struct {
-    vm: *Vm,
-    record: *ActivationRecord,
-    registers: []Value,
-    globals: *Globals,
-    constants: []Value,
-    identifiers: []Value,
-    extra: []u32,
-};
-
-const Handler = *const fn (ctx: *HandlerContext, inst: Inst) Error!void;
-
 const Records = std.ArrayList(ActivationRecord);
 
 const default_register_pool_size = 100_000;
@@ -154,6 +142,18 @@ pub fn runExecutable(vm: *Vm, executable: *Executable) Error!Value {
     return try vm.runRecord(&vm.records.items[vm.records.items.len - 1], false);
 }
 
+const HandlerContext = struct {
+    vm: *Vm,
+    record: *ActivationRecord,
+    registers: []Value,
+    globals: *Globals,
+    constants: []Value,
+    identifiers: []Value,
+    extra: []u32,
+};
+
+const Handler = *const fn (ctx: *HandlerContext, inst: Inst) Error!void;
+
 const handlers = blk: {
     var table: [@typeInfo(Inst.Op).@"enum".fields.len]Handler = undefined;
     table[@intFromEnum(Inst.Op.load_const)] = handleLoadConst;
@@ -167,6 +167,16 @@ const handlers = blk: {
     table[@intFromEnum(Inst.Op.store_global_by_name)] = handleStoreGlobalByName;
     table[@intFromEnum(Inst.Op.load_global_by_name)] = handleLoadGlobalByName;
     table[@intFromEnum(Inst.Op.mov)] = handleMov;
+
+    table[@intFromEnum(Inst.Op.negate)] = handleNegate;
+    table[@intFromEnum(Inst.Op.not)] = handleNot;
+    table[@intFromEnum(Inst.Op.un_plus)] = handleUnPlus;
+
+    table[@intFromEnum(Inst.Op.add)] = handleAdd;
+    table[@intFromEnum(Inst.Op.sub)] = handleSub;
+    table[@intFromEnum(Inst.Op.mul)] = handleMul;
+    table[@intFromEnum(Inst.Op.div)] = handleDiv;
+    table[@intFromEnum(Inst.Op.mod)] = handleModulus;
 
     break :blk table;
 };
@@ -246,9 +256,226 @@ fn handleMov(ctx: *HandlerContext, inst: Inst) Error!void {
     ctx.registers[inst.data.bin.rhs] = ctx.registers[inst.data.bin.lhs];
 }
 
+fn handleNegate(ctx: *HandlerContext, inst: Inst) Error!void {
+    const value = ctx.registers[inst.data.bin.lhs];
+    if (value.isNumeric()) {
+        ctx.registers[inst.data.bin.rhs] = Value.number(-value.asNumber());
+        return;
+    }
+    _ = try ctx.vm.raiseTypeError("invalid operand type for unary operator ('-') : '{s}'", .{value.getTypeString()});
+}
+
+fn handleNot(ctx: *HandlerContext, inst: Inst) Error!void {
+    const value = ctx.registers[inst.data.bin.lhs];
+    ctx.registers[inst.data.bin.rhs] = Value.bool(!value.isTruthy());
+}
+
+fn handleUnPlus(_: *HandlerContext, _: Inst) Error!void {
+    //TODO: implement
+}
+
+fn handleAdd(ctx: *HandlerContext, inst: Inst) Error!void {
+    const lhs = ctx.registers[inst.data.tri.op1];
+    const rhs = ctx.registers[inst.data.tri.op2];
+
+    if (lhs.isNumeric() and rhs.isNumeric()) {
+        ctx.registers[inst.data.tri.dst] = Value.number(lhs.asNumber() + rhs.asNumber());
+        return;
+    }
+
+    if (lhs.isString() and rhs.isString()) {
+        const a = lhs.toObject().toString();
+        const b = rhs.toObject().toString();
+        ctx.registers[inst.data.tri.dst] = Value.object(try a.concat(ctx.vm.gc, b));
+        return;
+    }
+
+    if (lhs.isString() or rhs.isString()) {
+        const self_str = if (lhs.isString())
+            lhs.toObject().toString()
+        else
+            rhs.toObject().toString();
+
+        const other_value = if (lhs.isString()) rhs else lhs;
+
+        var other_str: *String = undefined;
+        if (other_value.isObject()) {
+            const s = try ctx.vm.invokeSpecialMethod(other_value, ctx.vm.interpreter.common_names.__str__, &[_]Value{});
+            if (s.isString()) {
+                other_str = s.toObject().toString();
+            }
+            _ = try ctx.vm.raiseTypeError("__str__ method returned non-string value", .{});
+        } else {
+            other_str = (try String.new(ctx.vm.gc, other_value.toString())).asString().?;
+        }
+        ctx.registers[inst.data.tri.dst] = Value.object(try self_str.concat(ctx.vm.gc, other_str));
+        return;
+    }
+
+    if (lhs.isObject()) {
+        const class = lhs.toObject().class;
+        if (class.getField(ctx.vm.interpreter.common_names.__add__)) |method| {
+            if (method.asObject()) |obj| {
+                ctx.registers[inst.data.tri.dst] = try obj.callAssumeCallable(ctx.vm, lhs.toObject(), &[_]Value{rhs});
+                return;
+            }
+        }
+    }
+
+    if (rhs.isObject()) {
+        const class = rhs.toObject().class;
+        if (class.getField(ctx.vm.interpreter.common_names.__radd__)) |method| {
+            if (method.asObject()) |obj| {
+                ctx.registers[inst.data.tri.dst] = try obj.callAssumeCallable(ctx.vm, rhs.toObject(), &[_]Value{lhs});
+                return;
+            }
+        }
+    }
+
+    _ = try ctx.vm.raiseTypeException("+", lhs, rhs);
+}
+
+fn handleSub(ctx: *HandlerContext, inst: Inst) Error!void {
+    const lhs = ctx.registers[inst.data.tri.op1];
+    const rhs = ctx.registers[inst.data.tri.op2];
+
+    if (lhs.isNumeric() and rhs.isNumeric()) {
+        ctx.registers[inst.data.tri.dst] = Value.number(lhs.asNumber() - rhs.asNumber());
+        return;
+    }
+
+    if (lhs.isObject()) {
+        const class = lhs.toObject().class;
+        if (class.getField(ctx.vm.interpreter.common_names.__sub__)) |method| {
+            if (method.asObject()) |obj| {
+                ctx.registers[inst.data.tri.dst] = try obj.callAssumeCallable(ctx.vm, lhs.toObject(), &[_]Value{rhs});
+                return;
+            }
+        }
+    }
+
+    if (rhs.isObject()) {
+        const class = rhs.toObject().class;
+        if (class.getField(ctx.vm.interpreter.common_names.__rsub__)) |method| {
+            if (method.asObject()) |obj| {
+                ctx.registers[inst.data.tri.dst] = try obj.callAssumeCallable(ctx.vm, rhs.toObject(), &[_]Value{lhs});
+                return;
+            }
+        }
+    }
+
+    _ = try ctx.vm.raiseTypeException("-", lhs, rhs);
+}
+
+fn handleMul(ctx: *HandlerContext, inst: Inst) Error!void {
+    const lhs = ctx.registers[inst.data.tri.op1];
+    const rhs = ctx.registers[inst.data.tri.op2];
+
+    if (lhs.isNumeric() and rhs.isNumeric()) {
+        ctx.registers[inst.data.tri.dst] = Value.number(lhs.asNumber() * rhs.asNumber());
+        return;
+    }
+
+    if (lhs.isObject()) {
+        const class = lhs.toObject().class;
+        if (class.getField(ctx.vm.interpreter.common_names.__mul__)) |method| {
+            if (method.asObject()) |obj| {
+                ctx.registers[inst.data.tri.dst] = try obj.callAssumeCallable(ctx.vm, lhs.toObject(), &[_]Value{rhs});
+                return;
+            }
+        }
+    }
+
+    if (rhs.isObject()) {
+        const class = rhs.toObject().class;
+        if (class.getField(ctx.vm.interpreter.common_names.__rmul__)) |method| {
+            if (method.asObject()) |obj| {
+                ctx.registers[inst.data.tri.dst] = try obj.callAssumeCallable(ctx.vm, rhs.toObject(), &[_]Value{lhs});
+                return;
+            }
+        }
+    }
+
+    _ = try ctx.vm.raiseTypeException("*", lhs, rhs);
+}
+
+fn handleDiv(ctx: *HandlerContext, inst: Inst) Error!void {
+    const lhs = ctx.registers[inst.data.tri.op1];
+    const rhs = ctx.registers[inst.data.tri.op2];
+
+    if (lhs.isNumeric() and rhs.isNumeric()) {
+        const lvalue = lhs.asNumber();
+        const rvalue = rhs.asNumber();
+        if (rvalue == 0.0) {
+            _ = try ctx.vm.raiseZeroDivisionError("division by zero");
+        }
+        ctx.registers[inst.data.tri.dst] = Value.number(@divFloor(lvalue, rvalue));
+        return;
+    }
+
+    if (lhs.isObject()) {
+        const class = lhs.toObject().class;
+        if (class.getField(ctx.vm.interpreter.common_names.__div__)) |method| {
+            if (method.asObject()) |obj| {
+                ctx.registers[inst.data.tri.dst] = try obj.callAssumeCallable(ctx.vm, lhs.toObject(), &[_]Value{rhs});
+                return;
+            }
+        }
+    }
+
+    if (rhs.isObject()) {
+        const class = rhs.toObject().class;
+        if (class.getField(ctx.vm.interpreter.common_names.__rdiv__)) |method| {
+            if (method.asObject()) |obj| {
+                ctx.registers[inst.data.tri.dst] = try obj.callAssumeCallable(ctx.vm, rhs.toObject(), &[_]Value{lhs});
+                return;
+            }
+        }
+    }
+
+    _ = try ctx.vm.raiseTypeException("/", lhs, rhs);
+}
+
+fn handleModulus(ctx: *HandlerContext, inst: Inst) Error!void {
+    const lhs = ctx.registers[inst.data.tri.op1];
+    const rhs = ctx.registers[inst.data.tri.op2];
+
+    if (lhs.isNumeric() and rhs.isNumeric()) {
+        const lvalue = lhs.asNumber();
+        const rvalue = rhs.asNumber();
+        if (rvalue == 0.0) {
+            _ = try ctx.vm.raiseZeroDivisionError("modulo by zero");
+        }
+        ctx.registers[inst.data.tri.dst] = Value.number(@mod(lvalue, rvalue));
+        return;
+    }
+
+    if (lhs.isObject()) {
+        const class = lhs.toObject().class;
+        if (class.getField(ctx.vm.interpreter.common_names.__mod__)) |method| {
+            if (method.asObject()) |obj| {
+                ctx.registers[inst.data.tri.dst] = try obj.callAssumeCallable(ctx.vm, lhs.toObject(), &[_]Value{rhs});
+                return;
+            }
+        }
+    }
+
+    if (rhs.isObject()) {
+        const class = rhs.toObject().class;
+        if (class.getField(ctx.vm.interpreter.common_names.__rmod__)) |method| {
+            if (method.asObject()) |obj| {
+                ctx.registers[inst.data.tri.dst] = try obj.callAssumeCallable(ctx.vm, rhs.toObject(), &[_]Value{lhs});
+                return;
+            }
+        }
+    }
+
+    _ = try ctx.vm.raiseTypeException("%", lhs, rhs);
+}
+
 // pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 //     var record = r;
-//     var registers = record.registers;
+//     var ctx.registers = record.registers;
 //     var globals = vm.getGlobalSlots();
 //     var instructions = record.executable.instructions;
 //     var identifiers = record.executable.identifiers;
@@ -292,204 +519,12 @@ fn handleMov(ctx: *HandlerContext, inst: Inst) Error!void {
 //         instruction = instructions[record.ip];
 //         const data = instruction.data;
 //         record.ip += 1;
-//         switch (instruction.op) {
-//             .load_const => {
-//                 registers[data.bin.rhs] = constants[data.bin.lhs];
-//                 continue :start;
-//             },
-//             .load_ident => {
-//                 registers[data.bin.rhs] = identifiers[data.bin.lhs];
-//                 continue :start;
-//             },
-//             .load_true => {
-//                 registers[data.un] = Value.True;
-//                 continue :start;
-//             },
-//             .load_false => {
-//                 registers[data.un] = Value.False;
-//                 continue :start;
-//             },
-//             .load_none => {
-//                 registers[data.un] = Value.None;
-//                 continue :start;
-//             },
-//             .load_undefined => {
-//                 registers[data.un] = Value.Undefined;
-//                 continue :start;
-//             },
-//             .store_global_by_index => {
-//                 globals.fast_slots[data.bin.rhs] = registers[data.bin.lhs];
-//                 continue :start;
-//             },
-//             .load_global_by_index => {
-//                 registers[data.bin.rhs] = globals.fast_slots[data.bin.lhs];
-//                 continue :start;
-//             },
-//             .load_global_by_name => {
-//                 const name: *String = identifiers[data.bin.lhs].toObject().as(String);
-//                 if (vm.interpreter.builtins.getField(name)) |field| {
-//                     registers[data.bin.rhs] = field;
-//                     continue :start;
-//                 }
-//                 return vm.raiseReferenceError("undeclared identifier '{s}'", .{name.asSlice()});
-//             },
-//             .store_global_by_name => {
-//                 continue :start;
-//             },
-//             .mov => {
-//                 registers[data.bin.rhs] = registers[data.bin.lhs];
-//                 continue :start;
-//             },
-//             .negate => {
-//                 const value = registers[data.bin.lhs];
-//                 if (value.isNumeric()) {
-//                     registers[data.bin.rhs] = Value.number(-value.asNumber());
-//                     continue :start;
-//                 }
-//                 return vm.raiseTypeError("invalid operand type for unary operator ('-') : '{s}'", .{value.getTypeString()});
-//             },
-//             .not => {
-//                 const value = registers[data.bin.lhs];
-//                 registers[data.bin.rhs] = Value.bool(!value.isTruthy());
-//                 continue :start;
-//             },
-//             .un_plus => {
-//                 //TODO: should implement.
-//                 continue :start;
-//             },
-//             .add => {
-//                 const lhs = registers[data.tri.op1];
-//                 const rhs = registers[data.tri.op2];
-
-//                 if (lhs.isNumeric() and rhs.isNumeric()) {
-//                     registers[data.tri.dst] = Value.number(lhs.asNumber() + rhs.asNumber());
-//                     continue :start;
-//                 }
-
-//                 if (lhs.isString() and rhs.isString()) {
-//                     const a = lhs.toObject().toString();
-//                     const b = rhs.toObject().toString();
-//                     registers[data.tri.dst] = Value.object(try a.concat(vm.gc, b));
-//                     continue :start;
-//                 }
-
-//                 if (lhs.isString() or rhs.isString()) {
-//                     const self_str = if (lhs.isString())
-//                         lhs.toObject().toString()
-//                     else
-//                         rhs.toObject().toString();
-
-//                     const other_value = if (lhs.isString()) rhs else lhs;
-
-//                     var other_str: *String = undefined;
-//                     if (other_value.isObject()) {
-//                         const s = try vm.invokeSpecialMethod(other_value, vm.interpreter.common_names.__str__, &[_]Value{});
-//                         if (s.isString()) {
-//                             other_str = s.toObject().toString();
-//                         }
-//                         _ = try vm.raiseTypeError("__str__ method returned non-string value", .{});
-//                     } else {
-//                         other_str = (try String.new(vm.gc, other_value.toString())).asString().?;
-//                     }
-//                     registers[data.tri.dst] = Value.object(try self_str.concat(vm.gc, other_str));
-//                     continue :start;
-//                 }
-
-//                 if (lhs.isObject()) {
-//                     const class = lhs.toObject().class;
-//                     if (class.getField(vm.interpreter.common_names.__add__)) |method| {
-//                         if (method.asObject()) |obj| {
-//                             registers[data.tri.dst] = try obj.callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
-//                         }
-//                         continue :start;
-//                     }
-//                 }
-
-//                 if (rhs.isObject()) {
-//                     const class = rhs.toObject().class;
-//                     if (class.getField(vm.interpreter.common_names.__radd__)) |method| {
-//                         if (method.asObject()) |obj| {
-//                             registers[data.tri.dst] = try obj.callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
-//                         }
-//                         continue :start;
-//                     }
-//                 }
-
-//                 return vm.raiseTypeException("+", lhs, rhs);
-//             },
-//             .sub => {
-//                 const lhs = registers[data.tri.op1];
-//                 const rhs = registers[data.tri.op2];
-
-//                 if (lhs.isNumeric() and rhs.isNumeric()) {
-//                     registers[data.tri.dst] = Value.number(lhs.asNumber() - rhs.asNumber());
-//                     continue :start;
-//                 }
-
-//                 if (lhs.isObject()) {
-//                     const class = lhs.toObject().class;
-//                     if (class.getField(vm.interpreter.common_names.__sub__)) |method| {
-//                         if (method.asObject()) |obj| {
-//                             registers[data.tri.dst] = try obj.callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
-//                         }
-//                         continue :start;
-//                     }
-//                 }
-
-//                 if (rhs.isObject()) {
-//                     const class = rhs.toObject().class;
-//                     if (class.getField(vm.interpreter.common_names.__rsub__)) |method| {
-//                         if (method.asObject()) |obj| {
-//                             registers[data.tri.dst] = try obj.callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
-//                         }
-//                         continue :start;
-//                     }
-//                 }
-
-//                 return vm.raiseTypeException("-", lhs, rhs);
-//             },
-//             .mul => {
-//                 const lhs = registers[data.tri.op1];
-//                 const rhs = registers[data.tri.op2];
-
-//                 if (lhs.isNumeric() and rhs.isNumeric()) {
-//                     registers[data.tri.dst] = Value.number(lhs.asNumber() * rhs.asNumber());
-//                     continue :start;
-//                 }
-
-//                 if (lhs.isObject()) {
-//                     const class = lhs.toObject().class;
-//                     if (class.getField(vm.interpreter.common_names.__mul__)) |method| {
-//                         if (method.asObject()) |obj| {
-//                             registers[data.tri.dst] = try obj.callAssumeCallable(vm, lhs.toObject(), &[_]Value{rhs});
-//                         }
-//                         continue :start;
-//                     }
-//                 }
-
-//                 if (rhs.isObject()) {
-//                     const class = rhs.toObject().class;
-//                     if (class.getField(vm.interpreter.common_names.__rmul__)) |method| {
-//                         if (method.asObject()) |obj| {
-//                             registers[data.tri.dst] = try obj.callAssumeCallable(vm, rhs.toObject(), &[_]Value{lhs});
-//                         }
-//                         continue :start;
-//                     }
-//                 }
-
-//                 return vm.raiseTypeException("*", lhs, rhs);
-//             },
 //             .div => {
 //                 const lhs = registers[data.tri.op1];
 //                 const rhs = registers[data.tri.op2];
 
 //                 if (lhs.isNumeric() and rhs.isNumeric()) {
-//                     const lvalue = lhs.asNumber();
-//                     const rvalue = rhs.asNumber();
-//                     if (rvalue == 0.0) {
-//                         return vm.raiseZeroDivisionError("division by zero");
-//                     }
-//                     registers[data.tri.dst] = Value.number(@divFloor(lvalue, rvalue));
+
 //                     continue :start;
 //                 }
 
