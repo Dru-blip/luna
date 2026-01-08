@@ -154,6 +154,7 @@ fn parseStmt(p: *Parser) ParserError!*Node {
         .keyword_foreach => return p.parseForEachStmt(),
         .keyword_class => return p.parseClassDecl(),
         .keyword_guard => return p.parseGuardStmt(),
+        .keyword_raise => return p.parseRaiseStmt(),
         else => {
             const expr = try p.parseExpr(0);
             return p.ast.makeExprStmt(expr);
@@ -325,6 +326,12 @@ fn parseBlockStmt(p: *Parser) ParserError!*Node {
 
     const r_brace = try p.expectToken(.r_brace);
     return p.ast.makeBlockStmt(l_brace.loc.merge(&r_brace.loc), try list.toOwnedSlice(p.ast.arena.allocator()));
+}
+
+fn parseRaiseStmt(p: *Parser) ParserError!*Node {
+    const token = try p.expectToken(.keyword_raise);
+    const expr = try p.parseExpr(0);
+    return p.ast.makeRaiseStmt(token.loc.merge(&expr.loc), expr);
 }
 
 fn parseReturnStmt(p: *Parser) ParserError!*Node {

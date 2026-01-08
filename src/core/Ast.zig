@@ -27,6 +27,7 @@ pub const Node = struct {
         function_decl,
         class_decl,
         guard_stmt,
+        raise_stmt,
 
         add,
         sub,
@@ -430,5 +431,11 @@ pub fn makeGuardStmt(
             .ensure = ensure,
         },
     };
+    return node;
+}
+
+pub fn makeRaiseStmt(ast: *Ast, loc: Token.Loc, expr: *Node) !*Node {
+    var node = try makeNode(ast, .raise_stmt, loc);
+    node.data = .{ .opt = expr };
     return node;
 }

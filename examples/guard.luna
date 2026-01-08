@@ -1,12 +1,9 @@
 guard {
+    raise Exception("Guard failed")
 }
-rescue FileNotFoundError => e {
-}
-rescue ParseError {
-}
-rescue Error {
-}
-else {
+rescue Exception {
+    print("from rescue block")
 }
 ensure {
+    print("from ensure block")
 }

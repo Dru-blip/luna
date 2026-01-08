@@ -882,6 +882,7 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
                     } else {
                         registers[data.call.ret] = Value.object(try class.newInstance(vm.gc));
                     }
+
                     if (class.getField(vm.interpreter.common_names.__init__)) |constructor| {
                         _ = try constructor.toObject().callAssumeCallable(vm, registers[data.call.ret].toObject(), args[0..data.call.argc]);
                     }
@@ -949,7 +950,6 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
             },
         }
     }
-
     return Value.None;
 }
 

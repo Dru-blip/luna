@@ -56,4 +56,4 @@ class Pair {
 
 let a = List()
 a.append(1)
-print(a[0])
+print(a[5])

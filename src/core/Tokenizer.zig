@@ -91,6 +91,7 @@ pub const Token = struct {
         keyword_guard,
         keyword_rescue,
         keyword_ensure,
+        keyword_raise,
 
         eof,
     };
@@ -118,6 +119,7 @@ pub const Token = struct {
         .{ "guard", .keyword_guard },
         .{ "rescue", .keyword_rescue },
         .{ "ensure", .keyword_ensure },
+        .{ "raise", .keyword_raise },
     });
 
     pub fn getKeyword(bytes: []const u8) ?Tag {
