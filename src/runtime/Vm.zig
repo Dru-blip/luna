@@ -153,6 +153,38 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
     var instruction: Inst = undefined;
 
     start: while (true) {
+        errdefer {
+            if (vm.interpreter.exception) |exception| {
+                @branchHint(.cold);
+                if (record.executable.findExceptionHandlerBlockForOffset(@intCast(record.ip - 1))) |handler_block| {
+                    for (handler_block.rescues) |resuce_block| {
+                        const exception_class = switch (resuce_block.exeception_class_loc) {
+                            0 => registers[resuce_block.exception_type],
+                            1 => globals.fast_slots[resuce_block.exception_type],
+                            2 => blk: {
+                                const exception_class_name = identifiers[resuce_block.exception_type].toObject().toString();
+                                if (vm.interpreter.builtins.getField(exception_class_name)) |field| {
+                                    break :blk field;
+                                }
+                                break :blk Value.None;
+                                //TODO: should attach the occured exception to current exception , that we are currently handling.
+                                // because we cannot propagate error through errdefer.
+                                // break :blk vm.raiseReferenceError("undeclared identifier '{s}'", .{exception_class_name.asSlice()});
+                            },
+                            else => unreachable,
+                        };
+
+                        if (exception_class.asClass()) |class| {
+                            if (Object.from(exception).isInstanceOf(class)) {
+                                record.ip = resuce_block.handler_offset;
+                            }
+                        }
+                        //TODO: throw exception if the exception_class is not a class.
+                    }
+                }
+            }
+        }
+
         instruction = instructions[record.ip];
         const data = instruction.data;
         record.ip += 1;

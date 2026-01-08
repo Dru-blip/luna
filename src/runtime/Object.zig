@@ -125,3 +125,12 @@ pub fn callAssumeCallable(
 
     return vm.raiseTypeError("{s} object is not callable", .{self.getClassName()});
 }
+
+pub fn isInstanceOf(self: *Object, class: *Class) bool {
+    var curr_class: ?*Class = self.class;
+    while (curr_class) |curr| {
+        if (curr == class) return true;
+        curr_class = curr.super_class;
+    }
+    return false;
+}

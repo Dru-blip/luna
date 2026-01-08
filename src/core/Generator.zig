@@ -359,11 +359,22 @@ fn genGuardStmt(g: *Generator, node: *const Ast.Node) !void {
 
     g.switchBasicBlock(guard_block);
     try g.genBlockStmt(node.data.guard_stmt.body);
-    exeception_handler.end_offset = @intCast(guard_block.instructions.items.len);
+    exeception_handler.end_offset = @intCast(guard_block.instructions.items.len + 1);
 
     for (node.data.guard_stmt.handlers) |handler| {
         const handler_block = try g.makeBasicBlock();
-        const execetion_type = try g.addIdentifier(handler.class);
+
+        var exception_class_var: Variable = undefined;
+        var execetion_type = try g.addIdentifier(handler.class);
+        var class_loc: u32 = 0;
+
+        if (g.findVariable(handler.class, &exception_class_var)) {
+            execetion_type = exception_class_var.allocated_reg_slot;
+            class_loc = if (exception_class_var.scope == .global) 1 else 0;
+        } else {
+            class_loc = 2;
+        }
+
         var exeception_reg: ?u32 = null;
 
         var exeception_variable: Variable = undefined;
@@ -376,7 +387,9 @@ fn genGuardStmt(g: *Generator, node: *const Ast.Node) !void {
             .exception_type = execetion_type,
             .handler_offset = handler_block.id,
             .exception_register = exeception_reg,
+            .exeception_class_loc = class_loc,
         };
+
         try rescue_handlers.append(g.gpa, rescue_handler);
         try g.addUn(.jmp, handler_block.id, handler.block.loc);
         g.switchBasicBlock(handler_block);
@@ -1124,6 +1137,15 @@ fn linearizeBasicBlocks(g: *Generator, executable: *Executable) !void {
             else => continue,
         }
     }
+
+    for (g.exception_handlers.items) |*handler_block| {
+        handler_block.start_offset = block_start_offsets.items[handler_block.start_offset];
+        handler_block.end_offset = handler_block.start_offset + handler_block.end_offset;
+        for (handler_block.rescues) |*handler| {
+            handler.handler_offset = block_start_offsets.items[handler.handler_offset];
+        }
+    }
+
     executable.instructions = try instructions.toOwnedSlice(g.gpa);
     executable.spans = try spans.toOwnedSlice(g.gpa);
     executable.extra = try g.extra.toOwnedSlice(g.gpa);

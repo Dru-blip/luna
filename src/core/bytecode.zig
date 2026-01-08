@@ -115,6 +115,7 @@ pub const RescueHandler = struct {
     exception_type: u32,
     handler_offset: u32,
     exception_register: ?u32 = null,
+    exeception_class_loc: u32 = 0,
 };
 
 pub const ExceptionHandlerBlock = struct {
@@ -142,6 +143,15 @@ pub const Executable = struct {
         const obj = try gc.alloc(Executable);
         obj.class = gc.interpreter.base_class;
         return obj.as(Executable);
+    }
+
+    pub fn findExceptionHandlerBlockForOffset(executable: *Executable, ip: u32) ?ExceptionHandlerBlock {
+        for (executable.exception_handlers) |handler| {
+            if (handler.start_offset <= ip and ip < handler.end_offset) {
+                return handler;
+            }
+        }
+        return null;
     }
 
     pub const gc_hooks = Object.GcHooks{
