@@ -26,12 +26,14 @@ fn constructor(vm: *Vm, _: *Object, _: []const Value) !Value {
 pub fn registerMethods(gc: *Gc, dc: *Class) !void {
     try dc.defineNativeMethod(gc, "set", set, 2, false);
     try dc.defineNativeMethod(gc, "get", get, 1, false);
-    try dc.defineNativeMethod(gc, "remove", remove, 1, false);
-    try dc.defineNativeMethod(gc, "contains", contains, 1, false);
+    try dc.defineNativeMethod(gc, "pop", pop, 2, true);
     try dc.defineNativeMethod(gc, "clear", clear, 0, false);
     try dc.defineNativeMethod(gc, "keys", keys, 0, false);
     try dc.defineNativeMethod(gc, "values", values, 0, false);
+    try dc.defineNativeMethod(gc, "update", update, 1, false);
+    try dc.defineNativeMethod(gc, "setdefault", setdefault, 2, true);
 
+    try dc.defineNativeMethod(gc, "__contains__", contains, 1, false);
     try dc.defineNativeMethod(gc, "__constructor__", constructor, 8, true);
     try dc.defineNativeMethod(gc, "__getattr__", getattr, 1, false);
     try dc.defineNativeMethod(gc, "__setattr__", setattr, 2, false);
@@ -55,11 +57,49 @@ fn get(vm: *Vm, self: *Object, args: []const Value) !Value {
     return try dict.get(vm, key) orelse Value.None;
 }
 
-fn remove(vm: *Vm, self: *Object, args: []const Value) !Value {
+fn pop(vm: *Vm, self: *Object, args: []const Value) !Value {
     const dict: *Dict = self.as(Dict);
     const key = args[0];
-    //TODO: should raise key error,if not found.
-    return try dict.remove(vm, key) orelse Value.None;
+
+    return try dict.remove(vm, key) orelse {
+        if (args.len > 1) {
+            return args[1];
+        }
+        //TODO: should raise key error not attribute error.
+        return vm.raiseAttributeError("key not found ", .{});
+    };
+}
+
+fn update(vm: *Vm, self: *Object, args: []const Value) !Value {
+    const dict: *Dict = self.as(Dict);
+    const other = args[0];
+
+    if (other.asObject()) |obj| {
+        //TODO: check if other is dict
+        const other_dict = obj.as(Dict);
+        var iterator = other_dict.map.iterator();
+        while (iterator.next()) |entry| {
+            try dict.set(vm, entry.key, entry.value);
+        }
+        return Value.None;
+    }
+
+    return vm.raiseTypeError("update() requires a dict", .{});
+}
+
+fn setdefault(vm: *Vm, self: *Object, args: []const Value) !Value {
+    const dict: *Dict = self.as(Dict);
+    const key = args[0];
+    const default = if (args.len > 1) args[1] else Value.None;
+
+    //Info: requires two hash calls.(should optimize)
+    // One here
+    if (try dict.get(vm, key)) |value| {
+        return value;
+    }
+    // Two here
+    try dict.set(vm, key, default);
+    return default;
 }
 
 fn contains(vm: *Vm, self: *Object, args: []const Value) !Value {

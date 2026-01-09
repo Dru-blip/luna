@@ -58,6 +58,4 @@ class order:Dict{}
 let a=order()
 a.a=4
 
-foreach key in a.keys(){
-    print(key)
-}
+a.pop("b")
