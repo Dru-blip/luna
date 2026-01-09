@@ -198,6 +198,11 @@ const handlers = blk: {
     table[@intFromEnum(Inst.Op.build_dict)] = handleBuildDict;
     table[@intFromEnum(Inst.Op.add_dict_entry)] = handleAddDictEntry;
 
+    table[@intFromEnum(Inst.Op.build_function)] = handleBuildFunction;
+    table[@intFromEnum(Inst.Op.build_class)] = handleBuildClass;
+    table[@intFromEnum(Inst.Op.set_super_class)] = handleSetSuperClass;
+    table[@intFromEnum(Inst.Op.add_class_method)] = handleAddClassMethod;
+
     break :blk table;
 };
 
@@ -845,6 +850,42 @@ fn handleAddDictEntry(ctx: *HandlerContext, inst: Inst) Error!void {
     try dict.set(ctx.vm, key, value);
 }
 
+fn handleBuildFunction(ctx: *HandlerContext, inst: Inst) Error!void {
+    const func_obj = try Function.withExecutable(ctx.vm.gc, ctx.constants[inst.data.bin.lhs].toObject().as(Executable));
+    const function: *Function = func_obj.as(Function);
+    function.module_env = ctx.vm.interpreter.getRunningModule();
+    ctx.registers[inst.data.bin.rhs] = Value.object(func_obj);
+}
+
+fn handleBuildClass(ctx: *HandlerContext, inst: Inst) Error!void {
+    const class_name = ctx.identifiers[inst.data.bin.lhs];
+    const class = try Class.new(ctx.vm.gc);
+    class.super_class = ctx.vm.interpreter.base_class;
+    class.name = class_name.toObject().toString();
+    Object.from(class).class = ctx.vm.interpreter.base_class;
+    ctx.registers[inst.data.bin.rhs] = Value.object(Object.from(class));
+}
+
+fn handleSetSuperClass(ctx: *HandlerContext, inst: Inst) Error!void {
+    const sub_class_value = ctx.registers[inst.data.bin.rhs];
+    const super_class_value = ctx.registers[inst.data.bin.lhs];
+
+    if (super_class_value.asClass()) |super_class| {
+        const sub_class: *Class = sub_class_value.toObject().as(Class);
+        sub_class.super_class = super_class;
+        return;
+    }
+
+    _ = try ctx.vm.raiseTypeError("Expected a class", .{});
+}
+
+fn handleAddClassMethod(ctx: *HandlerContext, inst: Inst) Error!void {
+    const class: *Class = ctx.registers[inst.data.bin.rhs].toObject().as(Class);
+    const method: *Function = ctx.registers[inst.data.bin.lhs].toObject().as(Function);
+    method.home_class = class;
+    try class.addMethod(method.exe.name, ctx.registers[inst.data.bin.lhs]);
+}
+
 // pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 //     var record = r;
 //     var ctx.registers = record.registers;
@@ -892,47 +933,13 @@ fn handleAddDictEntry(ctx: *HandlerContext, inst: Inst) Error!void {
 //         const data = instruction.data;
 //         record.ip += 1;
 
-//             .build_function => {
-//                 const func_obj = try Function.withExecutable(vm.gc, constants[data.bin.lhs].toObject().as(Executable));
-//                 const function: *Function = func_obj.as(Function);
-//                 function.module_env = vm.interpreter.getRunningModule();
-//                 registers[data.bin.rhs] = Value.object(func_obj);
-//                 continue :start;
-//             },
-//             .build_class => {
-//                 const class_name = identifiers[data.bin.lhs];
-//                 const class = try Class.new(vm.gc);
-//                 class.super_class = vm.interpreter.base_class;
-//                 class.name = class_name.toObject().toString();
-//                 Object.from(class).class = vm.interpreter.base_class;
-//                 registers[data.bin.rhs] = Value.object(Object.from(class));
-//                 continue :start;
-//             },
-//             .set_super_class => {
-//                 const sub_class_value = registers[data.bin.rhs];
-//                 const super_class_value = registers[data.bin.lhs];
-
-//                 if (super_class_value.asClass()) |super_class| {
-//                     const sub_class: *Class = sub_class_value.toObject().as(Class);
-//                     sub_class.super_class = super_class;
-//                     continue :start;
-//                 }
-
-//                 return vm.raiseTypeError("Expected a class", .{});
-//             },
 //             .get_super_class => {
 //                 //ERROR: this is useless.
 //                 const super_class = record.function.?.home_class.?.super_class.?;
 //                 registers[data.un] = Value.object(Object.from(super_class));
 //                 continue :start;
 //             },
-//             .add_class_method => {
-//                 const class: *Class = registers[data.bin.rhs].toObject().as(Class);
-//                 const method: *Function = registers[data.bin.lhs].toObject().as(Function);
-//                 method.home_class = class;
-//                 try class.addMethod(method.exe.name, registers[data.bin.lhs]);
-//                 continue :start;
-//             },
+
 //             .build_trace_and_throw_exception => {
 //                 const exception: *Exception = constants[data.un].toObject().as(Exception);
 //                 try exception.buildTraceback(vm);
@@ -949,14 +956,6 @@ fn handleAddDictEntry(ctx: *HandlerContext, inst: Inst) Error!void {
 //                 const list: *List = registers[data.bin.rhs].toObject().as(List);
 //                 const item = registers[data.bin.lhs];
 //                 try list.append(item);
-//                 continue :start;
-//             },
-//             .get_iter => {
-
-//                 continue :start;
-//             },
-//             .iter_next => {
-
 //                 continue :start;
 //             },
 //             .jmp => {
