@@ -405,7 +405,8 @@ fn handleAdd(ctx: *HandlerContext, inst: Inst) Error!void {
             }
             _ = try ctx.vm.raiseTypeError("__str__ method returned non-string value", .{});
         } else {
-            other_str = (try String.new(ctx.vm.gc, other_value.toString())).asString().?;
+            var buffer: [56]u8 = undefined;
+            other_str = (try String.new(ctx.vm.gc, other_value.toString(&buffer))).asString().?;
         }
         ctx.registers[inst.data.tri.dst] = Value.object(try self_str.concat(ctx.vm.gc, other_str));
         return;

@@ -12,7 +12,7 @@ class Pair {
         return this.a == other.a and this.b == other.b
     }
 
-    fn __str__(){
+   fn __str__(){
         return "(" + this.a + ", " + this.b + ")"
     }
 }

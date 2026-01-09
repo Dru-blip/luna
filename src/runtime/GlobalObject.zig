@@ -74,16 +74,17 @@ fn print(vm: *Vm, _: *Object, args: []const Value) !Value {
                     continue;
                 }
                 const class = arg.toObject().class;
-                const str_method_value = class.getField(try vm.interpreter.string_interner.intern("__str__"));
+                const str_method_value = class.getField(vm.interpreter.common_names.__str__);
                 if (str_method_value) |str_method_object| {
-                    if (str_method_object.asObject()) |str| {
-                        const s = try str.callAssumeCallable(vm, arg.toObject(), &[_]Value{});
-                        //TODO: should check if s is not a string
-                        // if (s.type != .string) {
-                        //     throw Error("TypeError", "Expected string, got {}", .{s.type});
-                        // }
-                        std.debug.print("{s} ", .{s.toObject().asString().?.asSlice()});
-                        continue;
+                    if (str_method_object.asObject()) |str_method| {
+                        const s = try str_method.callAssumeCallable(vm, arg.toObject(), &[_]Value{});
+                        if (s.asObject()) |obj| {
+                            if (obj.asString()) |str| {
+                                std.debug.print("{s} ", .{str.asSlice()});
+                                continue;
+                            }
+                        }
+                        return vm.raiseTypeError("__str__ return a non string object", .{});
                     }
                     std.debug.print("Object", .{});
                 } else {

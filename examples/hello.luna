@@ -52,10 +52,3 @@ class Pair {
         return 2
     }
 }
-
-
-class order:Dict{}
-let a=order()
-a.a=4
-
-a.pop("b")
