@@ -65,6 +65,7 @@ pub const Inst = struct {
 
         get_iter,
         iter_next,
+        iter_check_next,
 
         build_class,
         add_class_method,
@@ -186,6 +187,9 @@ pub const Executable = struct {
         gc.gpa.free(executable.instructions);
         gc.gpa.free(executable.identifiers);
         gc.gpa.free(executable.extra);
+        for (executable.exception_handlers) |handler| {
+            gc.gpa.free(handler.rescues);
+        }
         gc.gpa.free(executable.exception_handlers);
     }
 
@@ -336,6 +340,10 @@ pub const Executable = struct {
                 ),
                 .branch => try out.print(
                     "JumpIf r{d} ? {d} : {d}",
+                    .{ inst.data.tri.op1, inst.data.tri.op2, inst.data.tri.dst },
+                ),
+                .iter_check_next => try out.print(
+                    "IterCheckNext r{d} ? {d} : {d}",
                     .{ inst.data.tri.op1, inst.data.tri.op2, inst.data.tri.dst },
                 ),
 

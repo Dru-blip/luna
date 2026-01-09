@@ -537,7 +537,7 @@ fn genForEachStmt(g: *Generator, node: *const Ast.Node) GenError!void {
     try g.addBin(.iter_next, iterator_reg, next_value_reg, node.data.foreach.iterable.loc);
     // TODO: Avoid relying on a falsy check here.
     // If the iterator returns a falsy value, the iteration stops prematurely.
-    try g.addTri(.branch, next_value_reg, body_block.id, end_block.id, node.loc);
+    try g.addTri(.iter_check_next, next_value_reg, body_block.id, end_block.id, node.loc);
 
     g.switchBasicBlock(body_block);
     try g.addBin(.mov, next_value_reg, loop_variable.allocated_reg_slot, node.loc);
@@ -1148,6 +1148,10 @@ fn linearizeBasicBlocks(g: *Generator, executable: *Executable) !void {
                 instr.data.un = block_start_offsets.items[instr.data.un];
             },
             .branch => {
+                instr.data.tri.op2 = block_start_offsets.items[instr.data.tri.op2];
+                instr.data.tri.dst = block_start_offsets.items[instr.data.tri.dst];
+            },
+            .iter_check_next => {
                 instr.data.tri.op2 = block_start_offsets.items[instr.data.tri.op2];
                 instr.data.tri.dst = block_start_offsets.items[instr.data.tri.dst];
             },

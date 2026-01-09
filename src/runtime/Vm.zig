@@ -211,6 +211,7 @@ const handlers = blk: {
 
     table[@intFromEnum(Inst.Op.jmp)] = handleJmp;
     table[@intFromEnum(Inst.Op.branch)] = handleBranch;
+    table[@intFromEnum(Inst.Op.iter_check_next)] = handleIterCheckNext;
     table[@intFromEnum(Inst.Op.build_trace_and_throw_exception)] = handleBuildTraceAndThrowException;
 
     table[@intFromEnum(Inst.Op.super_call)] = handleSuperCall;
@@ -979,6 +980,14 @@ fn handleBranch(ctx: *HandlerContext, inst: Inst) Error!void {
         ctx.record.ip = inst.data.tri.op2;
     } else {
         ctx.record.ip = inst.data.tri.dst;
+    }
+}
+
+fn handleIterCheckNext(ctx: *HandlerContext, inst: Inst) Error!void {
+    if (ctx.registers[inst.data.tri.op1].isUndefined()) {
+        ctx.record.ip = inst.data.tri.dst;
+    } else {
+        ctx.record.ip = inst.data.tri.op2;
     }
 }
 
