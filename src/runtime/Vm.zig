@@ -737,6 +737,82 @@ fn handleTestNeq(ctx: *HandlerContext, inst: Inst) Error!void {
     ctx.registers[inst.data.tri.dst] = Value.bool(!lhs.eql(rhs));
 }
 
+fn handleGetItem(ctx: *HandlerContext, inst: Inst) Error!void {
+    const target = ctx.registers[inst.data.tri.op1];
+    const index = ctx.registers[inst.data.tri.op2];
+
+    var args: [1]Value = undefined;
+    args[0] = index;
+
+    ctx.registers[inst.data.tri.dst] = try ctx.vm.invokeSpecialMethod(
+        target,
+        ctx.vm.interpreter.common_names.__getitem__,
+        &args,
+    );
+}
+
+fn handleSetItem(ctx: *HandlerContext, inst: Inst) Error!void {
+    const target = ctx.registers[inst.data.tri.op1];
+    const index = ctx.registers[inst.data.tri.op2];
+
+    var args: [2]Value = undefined;
+    args[0] = index;
+    args[1] = ctx.registers[inst.data.tri.dst];
+
+    _ = try ctx.vm.invokeSpecialMethod(
+        target,
+        ctx.vm.interpreter.common_names.__setitem__,
+        &args,
+    );
+}
+
+fn handleGetAttribute(ctx: *HandlerContext, inst: Inst) Error!void {
+    const target = ctx.registers[inst.data.tri.op1];
+    const index = ctx.registers[inst.data.tri.op2];
+
+    var args: [1]Value = undefined;
+    args[0] = index;
+
+    ctx.registers[inst.data.tri.dst] = try ctx.vm.invokeSpecialMethod(
+        target,
+        ctx.vm.interpreter.common_names.__getattr__,
+        &args,
+    );
+}
+
+fn handleSetAttribute(ctx: *HandlerContext, inst: Inst) Error!void {
+    const target = ctx.registers[inst.data.tri.op1];
+    const index = ctx.registers[inst.data.tri.op2];
+
+    var args: [2]Value = undefined;
+    args[1] = index;
+    args[0] = ctx.registers[inst.data.tri.op1];
+
+    _ = try ctx.vm.invokeSpecialMethod(
+        target,
+        ctx.vm.interpreter.common_names.__setattr__,
+        &args,
+    );
+}
+
+fn handleGetIter(ctx: *HandlerContext, inst: Inst) Error!void {
+    const iterable_value = ctx.registers[inst.data.bin.lhs];
+    ctx.registers[inst.data.bin.rhs] = try ctx.vm.invokeSpecialMethod(
+        iterable_value,
+        ctx.vm.interpreter.common_names.__iter__,
+        &[_]Value{},
+    );
+}
+
+fn handleIterNext(ctx: *HandlerContext, inst: Inst) Error!void {
+    const iterator_value = ctx.registers[inst.data.bin.lhs];
+    ctx.registers[inst.data.bin.rhs] = try ctx.vm.invokeSpecialMethod(
+        iterator_value,
+        ctx.vm.interpreter.common_names.__next__,
+        &[_]Value{},
+    );
+}
+
 // pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 //     var record = r;
 //     var ctx.registers = record.registers;
@@ -854,82 +930,12 @@ fn handleTestNeq(ctx: *HandlerContext, inst: Inst) Error!void {
 //                 try list.append(item);
 //                 continue :start;
 //             },
-//             .get_item => {
-//                 const target = registers[data.tri.op1];
-//                 const index = registers[data.tri.op2];
-
-//                 var args: [1]Value = undefined;
-//                 args[0] = index;
-
-//                 registers[data.tri.dst] = try vm.invokeSpecialMethod(
-//                     target,
-//                     vm.interpreter.common_names.__getitem__,
-//                     &args,
-//                 );
-//                 continue :start;
-//             },
-//             .set_item => {
-//                 const target = registers[data.tri.op1];
-//                 const index = registers[data.tri.op2];
-
-//                 var args: [2]Value = undefined;
-//                 args[0] = index;
-//                 args[1] = registers[data.tri.dst];
-
-//                 _ = try vm.invokeSpecialMethod(
-//                     target,
-//                     vm.interpreter.common_names.__setitem__,
-//                     &args,
-//                 );
-
-//                 continue :start;
-//             },
-//             .get_attribute => {
-//                 const target = registers[data.tri.op1];
-//                 const index = constants[data.tri.op2];
-
-//                 var args: [1]Value = undefined;
-//                 args[0] = index;
-
-//                 registers[data.tri.dst] = try vm.invokeSpecialMethod(
-//                     target,
-//                     vm.interpreter.common_names.__getattr__,
-//                     &args,
-//                 );
-//                 continue :start;
-//             },
-//             .set_attribute => {
-//                 const target = registers[data.tri.dst];
-//                 const index = registers[data.tri.op2];
-
-//                 var args: [2]Value = undefined;
-//                 args[1] = index;
-//                 args[0] = registers[data.tri.op1];
-
-//                 _ = try vm.invokeSpecialMethod(
-//                     target,
-//                     vm.interpreter.common_names.__setattr__,
-//                     &args,
-//                 );
-
-//                 continue :start;
-//             },
 //             .get_iter => {
-//                 const iterable_value = registers[data.bin.lhs];
-//                 registers[data.bin.rhs] = try vm.invokeSpecialMethod(
-//                     iterable_value,
-//                     vm.interpreter.common_names.__iter__,
-//                     &[_]Value{},
-//                 );
+
 //                 continue :start;
 //             },
 //             .iter_next => {
-//                 const iterator_value = registers[data.bin.lhs];
-//                 registers[data.bin.rhs] = try vm.invokeSpecialMethod(
-//                     iterator_value,
-//                     vm.interpreter.common_names.__next__,
-//                     &[_]Value{},
-//                 );
+
 //                 continue :start;
 //             },
 //             .jmp => {
