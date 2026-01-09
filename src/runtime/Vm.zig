@@ -900,6 +900,25 @@ fn handleAppendListItem(ctx: *HandlerContext, inst: Inst) Error!void {
     try list.append(item);
 }
 
+fn handleJmp(ctx: *HandlerContext, inst: Inst) Error!void {
+    ctx.record.ip = inst.data.un;
+}
+
+fn handleBranch(ctx: *HandlerContext, inst: Inst) Error!void {
+    if (ctx.registers[inst.data.tri.op1].isTruthy()) {
+        ctx.record.ip = inst.data.tri.op2;
+    } else {
+        ctx.record.ip = inst.data.tri.dst;
+    }
+}
+
+fn handleBuildTraceAndThrowException(ctx: *HandlerContext, inst: Inst) Error!void {
+    const exception: *Exception = ctx.constants[inst.data.un].toObject().as(Exception);
+    try exception.buildTraceback(ctx.vm);
+    ctx.vm.interpreter.exception = exception;
+    return Error.ExceptionThrown;
+}
+
 // pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 //     var record = r;
 //     var ctx.registers = record.registers;
@@ -954,25 +973,6 @@ fn handleAppendListItem(ctx: *HandlerContext, inst: Inst) Error!void {
 //                 continue :start;
 //             },
 
-//             .build_trace_and_throw_exception => {
-//                 const exception: *Exception = constants[data.un].toObject().as(Exception);
-//                 try exception.buildTraceback(vm);
-//                 vm.interpreter.exception = exception;
-//                 return Error.ExceptionThrown;
-//             },
-
-//             .jmp => {
-//                 record.ip = data.un;
-//                 continue :start;
-//             },
-//             .branch => {
-//                 if (registers[data.tri.op1].isTruthy()) {
-//                     record.ip = data.tri.op2;
-//                 } else {
-//                     record.ip = data.tri.dst;
-//                 }
-//                 continue :start;
-//             },
 //             .super_call => {
 //                 const super_class = record.function.?.home_class.?.super_class.?;
 //                 const method_name = identifiers[data.super_call.method].toObject().toString();
