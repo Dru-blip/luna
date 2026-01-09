@@ -12,8 +12,8 @@ guard {
             print("caught BError at level 2")
         }
     }
-    rescue AError {
-        print("caught AError at level 2")
+    rescue AError => e {
+        print(e)
         raise BError("rethrow as BError")
     }
 }

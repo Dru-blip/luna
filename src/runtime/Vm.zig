@@ -288,6 +288,10 @@ inline fn handleException(vm: *Vm, ctx: *HandlerContext) ExceptionHandleResult {
                 if (Object.from(exception).isInstanceOf(class)) {
                     ctx.record.ip = rescue_block.handler_offset;
                     ctx.vm.interpreter.exception = null;
+
+                    if (rescue_block.exception_register) |reg| {
+                        ctx.registers[reg] = Value.object(Object.from(exception));
+                    }
                     return .Handled;
                 }
             }
