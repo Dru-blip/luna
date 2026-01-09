@@ -1,9 +1,6 @@
 guard {
-    raise Exception("Guard failed")
+    1/0
 }
 rescue Exception {
     print("from rescue block")
-}
-ensure {
-    print("from ensure block")
 }

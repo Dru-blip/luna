@@ -221,8 +221,7 @@ const handlers = blk: {
     break :blk table;
 };
 
-pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
-    _ = as_callback;
+pub fn runRecord(vm: *Vm, r: *ActivationRecord, _: bool) Error!Value {
     var ctx = HandlerContext{
         .vm = vm,
         .record = r,
@@ -235,10 +234,47 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 
     const instructions = r.executable.instructions;
 
-    while (ctx.record.ip < instructions.len) {
+    loop: while (ctx.record.ip < instructions.len) {
         const inst = instructions[ctx.record.ip];
         ctx.record.ip += 1;
-        try dispatch(&ctx, inst);
+        dispatch(&ctx, inst) catch |err| {
+            @branchHint(.cold);
+            switch (err) {
+                Error.ExceptionThrown => {
+                    const exception = vm.interpreter.exception.?;
+                    if (ctx.record.executable.findExceptionHandlerBlockForOffset(@intCast(ctx.record.ip - 1))) |handler_block| {
+                        for (handler_block.rescues) |resuce_block| {
+                            const exception_class = switch (resuce_block.exeception_class_loc) {
+                                0 => ctx.registers[resuce_block.exception_type],
+                                1 => ctx.globals.fast_slots[resuce_block.exception_type],
+                                2 => blk: {
+                                    const exception_class_name = ctx.identifiers[resuce_block.exception_type].toObject().toString();
+                                    if (vm.interpreter.builtins.getField(exception_class_name)) |field| {
+                                        break :blk field;
+                                    }
+                                    break :blk Value.None;
+                                    //TODO: should attach the occured exception to current exception , that we are currently handling.
+                                    // because we cannot propagate error through errdefer.
+                                    // break :blk vm.raiseReferenceError("undeclared identifier '{s}'", .{exception_class_name.asSlice()});
+                                },
+                                else => unreachable,
+                            };
+
+                            if (exception_class.asClass()) |class| {
+                                if (Object.from(exception).isInstanceOf(class)) {
+                                    ctx.record.ip = resuce_block.handler_offset;
+                                    continue :loop;
+                                }
+                            }
+                            //TODO: throw exception if the exception_class is not a class.
+                        }
+                        return err;
+                    }
+                    return err;
+                },
+                else => return err,
+            }
+        };
     }
 
     return ctx.return_value;

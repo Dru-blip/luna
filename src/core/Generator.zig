@@ -348,6 +348,7 @@ fn genStmt(g: *Generator, node: *const Ast.Node) GenError!void {
 
 fn genGuardStmt(g: *Generator, node: *const Ast.Node) !void {
     const guard_block = try g.makeBasicBlock();
+    const end_block = try g.makeBasicBlock();
     var exeception_handler: ExceptionHandlerBlock = .{
         .start_offset = guard_block.id,
         .end_offset = guard_block.id,
@@ -360,6 +361,17 @@ fn genGuardStmt(g: *Generator, node: *const Ast.Node) !void {
     g.switchBasicBlock(guard_block);
     try g.genBlockStmt(node.data.guard_stmt.body);
     exeception_handler.end_offset = @intCast(guard_block.instructions.items.len + 1);
+
+    var ensure_block_id: ?u32 = null;
+    if (node.data.guard_stmt.ensure) |ensure| {
+        const ensure_block = try g.makeBasicBlock();
+        ensure_block_id = ensure_block.id;
+        try g.addUn(.jmp, ensure_block.id, ensure.loc);
+        exeception_handler.ensure_offset = ensure_block.id;
+        g.switchBasicBlock(ensure_block);
+        try g.genBlockStmt(ensure);
+        try g.addUn(.jmp, end_block.id, ensure.loc);
+    }
 
     for (node.data.guard_stmt.handlers) |handler| {
         const handler_block = try g.makeBasicBlock();
@@ -383,17 +395,25 @@ fn genGuardStmt(g: *Generator, node: *const Ast.Node) !void {
             exeception_reg = exeception_variable.allocated_reg_slot;
         }
 
-        const rescue_handler: RescueHandler = .{
+        var rescue_handler: RescueHandler = .{
             .exception_type = execetion_type,
             .handler_offset = handler_block.id,
             .exception_register = exeception_reg,
             .exeception_class_loc = class_loc,
         };
 
-        try rescue_handlers.append(g.gpa, rescue_handler);
         try g.addUn(.jmp, handler_block.id, handler.block.loc);
         g.switchBasicBlock(handler_block);
         try g.genBlockStmt(handler.block);
+
+        if (ensure_block_id) |enusre_offset| {
+            rescue_handler.ensure_offset = enusre_offset;
+            try g.addUn(.jmp, enusre_offset, handler.block.loc);
+        } else {
+            try g.addUn(.jmp, end_block.id, handler.block.loc);
+        }
+
+        try rescue_handlers.append(g.gpa, rescue_handler);
     }
 
     if (node.data.guard_stmt.alternate) |alternate| {
@@ -404,16 +424,10 @@ fn genGuardStmt(g: *Generator, node: *const Ast.Node) !void {
         try g.genBlockStmt(alternate);
     }
 
-    if (node.data.guard_stmt.ensure) |ensure| {
-        const ensure_block = try g.makeBasicBlock();
-        try g.addUn(.jmp, ensure_block.id, ensure.loc);
-        exeception_handler.ensure_offset = ensure_block.id;
-        g.switchBasicBlock(ensure_block);
-        try g.genBlockStmt(ensure);
-    }
-
     exeception_handler.rescues = try rescue_handlers.toOwnedSlice(g.gpa);
     try g.exception_handlers.append(g.gpa, exeception_handler);
+
+    g.switchBasicBlock(end_block);
 }
 
 fn genClassDecl(g: *Generator, node: *const Ast.Node) !void {
@@ -1138,11 +1152,14 @@ fn linearizeBasicBlocks(g: *Generator, executable: *Executable) !void {
         }
     }
 
-    for (g.exception_handlers.items) |*handler_block| {
+    for (executable.exception_handlers) |*handler_block| {
         handler_block.start_offset = block_start_offsets.items[handler_block.start_offset];
         handler_block.end_offset = handler_block.start_offset + handler_block.end_offset;
         for (handler_block.rescues) |*handler| {
             handler.handler_offset = block_start_offsets.items[handler.handler_offset];
+            if (handler.ensure_offset) |ensure_offset| {
+                handler.ensure_offset = block_start_offsets.items[ensure_offset];
+            }
         }
     }
 

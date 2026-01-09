@@ -115,6 +115,7 @@ pub const RescueHandler = struct {
     handler_offset: u32,
     exception_register: ?u32 = null,
     exeception_class_loc: u32 = 0,
+    ensure_offset: ?u32 = null,
 };
 
 pub const ExceptionHandlerBlock = struct {

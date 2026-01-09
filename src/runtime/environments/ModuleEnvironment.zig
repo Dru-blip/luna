@@ -18,6 +18,7 @@ pub const gc_hooks: Object.GcHooks = .{
 
 pub fn new(gc: *Gc, module: *Module, global_count: u32) !*ModuleEnvironment {
     const obj = try gc.alloc(ModuleEnvironment);
+    obj.class = gc.interpreter.base_class;
     var env: *ModuleEnvironment = obj.as(ModuleEnvironment);
     env.module = module;
     env.globals = .{
