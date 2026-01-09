@@ -177,6 +177,26 @@ const handlers = blk: {
     table[@intFromEnum(Inst.Op.mul)] = handleMul;
     table[@intFromEnum(Inst.Op.div)] = handleDiv;
     table[@intFromEnum(Inst.Op.mod)] = handleModulus;
+    table[@intFromEnum(Inst.Op.test_lt)] = handleTestLt;
+    table[@intFromEnum(Inst.Op.test_gt)] = handleTestGt;
+    table[@intFromEnum(Inst.Op.test_le)] = handleTestLe;
+    table[@intFromEnum(Inst.Op.test_ge)] = handleTestGe;
+    table[@intFromEnum(Inst.Op.test_eq)] = handleTestEq;
+    table[@intFromEnum(Inst.Op.test_neq)] = handleTestNeq;
+
+    table[@intFromEnum(Inst.Op.@"and")] = handleAnd;
+    table[@intFromEnum(Inst.Op.@"or")] = handleOr;
+    table[@intFromEnum(Inst.Op.xor)] = handleXor;
+
+    table[@intFromEnum(Inst.Op.get_item)] = handleGetItem;
+    table[@intFromEnum(Inst.Op.set_item)] = handleSetItem;
+    table[@intFromEnum(Inst.Op.get_attribute)] = handleGetAttribute;
+    table[@intFromEnum(Inst.Op.set_attribute)] = handleSetAttribute;
+
+    table[@intFromEnum(Inst.Op.get_iter)] = handleGetIter;
+    table[@intFromEnum(Inst.Op.iter_next)] = handleIterNext;
+    table[@intFromEnum(Inst.Op.build_dict)] = handleBuildDict;
+    table[@intFromEnum(Inst.Op.add_dict_entry)] = handleAddDictEntry;
 
     break :blk table;
 };
@@ -508,7 +528,7 @@ fn handleTestLt(ctx: *HandlerContext, inst: Inst) Error!void {
     const rhs = ctx.registers[inst.data.tri.op2];
 
     if (lhs.isNumeric() and rhs.isNumeric()) {
-        ctx.registers[inst.data.tri.dst] = Value.number(lhs.asNumber() < rhs.asNumber());
+        ctx.registers[inst.data.tri.dst] = Value.bool(lhs.asNumber() < rhs.asNumber());
         return;
     }
 
@@ -542,12 +562,12 @@ fn handleTestLt(ctx: *HandlerContext, inst: Inst) Error!void {
     _ = try ctx.vm.raiseTypeException("<", lhs, rhs);
 }
 
-fn handleTestLE(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleTestLe(ctx: *HandlerContext, inst: Inst) Error!void {
     const lhs = ctx.registers[inst.data.tri.op1];
     const rhs = ctx.registers[inst.data.tri.op2];
 
     if (lhs.isNumeric() and rhs.isNumeric()) {
-        ctx.registers[inst.data.tri.dst] = Value.number(lhs.asNumber() <= rhs.asNumber());
+        ctx.registers[inst.data.tri.dst] = Value.bool(lhs.asNumber() <= rhs.asNumber());
         return;
     }
 
@@ -586,7 +606,7 @@ fn handleTestGt(ctx: *HandlerContext, inst: Inst) Error!void {
     const rhs = ctx.registers[inst.data.tri.op2];
 
     if (lhs.isNumeric() and rhs.isNumeric()) {
-        ctx.registers[inst.data.tri.dst] = Value.number(lhs.asNumber() > rhs.asNumber());
+        ctx.registers[inst.data.tri.dst] = Value.bool(lhs.asNumber() > rhs.asNumber());
         return;
     }
 
@@ -625,7 +645,7 @@ fn handleTestGe(ctx: *HandlerContext, inst: Inst) Error!void {
     const rhs = ctx.registers[inst.data.tri.op2];
 
     if (lhs.isNumeric() and rhs.isNumeric()) {
-        ctx.registers[inst.data.tri.dst] = Value.number(lhs.asNumber() >= rhs.asNumber());
+        ctx.registers[inst.data.tri.dst] = Value.bool(lhs.asNumber() >= rhs.asNumber());
         return;
     }
 
@@ -664,7 +684,7 @@ fn handleTestEq(ctx: *HandlerContext, inst: Inst) Error!void {
     const rhs = ctx.registers[inst.data.tri.op2];
 
     if (lhs.isNumeric() and rhs.isNumeric()) {
-        ctx.registers[inst.data.tri.dst] = Value.number(lhs.asNumber() == rhs.asNumber());
+        ctx.registers[inst.data.tri.dst] = Value.bool(lhs.asNumber() == rhs.asNumber());
         return;
     }
 
@@ -703,7 +723,7 @@ fn handleTestNeq(ctx: *HandlerContext, inst: Inst) Error!void {
     const rhs = ctx.registers[inst.data.tri.op2];
 
     if (lhs.isNumeric() and rhs.isNumeric()) {
-        ctx.registers[inst.data.tri.dst] = Value.number(lhs.asNumber() != rhs.asNumber());
+        ctx.registers[inst.data.tri.dst] = Value.bool(lhs.asNumber() != rhs.asNumber());
         return;
     }
 
@@ -813,6 +833,18 @@ fn handleIterNext(ctx: *HandlerContext, inst: Inst) Error!void {
     );
 }
 
+fn handleBuildDict(ctx: *HandlerContext, inst: Inst) Error!void {
+    const dict = try Dict.new(ctx.vm.gc);
+    ctx.registers[inst.data.un] = Value.object(dict);
+}
+
+fn handleAddDictEntry(ctx: *HandlerContext, inst: Inst) Error!void {
+    const dict: *Dict = ctx.registers[inst.data.tri.dst].toObject().as(Dict);
+    const key = ctx.registers[inst.data.tri.op1];
+    const value = ctx.registers[inst.data.tri.op2];
+    try dict.set(ctx.vm, key, value);
+}
+
 // pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 //     var record = r;
 //     var ctx.registers = record.registers;
@@ -907,18 +939,7 @@ fn handleIterNext(ctx: *HandlerContext, inst: Inst) Error!void {
 //                 vm.interpreter.exception = exception;
 //                 return Error.ExceptionThrown;
 //             },
-//             .build_dict => {
-//                 const dict = try Dict.new(vm.gc);
-//                 registers[data.un] = Value.object(dict);
-//                 continue :start;
-//             },
-//             .add_dict_entry => {
-//                 const dict: *Dict = registers[data.tri.dst].toObject().as(Dict);
-//                 const key = registers[data.tri.op1];
-//                 const value = registers[data.tri.op2];
-//                 try dict.set(vm, key, value);
-//                 continue :start;
-//             },
+
 //             .build_list => {
 //                 const list = try List.new(vm.gc);
 //                 registers[data.un] = Value.object(list);
