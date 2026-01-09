@@ -1,13 +1,18 @@
-guard {
-   let a=[1,2,4]
-   1=3
+class NotImplementedError : Exception{
+    fn __init__(msg){
+        this.a=5
+    }
 }
-rescue IndexError{
-    print("from IndexError rescue block")
+
+guard {
+   raise NotImplementedError("not implemented")
+}
+rescue NotImplementedError{
+    print("from NotImplementedError rescue block")
 }
 rescue InvalidAssignmentTargetError{
     print("from InvalidAssignmentTargetError rescue block")
 }
-rescue Exception {
-    print("from rescue block")
+ensure{
+    print("from ensure block")
 }

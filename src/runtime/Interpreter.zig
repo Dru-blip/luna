@@ -99,6 +99,7 @@ pub const Names = struct {
     __ne__: *String,
     __hash__: *String,
     __len__: *String,
+    __constructor__: *String,
 
     BaseException: *String,
     TypeError: *String,
@@ -148,6 +149,7 @@ pub const Names = struct {
             .__ne__ = try string_interner.intern("__ne__"),
             .__hash__ = try string_interner.intern("__hash__"),
             .__len__ = try string_interner.intern("__len__"),
+            .__constructor__ = try string_interner.intern("__constructor__"),
 
             .BaseException = try string_interner.intern("Exception"),
             .TypeError = try string_interner.intern("TypeError"),

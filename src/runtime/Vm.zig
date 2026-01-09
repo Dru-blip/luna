@@ -1043,7 +1043,8 @@ fn handleCall(ctx: *HandlerContext, inst: Inst) Error!void {
 
         if (class.constructor) |constructor| {
             ctx.registers[inst.data.call.ret] = try constructor(ctx.vm, this_value.toObject(), args[0..inst.data.call.argc]);
-            return;
+        } else if (class.getField(ctx.vm.interpreter.common_names.__constructor__)) |new_method| {
+            ctx.registers[inst.data.call.ret] = try new_method.toObject().callAssumeCallable(ctx.vm, Object.from(class), args[0..inst.data.call.argc]);
         } else {
             ctx.registers[inst.data.call.ret] = Value.object(try class.newInstance(ctx.vm.gc));
         }
@@ -1085,8 +1086,8 @@ fn handleRetNone(ctx: *HandlerContext, _: Inst) Error!void {
 fn handleRaiseException(ctx: *HandlerContext, inst: Inst) Error!void {
     const exception_val = ctx.registers[inst.data.un];
     if (exception_val.asObject()) |exception_object| {
-        if (exception_object.asException()) |exception| {
-            ctx.vm.interpreter.exception = exception;
+        if (exception_object.isInstanceOf(ctx.vm.interpreter.base_exception_class)) {
+            ctx.vm.interpreter.exception = exception_object.asException().?;
             return Error.ExceptionThrown;
         }
         _ = try ctx.vm.raiseTypeError("raise requires an exception object", .{});

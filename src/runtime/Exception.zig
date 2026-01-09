@@ -6,6 +6,7 @@ const ObjectSet = @import("ObjectSet.zig");
 const Gc = @import("../core/Gc.zig");
 const Vm = @import("Vm.zig");
 const Class = @import("Class.zig");
+const Value = @import("../core/Value.zig");
 
 const Exception = @This();
 
@@ -46,6 +47,7 @@ pub const TracebackFrame = struct {
 };
 
 message: *String = undefined,
+attributes: Class.FieldMap,
 traceback: std.ArrayList(TracebackFrame) = .empty,
 
 pub const gc_hooks: Object.GcHooks = .{
@@ -66,6 +68,7 @@ pub fn new(
     ex.* = .{
         .message = message,
         .traceback = .empty,
+        .attributes = Class.FieldMap.init(gc),
     };
     return ex;
 }
@@ -79,6 +82,7 @@ pub fn withMessage(vm: *Vm, exception_class: *Class, comptime fmt: []const u8, a
     const message_obj = try String.new(vm.gc, raw_msg);
     ex.* = .{
         .message = message_obj.as(String),
+        .attributes = Class.FieldMap.init(vm.gc),
     };
     try ex.buildTraceback(vm);
     return ex;
@@ -140,6 +144,22 @@ fn visit(self: *Object, live_objects: *ObjectSet) !void {
         try message.gc_hooks.visit(message, live_objects);
     }
 
+    var iter = err.attributes.iterator();
+    while (iter.next()) |attribute| {
+        const key = attribute.key_ptr.*;
+        const key_obj = Object.from(key);
+        if (!live_objects.contains(key_obj)) {
+            try key_obj.gc_hooks.visit(key_obj, live_objects);
+        }
+
+        const value = attribute.value_ptr;
+        if (value.asObject()) |obj| {
+            if (!live_objects.contains(obj)) {
+                try obj.gc_hooks.visit(obj, live_objects);
+            }
+        }
+    }
+
     for (err.traceback.items) |frame| {
         const func_name_obj = Object.from(frame.function_name);
         if (!live_objects.contains(func_name_obj)) {
@@ -172,4 +192,12 @@ fn extractSourceLine(
         end += 1;
     line_start_offset.* = start;
     line_length.* = end - start;
+}
+
+pub fn getAttribute(self: *Exception, name: *String) ?Value {
+    return self.attributes.fields.get(name);
+}
+
+pub fn setAttribute(self: *Exception, name: *String, value: Value) !void {
+    try self.attributes.fields.put(name, value);
 }
