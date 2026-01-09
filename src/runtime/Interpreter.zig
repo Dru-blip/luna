@@ -20,6 +20,9 @@ const Dict = @import("Dict.zig");
 const ModuleEnvironment = @import("environments/ModuleEnvironment.zig");
 const String = @import("String.zig");
 const GlobalObject = @import("GlobalObject.zig");
+const DictKeyIterator = @import("dict_iterator.zig").DictKeyIterator;
+const DictValueIterator = @import("dict_iterator.zig").DictValueIterator;
+const DictEntryIterator = @import("dict_iterator.zig").DictEntryIterator;
 const BaseExceptionClass = @import("BaseExceptionClass.zig");
 
 const Interpreter = @This();
@@ -44,6 +47,9 @@ list_class: *Class = undefined,
 list_iterator_class: *Class = undefined,
 string_iterator_class: *Class = undefined,
 dict_iterator_class: *Class = undefined,
+dict_key_iterator_class: *Class = undefined,
+dict_value_iterator_class: *Class = undefined,
+dict_entry_iterator_class: *Class = undefined,
 
 //Error classes.
 base_exception_class: *Class = undefined,
@@ -71,6 +77,9 @@ pub const Names = struct {
     ListIterator: *String,
     StringIterator: *String,
     DictIterator: *String,
+    DictKeyIterator: *String,
+    DictValueIterator: *String,
+    DictEntryIterator: *String,
     String: *String,
     module: *String,
     __getitem__: *String,
@@ -121,6 +130,9 @@ pub const Names = struct {
             .ListIterator = try string_interner.intern("ListIterator"),
             .StringIterator = try string_interner.intern("StringIterator"),
             .DictIterator = try string_interner.intern("DictIterator"),
+            .DictKeyIterator = try string_interner.intern("DictKeyIterator"),
+            .DictValueIterator = try string_interner.intern("DictValueIterator"),
+            .DictEntryIterator = try string_interner.intern("DictEntryIterator"),
             .String = try string_interner.intern("String"),
             .module = try string_interner.intern("<module>"),
             .__getitem__ = try string_interner.intern("__getitem__"),
@@ -183,6 +195,9 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     interpreter.list_iterator_class = try ListIterator.new(&interpreter.gc);
     interpreter.string_iterator_class = try StringIterator.new(&interpreter.gc);
     interpreter.dict_iterator_class = try DictIterator.new(&interpreter.gc);
+    interpreter.dict_entry_iterator_class = try DictEntryIterator.new(&interpreter.gc);
+    interpreter.dict_key_iterator_class = try DictKeyIterator.new(&interpreter.gc);
+    interpreter.dict_value_iterator_class = try DictValueIterator.new(&interpreter.gc);
 
     //TODO: should remove unnecessary assignments.
     Object.from(interpreter.base_class).class = interpreter.base_class;
@@ -198,6 +213,9 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     try ListIterator.registerMethods(&interpreter.gc, interpreter.list_iterator_class);
     try StringIterator.registerMethods(&interpreter.gc, interpreter.string_iterator_class);
     try DictIterator.registerMethods(&interpreter.gc, interpreter.dict_iterator_class);
+    try DictKeyIterator.registerMethods(&interpreter.gc, interpreter.dict_key_iterator_class);
+    try DictValueIterator.registerMethods(&interpreter.gc, interpreter.dict_value_iterator_class);
+    try DictEntryIterator.registerMethods(&interpreter.gc, interpreter.dict_entry_iterator_class);
 
     interpreter.common_names = try Names.init(&interpreter.string_interner);
     interpreter.string_class.name = interpreter.common_names.String;
@@ -207,6 +225,9 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     interpreter.list_iterator_class.name = interpreter.common_names.ListIterator;
     interpreter.string_iterator_class.name = interpreter.common_names.StringIterator;
     interpreter.dict_iterator_class.name = interpreter.common_names.DictIterator;
+    interpreter.dict_key_iterator_class.name = interpreter.common_names.DictKeyIterator;
+    interpreter.dict_value_iterator_class.name = interpreter.common_names.DictValueIterator;
+    interpreter.dict_entry_iterator_class.name = interpreter.common_names.DictEntryIterator;
     interpreter.module_cache = ModuleCache.init(interpreter.gpa);
 
     //Make Exception classes

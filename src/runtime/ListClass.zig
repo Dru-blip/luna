@@ -32,6 +32,7 @@ pub fn registerMethods(gc: *Gc, lc: *Class) !void {
     try lc.defineNativeMethod(gc, "size", size, 0, false);
     try lc.defineNativeMethod(gc, "contains", contains, 1, false);
 
+    try lc.defineNativeMethod(gc, "__constructor__", constructor, 8, true);
     try lc.defineNativeMethod(gc, "__getattr__", getattr, 1, false);
     try lc.defineNativeMethod(gc, "__getitem__", getitem, 1, false);
     try lc.defineNativeMethod(gc, "__setitem__", setitem, 2, false);

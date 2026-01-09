@@ -7,6 +7,8 @@ const Object = @import("Object.zig");
 const Dict = @import("Dict.zig");
 const String = @import("String.zig");
 const DictIterator = @import("DictIterator.zig");
+const DictKeyIterator = @import("dict_iterator.zig").DictKeyIterator;
+const DictValueIterator = @import("dict_iterator.zig").DictValueIterator;
 
 const DictClass = @This();
 
@@ -27,13 +29,16 @@ pub fn registerMethods(gc: *Gc, dc: *Class) !void {
     try dc.defineNativeMethod(gc, "remove", remove, 1, false);
     try dc.defineNativeMethod(gc, "contains", contains, 1, false);
     try dc.defineNativeMethod(gc, "clear", clear, 0, false);
-    try dc.defineNativeMethod(gc, "size", size, 0, false);
+    try dc.defineNativeMethod(gc, "keys", keys, 0, false);
+    try dc.defineNativeMethod(gc, "values", values, 0, false);
 
+    try dc.defineNativeMethod(gc, "__constructor__", constructor, 8, true);
     try dc.defineNativeMethod(gc, "__getattr__", getattr, 1, false);
     try dc.defineNativeMethod(gc, "__setattr__", setattr, 2, false);
     try dc.defineNativeMethod(gc, "__getitem__", getitem, 1, false);
     try dc.defineNativeMethod(gc, "__setitem__", setitem, 2, false);
     try dc.defineNativeMethod(gc, "__iter__", iter, 0, false);
+    try dc.defineNativeMethod(gc, "__len__", size, 0, false);
 }
 
 fn set(vm: *Vm, self: *Object, args: []const Value) !Value {
@@ -72,6 +77,14 @@ fn clear(_: *Vm, _: *Object, _: []const Value) !Value {
 fn size(_: *Vm, self: *Object, _: []const Value) !Value {
     const dict: *Dict = self.as(Dict);
     return Value.number(@floatFromInt(dict.size()));
+}
+
+fn keys(vm: *Vm, self: *Object, _: []const Value) !Value {
+    return Value.object(try DictKeyIterator.newInstance(vm.gc, self));
+}
+
+fn values(vm: *Vm, self: *Object, _: []const Value) !Value {
+    return Value.object(try DictValueIterator.newInstance(vm.gc, self));
 }
 
 fn getattr(vm: *Vm, self: *Object, args: []const Value) !Value {

@@ -77,6 +77,8 @@ fn finalize(self: *Object, _: *Gc) void {
     // Object.Base.finalize(self, gc);
 }
 
+pub const Mode = enum { Key, Value, Entry };
+
 pub const HashMap = struct {
     const Self = @This();
 
@@ -96,24 +98,6 @@ pub const HashMap = struct {
         free: bool = false,
 
         const empty: u32 = std.math.maxInt(u32);
-    };
-
-    pub const Iterator = struct {
-        map: *const Self,
-        index: usize = 0,
-
-        pub fn next(self: *Iterator) ?Entry {
-            while (self.index < self.map.buckets.items.len) {
-                const current_index = self.index;
-                self.index += 1;
-
-                const entry = self.map.buckets.items[current_index];
-                if (!entry.free) {
-                    return entry;
-                }
-            }
-            return null;
-        }
     };
 
     pub fn init(allocator: std.mem.Allocator) Self {
@@ -200,8 +184,8 @@ pub const HashMap = struct {
         }
     }
 
-    pub fn iterator(self: *Self) Iterator {
-        return .{
+    pub fn iterator(self: *Self) Iterator(.Entry) {
+        return Iterator(.Entry){
             .map = self,
         };
     }
@@ -351,3 +335,34 @@ pub const HashMap = struct {
         try self.buckets.ensureUnusedCapacity(self.allocator, self.capacity - self.buckets.items.len);
     }
 };
+
+pub fn Iterator(comptime mode: Mode) type {
+    const ItemType = if (mode == .Entry) HashMap.Entry else Value;
+    return struct {
+        map: *const HashMap,
+        index: usize = 0,
+
+        const It = @This();
+
+        pub fn next(self: *It) ?ItemType {
+            while (self.index < self.map.buckets.items.len) {
+                const i = self.index;
+                self.index += 1;
+
+                const entry = self.map.buckets.items[i];
+                if (!entry.free) {
+                    return extract(entry);
+                }
+            }
+            return null;
+        }
+
+        fn extract(entry: HashMap.Entry) ItemType {
+            return switch (mode) {
+                .Key => entry.key,
+                .Value => entry.value,
+                .Entry => entry,
+            };
+        }
+    };
+}

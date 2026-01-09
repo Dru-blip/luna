@@ -11,7 +11,7 @@ const String = @import("String.zig");
 const DictIterator = @This();
 
 dict: *Object,
-iterator: Dict.HashMap.Iterator,
+iterator: Dict.Iterator(.Entry),
 
 pub const gc_hooks = Object.GcHooks{
     .name = "DictIterator",
@@ -52,8 +52,7 @@ pub fn registerMethods(gc: *Gc, ic: *Class) !void {
     try ic.defineNativeMethod(gc, "__next__", next, 0, false);
 }
 
-fn next(vm: *Vm, self: *Object, _: []const Value) !Value {
-    _ = vm;
+fn next(_: *Vm, self: *Object, _: []const Value) !Value {
     const iterator: *DictIterator = self.as(DictIterator);
     const entry = iterator.iterator.next() orelse return Value.Undefined;
     return entry.key;

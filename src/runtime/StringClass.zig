@@ -20,6 +20,8 @@ pub fn new(gc: *Gc) !*Class {
 pub fn registerMethods(gc: *Gc, sc: *Class) !void {
     try sc.defineNativeMethod(gc, "to_num", to_number, 0, false);
     try sc.defineNativeMethod(gc, "__getattr__", getattr, 1, false);
+    try sc.defineNativeMethod(gc, "__setattr__", setattr, 2, false);
+
     try sc.defineNativeMethod(gc, "__getitem__", getitem, 1, false);
     try sc.defineNativeMethod(gc, "__setitem__", setitem, 1, false);
     try sc.defineNativeMethod(gc, "__iter__", iter, 0, false);
@@ -71,4 +73,8 @@ fn getitem(vm: *Vm, self: *Object, args: []const Value) !Value {
 
 fn setitem(vm: *Vm, _: *Object, _: []const Value) !Value {
     return vm.raiseTypeError("'str' object does not support item assignment", .{});
+}
+
+fn setattr(vm: *Vm, _: *Object, _: []const Value) !Value {
+    return vm.raiseTypeError("'str' object does not support attribute assignment", .{});
 }
