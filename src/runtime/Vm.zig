@@ -203,6 +203,9 @@ const handlers = blk: {
     table[@intFromEnum(Inst.Op.set_super_class)] = handleSetSuperClass;
     table[@intFromEnum(Inst.Op.add_class_method)] = handleAddClassMethod;
 
+    table[@intFromEnum(Inst.Op.build_list)] = handleBuildList;
+    table[@intFromEnum(Inst.Op.append_list_item)] = handleAppendListItem;
+
     break :blk table;
 };
 
@@ -886,6 +889,17 @@ fn handleAddClassMethod(ctx: *HandlerContext, inst: Inst) Error!void {
     try class.addMethod(method.exe.name, ctx.registers[inst.data.bin.lhs]);
 }
 
+fn handleBuildList(ctx: *HandlerContext, inst: Inst) Error!void {
+    const list = try List.new(ctx.vm.gc);
+    ctx.registers[inst.data.un] = Value.object(list);
+}
+
+fn handleAppendListItem(ctx: *HandlerContext, inst: Inst) Error!void {
+    const list: *List = ctx.registers[inst.data.bin.rhs].toObject().as(List);
+    const item = ctx.registers[inst.data.bin.lhs];
+    try list.append(item);
+}
+
 // pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 //     var record = r;
 //     var ctx.registers = record.registers;
@@ -947,17 +961,6 @@ fn handleAddClassMethod(ctx: *HandlerContext, inst: Inst) Error!void {
 //                 return Error.ExceptionThrown;
 //             },
 
-//             .build_list => {
-//                 const list = try List.new(vm.gc);
-//                 registers[data.un] = Value.object(list);
-//                 continue :start;
-//             },
-//             .append_list_item => {
-//                 const list: *List = registers[data.bin.rhs].toObject().as(List);
-//                 const item = registers[data.bin.lhs];
-//                 try list.append(item);
-//                 continue :start;
-//             },
 //             .jmp => {
 //                 record.ip = data.un;
 //                 continue :start;
