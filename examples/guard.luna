@@ -1,3 +1,4 @@
+//Stupid example for testing exception handling
 class AError : Exception {}
 class BError : Exception {}
 class CError : Exception {}

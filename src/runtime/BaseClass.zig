@@ -12,6 +12,7 @@ const BaseClass = @This();
 pub fn registerMethods(gc: *Gc, class: *Class) !void {
     try class.defineNativeMethod(gc, "__getattr__", getattr, 1, false);
     try class.defineNativeMethod(gc, "__setattr__", setattr, 2, false);
+    try class.defineNativeMethod(gc, "__str__", str, 0, false);
 }
 
 fn getattr(vm: *Vm, self: *Object, args: []const Value) !Value {
@@ -58,4 +59,11 @@ fn setattr(_: *Vm, self: *Object, args: []const Value) !Value {
     try instance.setAttribute(name, value);
 
     return Value.None;
+}
+
+fn str(vm: *Vm, self: *Object, _: []const Value) !Value {
+    var buffer: [128]u8 = undefined;
+    const bytes = std.fmt.bufPrint(&buffer, "<{s} object at {*}>", .{ self.getClassName(), self }) catch unreachable;
+    const string = try String.new(vm.gc, bytes);
+    return Value.object(string);
 }
