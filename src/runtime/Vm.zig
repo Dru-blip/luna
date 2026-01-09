@@ -150,6 +150,7 @@ const HandlerContext = struct {
     constants: []Value,
     identifiers: []Value,
     extra: []u32,
+    return_value: Value = Value.None,
 };
 
 const Handler = *const fn (ctx: *HandlerContext, inst: Inst) Error!void;
@@ -206,6 +207,17 @@ const handlers = blk: {
     table[@intFromEnum(Inst.Op.build_list)] = handleBuildList;
     table[@intFromEnum(Inst.Op.append_list_item)] = handleAppendListItem;
 
+    table[@intFromEnum(Inst.Op.jmp)] = handleJmp;
+    table[@intFromEnum(Inst.Op.branch)] = handleBranch;
+    table[@intFromEnum(Inst.Op.build_trace_and_throw_exception)] = handleBuildTraceAndThrowException;
+
+    table[@intFromEnum(Inst.Op.super_call)] = handleSuperCall;
+    table[@intFromEnum(Inst.Op.call)] = handleCall;
+    table[@intFromEnum(Inst.Op.ret)] = handleRet;
+    table[@intFromEnum(Inst.Op.ret_none)] = handleRetNone;
+    table[@intFromEnum(Inst.Op.raise_exception)] = handleRaiseException;
+    table[@intFromEnum(Inst.Op.hlt)] = handleHlt;
+
     break :blk table;
 };
 
@@ -223,13 +235,13 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
 
     const instructions = r.executable.instructions;
 
-    while (r.ip < instructions.len) {
-        const inst = instructions[r.ip];
-        r.ip += 1;
+    while (ctx.record.ip < instructions.len) {
+        const inst = instructions[ctx.record.ip];
+        ctx.record.ip += 1;
         try dispatch(&ctx, inst);
     }
 
-    return Value.None;
+    return ctx.return_value;
 }
 
 fn dispatch(ctx: *HandlerContext, inst: Inst) Error!void {
@@ -796,7 +808,7 @@ fn handleSetItem(ctx: *HandlerContext, inst: Inst) Error!void {
 
 fn handleGetAttribute(ctx: *HandlerContext, inst: Inst) Error!void {
     const target = ctx.registers[inst.data.tri.op1];
-    const index = ctx.registers[inst.data.tri.op2];
+    const index = ctx.constants[inst.data.tri.op2];
 
     var args: [1]Value = undefined;
     args[0] = index;
@@ -809,7 +821,7 @@ fn handleGetAttribute(ctx: *HandlerContext, inst: Inst) Error!void {
 }
 
 fn handleSetAttribute(ctx: *HandlerContext, inst: Inst) Error!void {
-    const target = ctx.registers[inst.data.tri.op1];
+    const target = ctx.registers[inst.data.tri.dst];
     const index = ctx.registers[inst.data.tri.op2];
 
     var args: [2]Value = undefined;
@@ -919,205 +931,127 @@ fn handleBuildTraceAndThrowException(ctx: *HandlerContext, inst: Inst) Error!voi
     return Error.ExceptionThrown;
 }
 
-// pub fn runRecord(vm: *Vm, r: *ActivationRecord, as_callback: bool) Error!Value {
-//     var record = r;
-//     var ctx.registers = record.registers;
-//     var globals = vm.getGlobalSlots();
-//     var instructions = record.executable.instructions;
-//     var identifiers = record.executable.identifiers;
-//     var constants = record.executable.constants;
-//     var extra = record.executable.extra;
-//     var instruction: Inst = undefined;
+fn handleSuperCall(ctx: *HandlerContext, inst: Inst) Error!void {
+    const func = ctx.record.function.?;
+    const home_class = func.home_class.?;
+    const super_class = home_class.super_class.?;
 
-//     start: while (true) {
-//         errdefer {
-//             if (vm.interpreter.exception) |exception| {
-//                 @branchHint(.cold);
-//                 if (record.executable.findExceptionHandlerBlockForOffset(@intCast(record.ip - 1))) |handler_block| {
-//                     for (handler_block.rescues) |resuce_block| {
-//                         const exception_class = switch (resuce_block.exeception_class_loc) {
-//                             0 => registers[resuce_block.exception_type],
-//                             1 => globals.fast_slots[resuce_block.exception_type],
-//                             2 => blk: {
-//                                 const exception_class_name = identifiers[resuce_block.exception_type].toObject().toString();
-//                                 if (vm.interpreter.builtins.getField(exception_class_name)) |field| {
-//                                     break :blk field;
-//                                 }
-//                                 break :blk Value.None;
-//                                 //TODO: should attach the occured exception to current exception , that we are currently handling.
-//                                 // because we cannot propagate error through errdefer.
-//                                 // break :blk vm.raiseReferenceError("undeclared identifier '{s}'", .{exception_class_name.asSlice()});
-//                             },
-//                             else => unreachable,
-//                         };
+    const method_name = ctx.identifiers[inst.data.super_call.method].toObject().toString();
+    const method_value = super_class.getField(method_name);
+    const this_value = ctx.registers[0];
 
-//                         if (exception_class.asClass()) |class| {
-//                             if (Object.from(exception).isInstanceOf(class)) {
-//                                 record.ip = resuce_block.handler_offset;
-//                             }
-//                         }
-//                         //TODO: throw exception if the exception_class is not a class.
-//                     }
-//                 }
-//             }
-//         }
+    if (method_value) |meth_val| {
+        if (meth_val.asObject()) |meth_obj| {
+            const args_data = ctx.extra[inst.data.super_call.arg_offset .. inst.data.super_call.arg_offset + inst.data.super_call.argc];
 
-//         instruction = instructions[record.ip];
-//         const data = instruction.data;
-//         record.ip += 1;
+            var args: [8]Value = undefined;
+            for (args_data, 0..) |arg, i| {
+                args[i] = ctx.registers[arg];
+            }
 
-//             .get_super_class => {
-//                 //ERROR: this is useless.
-//                 const super_class = record.function.?.home_class.?.super_class.?;
-//                 registers[data.un] = Value.object(Object.from(super_class));
-//                 continue :start;
-//             },
+            ctx.registers[inst.data.super_call.ret] = try meth_obj.callAssumeCallable(ctx.vm, this_value.toObject(), args[0..inst.data.super_call.argc]);
+            return;
+        }
+    }
 
-//             .super_call => {
-//                 const super_class = record.function.?.home_class.?.super_class.?;
-//                 const method_name = identifiers[data.super_call.method].toObject().toString();
-//                 const method_value = super_class.getField(method_name);
-//                 const this_value = registers[0];
+    _ = try ctx.vm.raiseAttributeError(
+        "'{s}' has no method '{s}'",
+        .{ super_class.name.asSlice(), method_name.asSlice() },
+    );
+}
 
-//                 if (method_value) |meth_val| {
-//                     if (meth_val.asObject()) |meth_obj| {
-//                         const args_data = extra[data.super_call.arg_offset .. data.super_call.arg_offset + data.super_call.argc];
+fn handleCall(ctx: *HandlerContext, inst: Inst) Error!void {
+    const callee = ctx.registers[inst.data.call.callee];
+    if (!callee.isObject()) {
+        _ = try ctx.vm.raiseTypeError("'{s}' is not callable", .{callee.getTypeString()});
+        return;
+    }
 
-//                         var args: [8]Value = undefined;
-//                         for (args_data, 0..) |arg, i| {
-//                             args[i] = record.registers[arg];
-//                         }
+    const callee_obj = callee.toObject();
+    if (!callee_obj.isFunction()) {
+        _ = try ctx.vm.raiseTypeError("'{s}' object is not callable", .{callee_obj.getClassName()});
+        return;
+    }
 
-//                         _ = try meth_obj.callAssumeCallable(vm, this_value.toObject(), args[0..data.super_call.argc]);
-//                         continue :start;
-//                     }
-//                 }
-//                 return try vm.raiseAttributeError(
-//                     "'{s}' has no method '{s}'",
-//                     .{ super_class.name.asSlice(), method_name.asSlice() },
-//                 );
-//             },
-//             .call => {
-//                 const callee = registers[data.call.callee];
-//                 if (!callee.isObject()) {
-//                     return vm.raiseTypeError("'{s}' is not callable", .{callee.getTypeString()});
-//                 }
-//                 const callee_obj = callee.toObject();
+    const this_value = ctx.registers[inst.data.call.this];
+    const args_data = ctx.extra[inst.data.call.arg_offset .. inst.data.call.arg_offset + inst.data.call.argc];
 
-//                 if (!callee_obj.isFunction()) {
-//                     return vm.raiseTypeError("'{s}' object is not callable", .{callee_obj.getClassName()});
-//                 }
+    if (callee_obj.asNativeFunction()) |native_function| {
+        _ = try ctx.vm.checkArity(NativeFunction, native_function.name, native_function.arity, @intCast(inst.data.call.argc), native_function.isVariadic);
 
-//                 const this_value = registers[data.call.this];
+        var args: [8]Value = undefined;
+        for (args_data, 0..) |arg, i| {
+            args[i] = ctx.registers[arg];
+        }
 
-//                 const args_data = extra[data.call.arg_offset .. data.call.arg_offset + data.call.argc];
+        ctx.registers[inst.data.call.ret] = try native_function.function(ctx.vm, this_value.toObject(), args[0..inst.data.call.argc]);
+        return;
+    }
 
-//                 if (callee_obj.asNativeFunction()) |native_function| {
-//                     _ = try vm.checkArity(NativeFunction, native_function.name, native_function.arity, @intCast(data.call.argc), native_function.isVariadic);
+    if (callee_obj.asClass()) |class| {
+        var args: [8]Value = undefined;
+        for (args_data, 0..) |arg, i| {
+            args[i] = ctx.registers[arg];
+        }
 
-//                     var args: [8]Value = undefined;
+        if (class.constructor) |constructor| {
+            ctx.registers[inst.data.call.ret] = try constructor(ctx.vm, this_value.toObject(), args[0..inst.data.call.argc]);
+            return;
+        } else {
+            ctx.registers[inst.data.call.ret] = Value.object(try class.newInstance(ctx.vm.gc));
+        }
 
-//                     for (args_data, 0..) |arg, i| {
-//                         args[i] = record.registers[arg];
-//                     }
+        if (class.getField(ctx.vm.interpreter.common_names.__init__)) |init_method| {
+            _ = try init_method.toObject().callAssumeCallable(ctx.vm, ctx.registers[inst.data.call.ret].toObject(), args[0..inst.data.call.argc]);
+        }
+        return;
+    }
 
-//                     registers[data.call.ret] = try native_function.function(vm, this_value.toObject(), args[0..data.call.argc]);
-//                     continue :start;
-//                 }
+    const function: *Function = callee_obj.as(Function);
+    _ = try ctx.vm.checkArity(Function, function.exe.name, function.arity, @intCast(inst.data.call.argc), false);
 
-//                 if (callee_obj.asClass()) |class| {
-//                     var args: [8]Value = undefined;
-//                     for (args_data, 0..) |arg, i| {
-//                         args[i] = record.registers[arg];
-//                     }
+    var new_record = try ActivationRecord.withFunction(&ctx.vm.register_pool, function);
 
-//                     if (class.constructor) |constructor| {
-//                         registers[data.call.ret] = try constructor(vm, this_value.toObject(), args[0..data.call.argc]);
-//                         continue :start;
-//                     } else {
-//                         registers[data.call.ret] = Value.object(try class.newInstance(vm.gc));
-//                     }
+    new_record.registers[0] = this_value;
+    for (args_data, 0..) |arg, i| {
+        new_record.registers[i + 1] = ctx.registers[arg];
+    }
 
-//                     if (class.getField(vm.interpreter.common_names.__init__)) |constructor| {
-//                         _ = try constructor.toObject().callAssumeCallable(vm, registers[data.call.ret].toObject(), args[0..data.call.argc]);
-//                     }
-//                     continue :start;
-//                 }
+    _ = try ctx.vm.pushRecord(new_record);
+    const result = try ctx.vm.runRecord(&ctx.vm.records.items[ctx.vm.records.items.len - 1], false);
 
-//                 const function: *Function = callee_obj.as(Function);
-//                 _ = try vm.checkArity(Function, function.exe.name, function.arity, @intCast(data.call.argc), false);
-//                 const caller_record = vm.records.getLast();
-//                 _ = try vm.pushRecord(try ActivationRecord.withFunction(&vm.register_pool, function));
-//                 record = &vm.records.items[vm.records.items.len - 1];
-//                 record.caller_return_reg = data.call.ret;
+    var executed_record = ctx.vm.records.pop().?;
+    executed_record.deinit(&ctx.vm.register_pool);
 
-//                 record.registers[0] = this_value;
-//                 for (args_data, 0..) |arg, i| {
-//                     record.registers[i + 1] = caller_record.registers[arg];
-//                 }
+    ctx.registers[inst.data.call.ret] = result;
+}
 
-//                 registers = record.registers;
-//                 instructions = record.executable.instructions;
-//                 constants = record.executable.constants;
-//                 identifiers = record.executable.identifiers;
-//                 extra = record.executable.extra;
-//                 globals = vm.getGlobalSlots();
-//                 continue :start;
-//             },
-//             .ret => {
-//                 var callee = vm.records.pop().?;
-//                 if (vm.records.items.len == 0 or !vm.interpreter.isMainModule() or as_callback) {
-//                     callee.deinit(&vm.register_pool);
-//                     return registers[data.un];
-//                 }
+fn handleRet(ctx: *HandlerContext, inst: Inst) Error!void {
+    ctx.return_value = ctx.registers[inst.data.un];
+    ctx.record.ip = ctx.record.executable.instructions.len;
+}
 
-//                 record = &vm.records.items[vm.records.items.len - 1];
+fn handleRetNone(ctx: *HandlerContext, _: Inst) Error!void {
+    ctx.record.ip = ctx.record.executable.instructions.len;
+}
 
-//                 registers = record.registers;
-//                 instructions = record.executable.instructions;
-//                 constants = record.executable.constants;
-//                 identifiers = record.executable.identifiers;
-//                 extra = record.executable.extra;
-//                 globals = vm.getGlobalSlots();
-//                 record.registers[callee.caller_return_reg] = callee.registers[data.un];
-//                 callee.deinit(&vm.register_pool);
-//                 continue :start;
-//             },
-//             .ret_none => {
-//                 var callee = vm.records.pop().?;
-//                 if (vm.records.items.len == 0 or !vm.interpreter.isMainModule() or as_callback) {
-//                     callee.deinit(&vm.register_pool);
-//                     return Value.None;
-//                 }
-//                 record = &vm.records.items[vm.records.items.len - 1];
+fn handleRaiseException(ctx: *HandlerContext, inst: Inst) Error!void {
+    const exception_val = ctx.registers[inst.data.un];
+    if (exception_val.asObject()) |exception_object| {
+        if (exception_object.asException()) |exception| {
+            ctx.vm.interpreter.exception = exception;
+            return Error.ExceptionThrown;
+        }
+        _ = try ctx.vm.raiseTypeError("raise requires an exception object", .{});
+        return;
+    }
+    _ = try ctx.vm.raiseTypeError("raise requires an exception object", .{});
+}
 
-//                 registers = record.registers;
-//                 instructions = record.executable.instructions;
-//                 constants = record.executable.constants;
-//                 identifiers = record.executable.identifiers;
-//                 extra = record.executable.extra;
-//                 globals = vm.getGlobalSlots();
-//                 callee.deinit(&vm.register_pool);
-//                 continue :start;
-//             },
-//             .raise_exception => {
-//                 const exception_val = registers[data.un];
-//                 if (exception_val.asObject()) |exception_object| {
-//                     if (exception_object.asException()) |exception| {
-//                         vm.interpreter.exception = exception;
-//                     }
-//                     //TODO: raise error if exception_object is not an exception
-//                 }
-//                 //TODO: raise error if exception_val is not an object
-//                 return Error.ExceptionThrown;
-//             },
-//             .hlt => {
-//                 return Value.None;
-//             },
-//         }
-//     }
-//     return Value.None;
-// }
+fn handleHlt(ctx: *HandlerContext, inst: Inst) Error!void {
+    _ = inst;
+    ctx.record.ip = ctx.record.executable.instructions.len;
+}
 
 pub inline fn checkArity(vm: *Vm, comptime T: anytype, name: *String, expected: u8, actual: u8, variadic: bool) !Value {
     comptime {
