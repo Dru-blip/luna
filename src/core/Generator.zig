@@ -363,6 +363,17 @@ fn genGuardStmt(g: *Generator, node: *const Ast.Node) !void {
     exeception_handler.end_offset = @intCast(guard_block.instructions.items.len + 1);
 
     var ensure_block_id: ?u32 = null;
+
+    //TODO: else block should branch to ensure block if present.
+    if (node.data.guard_stmt.alternate) |alternate| {
+        const alternate_block = try g.makeBasicBlock();
+        try g.addUn(.jmp, alternate_block.id, alternate.loc);
+        exeception_handler.else_offset = alternate_block.id;
+        g.switchBasicBlock(alternate_block);
+        try g.genBlockStmt(alternate);
+        try g.addUn(.jmp, end_block.id, alternate.loc);
+    }
+
     if (node.data.guard_stmt.ensure) |ensure| {
         const ensure_block = try g.makeBasicBlock();
         ensure_block_id = ensure_block.id;
@@ -414,14 +425,6 @@ fn genGuardStmt(g: *Generator, node: *const Ast.Node) !void {
         }
 
         try rescue_handlers.append(g.gpa, rescue_handler);
-    }
-
-    if (node.data.guard_stmt.alternate) |alternate| {
-        const alternate_block = try g.makeBasicBlock();
-        try g.addUn(.jmp, alternate_block.id, alternate.loc);
-        exeception_handler.else_offset = alternate_block.id;
-        g.switchBasicBlock(alternate_block);
-        try g.genBlockStmt(alternate);
     }
 
     exeception_handler.rescues = try rescue_handlers.toOwnedSlice(g.gpa);

@@ -238,46 +238,57 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, _: bool) Error!Value {
         const inst = instructions[ctx.record.ip];
         ctx.record.ip += 1;
         dispatch(&ctx, inst) catch |err| {
-            @branchHint(.cold);
-            switch (err) {
-                Error.ExceptionThrown => {
-                    const exception = vm.interpreter.exception.?;
-                    if (ctx.record.executable.findExceptionHandlerBlockForOffset(@intCast(ctx.record.ip - 1))) |handler_block| {
-                        for (handler_block.rescues) |resuce_block| {
-                            const exception_class = switch (resuce_block.exeception_class_loc) {
-                                0 => ctx.registers[resuce_block.exception_type],
-                                1 => ctx.globals.fast_slots[resuce_block.exception_type],
-                                2 => blk: {
-                                    const exception_class_name = ctx.identifiers[resuce_block.exception_type].toObject().toString();
-                                    if (vm.interpreter.builtins.getField(exception_class_name)) |field| {
-                                        break :blk field;
-                                    }
-                                    break :blk Value.None;
-                                    //TODO: should attach the occured exception to current exception , that we are currently handling.
-                                    // because we cannot propagate error through errdefer.
-                                    // break :blk vm.raiseReferenceError("undeclared identifier '{s}'", .{exception_class_name.asSlice()});
-                                },
-                                else => unreachable,
-                            };
-
-                            if (exception_class.asClass()) |class| {
-                                if (Object.from(exception).isInstanceOf(class)) {
-                                    ctx.record.ip = resuce_block.handler_offset;
-                                    continue :loop;
-                                }
-                            }
-                            //TODO: throw exception if the exception_class is not a class.
-                        }
-                        return err;
-                    }
-                    return err;
-                },
-                else => return err,
+            if (vm.interpreter.exception != null and vm.handleException(&ctx) == .Handled) {
+                continue :loop;
             }
+            return err;
         };
     }
 
     return ctx.return_value;
+}
+
+const ExceptionHandleResult = enum {
+    Handled,
+    NotHandled,
+};
+
+inline fn handleException(vm: *Vm, ctx: *HandlerContext) ExceptionHandleResult {
+    const exception = vm.interpreter.exception.?;
+
+    const handler_block =
+        ctx.record.executable.findExceptionHandlerBlockForOffset(
+            @intCast(ctx.record.ip - 1),
+        ) orelse return .NotHandled;
+
+    for (handler_block.rescues) |rescue_block| {
+        const exception_class = switch (rescue_block.exeception_class_loc) {
+            0 => ctx.registers[rescue_block.exception_type],
+            1 => ctx.globals.fast_slots[rescue_block.exception_type],
+            2 => blk: {
+                const name =
+                    ctx.identifiers[rescue_block.exception_type]
+                        .toObject()
+                        .toString();
+
+                if (vm.interpreter.builtins.getField(name)) |field| {
+                    break :blk field;
+                }
+                break :blk Value.None;
+            },
+
+            else => unreachable,
+        };
+
+        if (exception_class.asClass()) |class| {
+            if (Object.from(exception).isInstanceOf(class)) {
+                ctx.record.ip = rescue_block.handler_offset;
+                return .Handled;
+            }
+        }
+        // TODO: raise TypeError if exception_class is not a class
+    }
+    return .NotHandled;
 }
 
 fn dispatch(ctx: *HandlerContext, inst: Inst) Error!void {
