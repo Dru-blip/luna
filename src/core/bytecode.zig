@@ -154,6 +154,25 @@ pub const Executable = struct {
         return null;
     }
 
+    pub fn findExceptionHandlerBlocksForOffset(
+        executable: *Executable,
+        gpa: std.mem.Allocator,
+        ip: u32,
+    ) ![]ExceptionHandlerBlock {
+        var blocks: std.ArrayList(ExceptionHandlerBlock) = .empty;
+
+        var i: usize = executable.exception_handlers.len;
+        while (i > 0) {
+            i -= 1;
+            const handler = executable.exception_handlers[i];
+            if (handler.start_offset <= ip and ip < handler.end_offset) {
+                try blocks.append(gpa, handler);
+            }
+        }
+
+        return try blocks.toOwnedSlice(gpa);
+    }
+
     pub const gc_hooks = Object.GcHooks{
         .name = "Executable",
         .visit = visit,

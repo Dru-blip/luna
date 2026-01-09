@@ -1,18 +1,25 @@
-class NotImplementedError : Exception{
-    fn __init__(msg){
-        this.a=5
-    }
-}
+class AError : Exception {}
+class BError : Exception {}
+class CError : Exception {}
 
 guard {
-   raise NotImplementedError("not implemented")
+    guard {
+        guard {
+            print("level 1")
+            raise AError("from level 1")
+        }
+        rescue BError {
+            print("caught BError at level 2")
+        }
+    }
+    rescue AError {
+        print("caught AError at level 2")
+        raise BError("rethrow as BError")
+    }
 }
-rescue NotImplementedError{
-    print("from NotImplementedError rescue block")
+rescue BError {
+    print("caught BError at level 3")
 }
-rescue InvalidAssignmentTargetError{
-    print("from InvalidAssignmentTargetError rescue block")
-}
-ensure{
-    print("from ensure block")
+ensure {
+    print("final cleanup")
 }

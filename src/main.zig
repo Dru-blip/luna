@@ -1,8 +1,8 @@
 const std = @import("std");
 const Interpreter = @import("runtime/Interpreter.zig");
 
-//TODO: should flatten the inheritance chain.
-// TODO: exception chain .
+// TODO: should flatten the inheritance chain.
+// TODO: exception chain.
 pub fn main() !void {
     var gpa = std.heap.DebugAllocator(.{}){};
     defer {

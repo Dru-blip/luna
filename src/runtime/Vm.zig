@@ -3,6 +3,8 @@ const Value = @import("../core/Value.zig");
 const Object = @import("Object.zig");
 const Interpreter = @import("Interpreter.zig");
 const Executable = @import("../core/bytecode.zig").Executable;
+const ExceptionHandlerBlock = @import("../core/bytecode.zig").ExceptionHandlerBlock;
+
 const String = @import("String.zig");
 const Function = @import("Function.zig");
 const Inst = @import("../core/bytecode.zig").Inst;
@@ -241,6 +243,10 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, _: bool) Error!Value {
             if (vm.interpreter.exception != null and vm.handleException(&ctx) == .Handled) {
                 continue :loop;
             }
+            if (vm.records.pop()) |*record| {
+                var re = @constCast(record);
+                re.deinit(&vm.register_pool);
+            }
             return err;
         };
     }
@@ -256,38 +262,39 @@ const ExceptionHandleResult = enum {
 inline fn handleException(vm: *Vm, ctx: *HandlerContext) ExceptionHandleResult {
     const exception = vm.interpreter.exception.?;
 
-    const handler_block =
-        ctx.record.executable.findExceptionHandlerBlockForOffset(
-            @intCast(ctx.record.ip - 1),
-        ) orelse return .NotHandled;
+    const exception_blocks = ctx.record.executable.findExceptionHandlerBlocksForOffset(vm.gpa, @intCast(ctx.record.ip - 1)) catch &[_]ExceptionHandlerBlock{};
 
-    for (handler_block.rescues) |rescue_block| {
-        const exception_class = switch (rescue_block.exeception_class_loc) {
-            0 => ctx.registers[rescue_block.exception_type],
-            1 => ctx.globals.fast_slots[rescue_block.exception_type],
-            2 => blk: {
-                const name =
-                    ctx.identifiers[rescue_block.exception_type]
-                        .toObject()
-                        .toString();
+    for (exception_blocks) |handler| {
+        for (handler.rescues) |rescue_block| {
+            const exception_class = switch (rescue_block.exeception_class_loc) {
+                0 => ctx.registers[rescue_block.exception_type],
+                1 => ctx.globals.fast_slots[rescue_block.exception_type],
+                2 => blk: {
+                    const name =
+                        ctx.identifiers[rescue_block.exception_type]
+                            .toObject()
+                            .toString();
 
-                if (vm.interpreter.builtins.getField(name)) |field| {
-                    break :blk field;
+                    if (vm.interpreter.builtins.getField(name)) |field| {
+                        break :blk field;
+                    }
+                    break :blk Value.None;
+                },
+
+                else => unreachable,
+            };
+
+            if (exception_class.asClass()) |class| {
+                if (Object.from(exception).isInstanceOf(class)) {
+                    ctx.record.ip = rescue_block.handler_offset;
+                    ctx.vm.interpreter.exception = null;
+                    return .Handled;
                 }
-                break :blk Value.None;
-            },
-
-            else => unreachable,
-        };
-
-        if (exception_class.asClass()) |class| {
-            if (Object.from(exception).isInstanceOf(class)) {
-                ctx.record.ip = rescue_block.handler_offset;
-                return .Handled;
             }
+            // TODO: raise TypeError if exception_class is not a class
         }
-        // TODO: raise TypeError if exception_class is not a class
     }
+
     return .NotHandled;
 }
 

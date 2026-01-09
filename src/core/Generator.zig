@@ -360,7 +360,7 @@ fn genGuardStmt(g: *Generator, node: *const Ast.Node) !void {
 
     g.switchBasicBlock(guard_block);
     try g.genBlockStmt(node.data.guard_stmt.body);
-    exeception_handler.end_offset = @intCast(guard_block.instructions.items.len + 1);
+    exeception_handler.end_offset = @intCast(g.blocks.items.len);
 
     var ensure_block_id: ?u32 = null;
 
@@ -1157,7 +1157,8 @@ fn linearizeBasicBlocks(g: *Generator, executable: *Executable) !void {
 
     for (executable.exception_handlers) |*handler_block| {
         handler_block.start_offset = block_start_offsets.items[handler_block.start_offset];
-        handler_block.end_offset = handler_block.start_offset + handler_block.end_offset;
+        handler_block.end_offset = block_start_offsets.items[handler_block.end_offset];
+
         for (handler_block.rescues) |*handler| {
             handler.handler_offset = block_start_offsets.items[handler.handler_offset];
             if (handler.ensure_offset) |ensure_offset| {
