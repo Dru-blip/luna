@@ -21,6 +21,16 @@ pub fn new(gc: *Gc) !*Class {
     try class.putField(gc.interpreter.common_names.List, Value.object(Object.from(gc.interpreter.list_class)));
     try class.putField(gc.interpreter.common_names.BaseException, Value.object(Object.from(gc.interpreter.base_exception_class)));
 
+    try class.putField(gc.interpreter.common_names.TypeError, Value.object(Object.from(gc.interpreter.type_error_class)));
+    try class.putField(gc.interpreter.common_names.ReferenceError, Value.object(Object.from(gc.interpreter.reference_error_class)));
+    try class.putField(gc.interpreter.common_names.ZeroDivisionError, Value.object(Object.from(gc.interpreter.zero_division_error_class)));
+    try class.putField(gc.interpreter.common_names.IndexError, Value.object(Object.from(gc.interpreter.index_error_class)));
+    try class.putField(gc.interpreter.common_names.ValueError, Value.object(Object.from(gc.interpreter.value_error_class)));
+    try class.putField(gc.interpreter.common_names.AttributeError, Value.object(Object.from(gc.interpreter.attribute_error_class)));
+    try class.putField(gc.interpreter.common_names.ModuleNotFoundError, Value.object(Object.from(gc.interpreter.module_not_found_error_class)));
+    try class.putField(gc.interpreter.common_names.InvalidAssignmentTargetError, Value.object(Object.from(gc.interpreter.invalid_assignment_target_error_class)));
+    try class.putField(gc.interpreter.common_names.StackOverflowError, Value.object(Object.from(gc.interpreter.stack_overflow_error_class)));
+
     return class;
 }
 

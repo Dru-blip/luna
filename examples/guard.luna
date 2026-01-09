@@ -1,8 +1,13 @@
 guard {
-    1
+   let a=[1,2,4]
+   1=3
+}
+rescue IndexError{
+    print("from IndexError rescue block")
+}
+rescue InvalidAssignmentTargetError{
+    print("from InvalidAssignmentTargetError rescue block")
 }
 rescue Exception {
     print("from rescue block")
-}ensure{
-    print("from ensure block")
 }
