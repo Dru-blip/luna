@@ -155,7 +155,7 @@ const HandlerContext = struct {
     return_value: Value = Value.None,
 };
 
-const Handler = *const fn (ctx: *HandlerContext, inst: Inst) Error!void;
+const Handler = *const fn (ctx: *HandlerContext, inst: *Inst) Error!void;
 
 const handlers = blk: {
     var table: [@typeInfo(Inst.Op).@"enum".fields.len]Handler = undefined;
@@ -170,11 +170,9 @@ const handlers = blk: {
     table[@intFromEnum(Inst.Op.store_global_by_name)] = handleStoreGlobalByName;
     table[@intFromEnum(Inst.Op.load_global_by_name)] = handleLoadGlobalByName;
     table[@intFromEnum(Inst.Op.mov)] = handleMov;
-
     table[@intFromEnum(Inst.Op.negate)] = handleNegate;
     table[@intFromEnum(Inst.Op.not)] = handleNot;
     table[@intFromEnum(Inst.Op.un_plus)] = handleUnPlus;
-
     table[@intFromEnum(Inst.Op.add)] = handleAdd;
     table[@intFromEnum(Inst.Op.sub)] = handleSub;
     table[@intFromEnum(Inst.Op.mul)] = handleMul;
@@ -186,41 +184,33 @@ const handlers = blk: {
     table[@intFromEnum(Inst.Op.test_ge)] = handleTestGe;
     table[@intFromEnum(Inst.Op.test_eq)] = handleTestEq;
     table[@intFromEnum(Inst.Op.test_neq)] = handleTestNeq;
-
     table[@intFromEnum(Inst.Op.@"and")] = handleAnd;
     table[@intFromEnum(Inst.Op.@"or")] = handleOr;
     table[@intFromEnum(Inst.Op.xor)] = handleXor;
-
     table[@intFromEnum(Inst.Op.get_item)] = handleGetItem;
     table[@intFromEnum(Inst.Op.set_item)] = handleSetItem;
     table[@intFromEnum(Inst.Op.get_attribute)] = handleGetAttribute;
     table[@intFromEnum(Inst.Op.set_attribute)] = handleSetAttribute;
-
     table[@intFromEnum(Inst.Op.get_iter)] = handleGetIter;
     table[@intFromEnum(Inst.Op.iter_next)] = handleIterNext;
     table[@intFromEnum(Inst.Op.build_dict)] = handleBuildDict;
     table[@intFromEnum(Inst.Op.add_dict_entry)] = handleAddDictEntry;
-
     table[@intFromEnum(Inst.Op.build_function)] = handleBuildFunction;
     table[@intFromEnum(Inst.Op.build_class)] = handleBuildClass;
     table[@intFromEnum(Inst.Op.set_super_class)] = handleSetSuperClass;
     table[@intFromEnum(Inst.Op.add_class_method)] = handleAddClassMethod;
-
     table[@intFromEnum(Inst.Op.build_list)] = handleBuildList;
     table[@intFromEnum(Inst.Op.append_list_item)] = handleAppendListItem;
-
     table[@intFromEnum(Inst.Op.jmp)] = handleJmp;
     table[@intFromEnum(Inst.Op.branch)] = handleBranch;
     table[@intFromEnum(Inst.Op.iter_check_next)] = handleIterCheckNext;
     table[@intFromEnum(Inst.Op.build_trace_and_throw_exception)] = handleBuildTraceAndThrowException;
-
     table[@intFromEnum(Inst.Op.super_call)] = handleSuperCall;
     table[@intFromEnum(Inst.Op.call)] = handleCall;
     table[@intFromEnum(Inst.Op.ret)] = handleRet;
     table[@intFromEnum(Inst.Op.ret_none)] = handleRetNone;
     table[@intFromEnum(Inst.Op.raise_exception)] = handleRaiseException;
     table[@intFromEnum(Inst.Op.hlt)] = handleHlt;
-
     break :blk table;
 };
 
@@ -238,9 +228,9 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, _: bool) Error!Value {
     const instructions = r.executable.instructions;
 
     loop: while (ctx.record.ip < instructions.len) {
-        const inst = instructions[ctx.record.ip];
+        var inst = instructions[ctx.record.ip];
         ctx.record.ip += 1;
-        dispatch(&ctx, inst) catch |err| {
+        dispatch(&ctx, &inst) catch |err| {
             if (vm.interpreter.exception != null and vm.handleException(&ctx) == .Handled) {
                 continue :loop;
             }
@@ -303,44 +293,44 @@ inline fn handleException(vm: *Vm, ctx: *HandlerContext) ExceptionHandleResult {
     return .NotHandled;
 }
 
-fn dispatch(ctx: *HandlerContext, inst: Inst) Error!void {
+fn dispatch(ctx: *HandlerContext, inst: *Inst) Error!void {
     const handler = handlers[@intFromEnum(inst.op)];
     return handler(ctx, inst);
 }
 
-fn handleLoadConst(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleLoadConst(ctx: *HandlerContext, inst: *Inst) Error!void {
     ctx.registers[inst.data.bin.rhs] = ctx.constants[inst.data.bin.lhs];
 }
 
-fn handleLoadIdent(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleLoadIdent(ctx: *HandlerContext, inst: *Inst) Error!void {
     ctx.registers[inst.data.bin.rhs] = ctx.identifiers[inst.data.bin.lhs];
 }
 
-fn handleLoadTrue(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleLoadTrue(ctx: *HandlerContext, inst: *Inst) Error!void {
     ctx.registers[inst.data.un] = Value.True;
 }
 
-fn handleLoadFalse(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleLoadFalse(ctx: *HandlerContext, inst: *Inst) Error!void {
     ctx.registers[inst.data.un] = Value.False;
 }
 
-fn handleLoadNone(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleLoadNone(ctx: *HandlerContext, inst: *Inst) Error!void {
     ctx.registers[inst.data.un] = Value.None;
 }
 
-fn handleLoadUndefined(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleLoadUndefined(ctx: *HandlerContext, inst: *Inst) Error!void {
     ctx.registers[inst.data.un] = Value.Undefined;
 }
 
-fn handleStoreGlobalByIndex(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleStoreGlobalByIndex(ctx: *HandlerContext, inst: *Inst) Error!void {
     ctx.globals.fast_slots[inst.data.bin.rhs] = ctx.registers[inst.data.bin.lhs];
 }
 
-fn handleLoadGlobalByIndex(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleLoadGlobalByIndex(ctx: *HandlerContext, inst: *Inst) Error!void {
     ctx.registers[inst.data.bin.rhs] = ctx.globals.fast_slots[inst.data.bin.lhs];
 }
 
-fn handleLoadGlobalByName(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleLoadGlobalByName(ctx: *HandlerContext, inst: *Inst) Error!void {
     const name: *String = ctx.identifiers[inst.data.bin.lhs].toObject().as(String);
     if (ctx.vm.interpreter.builtins.getField(name)) |field| {
         ctx.registers[inst.data.bin.rhs] = field;
@@ -349,13 +339,13 @@ fn handleLoadGlobalByName(ctx: *HandlerContext, inst: Inst) Error!void {
     _ = try ctx.vm.raiseReferenceError("undeclared identifier '{s}'", .{name.asSlice()});
 }
 
-fn handleStoreGlobalByName(_: *HandlerContext, _: Inst) Error!void {}
+fn handleStoreGlobalByName(_: *HandlerContext, _: *Inst) Error!void {}
 
-fn handleMov(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleMov(ctx: *HandlerContext, inst: *Inst) Error!void {
     ctx.registers[inst.data.bin.rhs] = ctx.registers[inst.data.bin.lhs];
 }
 
-fn handleNegate(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleNegate(ctx: *HandlerContext, inst: *Inst) Error!void {
     const value = ctx.registers[inst.data.bin.lhs];
     if (value.isNumeric()) {
         ctx.registers[inst.data.bin.rhs] = Value.number(-value.asNumber());
@@ -364,16 +354,16 @@ fn handleNegate(ctx: *HandlerContext, inst: Inst) Error!void {
     _ = try ctx.vm.raiseTypeError("invalid operand type for unary operator ('-') : '{s}'", .{value.getTypeString()});
 }
 
-fn handleNot(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleNot(ctx: *HandlerContext, inst: *Inst) Error!void {
     const value = ctx.registers[inst.data.bin.lhs];
     ctx.registers[inst.data.bin.rhs] = Value.bool(!value.isTruthy());
 }
 
-fn handleUnPlus(_: *HandlerContext, _: Inst) Error!void {
+fn handleUnPlus(_: *HandlerContext, _: *Inst) Error!void {
     //TODO: implement
 }
 
-fn handleAdd(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleAdd(ctx: *HandlerContext, inst: *Inst) Error!void {
     const lhs = ctx.registers[inst.data.tri.op1];
     const rhs = ctx.registers[inst.data.tri.op2];
 
@@ -435,7 +425,7 @@ fn handleAdd(ctx: *HandlerContext, inst: Inst) Error!void {
     _ = try ctx.vm.raiseTypeException("+", lhs, rhs);
 }
 
-fn handleSub(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleSub(ctx: *HandlerContext, inst: *Inst) Error!void {
     const lhs = ctx.registers[inst.data.tri.op1];
     const rhs = ctx.registers[inst.data.tri.op2];
 
@@ -467,7 +457,7 @@ fn handleSub(ctx: *HandlerContext, inst: Inst) Error!void {
     _ = try ctx.vm.raiseTypeException("-", lhs, rhs);
 }
 
-fn handleMul(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleMul(ctx: *HandlerContext, inst: *Inst) Error!void {
     const lhs = ctx.registers[inst.data.tri.op1];
     const rhs = ctx.registers[inst.data.tri.op2];
 
@@ -499,7 +489,7 @@ fn handleMul(ctx: *HandlerContext, inst: Inst) Error!void {
     _ = try ctx.vm.raiseTypeException("*", lhs, rhs);
 }
 
-fn handleDiv(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleDiv(ctx: *HandlerContext, inst: *Inst) Error!void {
     const lhs = ctx.registers[inst.data.tri.op1];
     const rhs = ctx.registers[inst.data.tri.op2];
 
@@ -536,7 +526,7 @@ fn handleDiv(ctx: *HandlerContext, inst: Inst) Error!void {
     _ = try ctx.vm.raiseTypeException("/", lhs, rhs);
 }
 
-fn handleModulus(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleModulus(ctx: *HandlerContext, inst: *Inst) Error!void {
     const lhs = ctx.registers[inst.data.tri.op1];
     const rhs = ctx.registers[inst.data.tri.op2];
 
@@ -573,7 +563,7 @@ fn handleModulus(ctx: *HandlerContext, inst: Inst) Error!void {
     _ = try ctx.vm.raiseTypeException("%", lhs, rhs);
 }
 
-fn handleAnd(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleAnd(ctx: *HandlerContext, inst: *Inst) Error!void {
     const lhs = ctx.registers[inst.data.tri.op1];
     const rhs = ctx.registers[inst.data.tri.op2];
     if (lhs.isNumeric() and rhs.isNumeric()) {
@@ -583,7 +573,7 @@ fn handleAnd(ctx: *HandlerContext, inst: Inst) Error!void {
     _ = try ctx.vm.raiseTypeException("&", lhs, rhs);
 }
 
-fn handleOr(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleOr(ctx: *HandlerContext, inst: *Inst) Error!void {
     const lhs = ctx.registers[inst.data.tri.op1];
     const rhs = ctx.registers[inst.data.tri.op2];
     if (lhs.isNumeric() and rhs.isNumeric()) {
@@ -593,7 +583,7 @@ fn handleOr(ctx: *HandlerContext, inst: Inst) Error!void {
     _ = try ctx.vm.raiseTypeException("|", lhs, rhs);
 }
 
-fn handleXor(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleXor(ctx: *HandlerContext, inst: *Inst) Error!void {
     const lhs = ctx.registers[inst.data.tri.op1];
     const rhs = ctx.registers[inst.data.tri.op2];
     if (lhs.isNumeric() and rhs.isNumeric()) {
@@ -603,7 +593,7 @@ fn handleXor(ctx: *HandlerContext, inst: Inst) Error!void {
     _ = try ctx.vm.raiseTypeException("^", lhs, rhs);
 }
 
-fn handleTestLt(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleTestLt(ctx: *HandlerContext, inst: *Inst) Error!void {
     const lhs = ctx.registers[inst.data.tri.op1];
     const rhs = ctx.registers[inst.data.tri.op2];
 
@@ -642,7 +632,7 @@ fn handleTestLt(ctx: *HandlerContext, inst: Inst) Error!void {
     _ = try ctx.vm.raiseTypeException("<", lhs, rhs);
 }
 
-fn handleTestLe(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleTestLe(ctx: *HandlerContext, inst: *Inst) Error!void {
     const lhs = ctx.registers[inst.data.tri.op1];
     const rhs = ctx.registers[inst.data.tri.op2];
 
@@ -681,7 +671,7 @@ fn handleTestLe(ctx: *HandlerContext, inst: Inst) Error!void {
     _ = try ctx.vm.raiseTypeException("<=", lhs, rhs);
 }
 
-fn handleTestGt(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleTestGt(ctx: *HandlerContext, inst: *Inst) Error!void {
     const lhs = ctx.registers[inst.data.tri.op1];
     const rhs = ctx.registers[inst.data.tri.op2];
 
@@ -720,7 +710,7 @@ fn handleTestGt(ctx: *HandlerContext, inst: Inst) Error!void {
     _ = try ctx.vm.raiseTypeException(">", lhs, rhs);
 }
 
-fn handleTestGe(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleTestGe(ctx: *HandlerContext, inst: *Inst) Error!void {
     const lhs = ctx.registers[inst.data.tri.op1];
     const rhs = ctx.registers[inst.data.tri.op2];
 
@@ -759,7 +749,7 @@ fn handleTestGe(ctx: *HandlerContext, inst: Inst) Error!void {
     _ = try ctx.vm.raiseTypeException(">=", lhs, rhs);
 }
 
-fn handleTestEq(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleTestEq(ctx: *HandlerContext, inst: *Inst) Error!void {
     const lhs = ctx.registers[inst.data.tri.op1];
     const rhs = ctx.registers[inst.data.tri.op2];
 
@@ -798,7 +788,7 @@ fn handleTestEq(ctx: *HandlerContext, inst: Inst) Error!void {
     ctx.registers[inst.data.tri.dst] = Value.bool(lhs.eql(rhs));
 }
 
-fn handleTestNeq(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleTestNeq(ctx: *HandlerContext, inst: *Inst) Error!void {
     const lhs = ctx.registers[inst.data.tri.op1];
     const rhs = ctx.registers[inst.data.tri.op2];
 
@@ -837,7 +827,7 @@ fn handleTestNeq(ctx: *HandlerContext, inst: Inst) Error!void {
     ctx.registers[inst.data.tri.dst] = Value.bool(!lhs.eql(rhs));
 }
 
-fn handleGetItem(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleGetItem(ctx: *HandlerContext, inst: *Inst) Error!void {
     const target = ctx.registers[inst.data.tri.op1];
     const index = ctx.registers[inst.data.tri.op2];
 
@@ -851,7 +841,7 @@ fn handleGetItem(ctx: *HandlerContext, inst: Inst) Error!void {
     );
 }
 
-fn handleSetItem(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleSetItem(ctx: *HandlerContext, inst: *Inst) Error!void {
     const target = ctx.registers[inst.data.tri.op1];
     const index = ctx.registers[inst.data.tri.op2];
 
@@ -866,7 +856,7 @@ fn handleSetItem(ctx: *HandlerContext, inst: Inst) Error!void {
     );
 }
 
-fn handleGetAttribute(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleGetAttribute(ctx: *HandlerContext, inst: *Inst) Error!void {
     const target = ctx.registers[inst.data.tri.op1];
     const index = ctx.constants[inst.data.tri.op2];
 
@@ -880,7 +870,7 @@ fn handleGetAttribute(ctx: *HandlerContext, inst: Inst) Error!void {
     );
 }
 
-fn handleSetAttribute(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleSetAttribute(ctx: *HandlerContext, inst: *Inst) Error!void {
     const target = ctx.registers[inst.data.tri.dst];
     const index = ctx.registers[inst.data.tri.op2];
 
@@ -895,7 +885,7 @@ fn handleSetAttribute(ctx: *HandlerContext, inst: Inst) Error!void {
     );
 }
 
-fn handleGetIter(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleGetIter(ctx: *HandlerContext, inst: *Inst) Error!void {
     const iterable_value = ctx.registers[inst.data.bin.lhs];
     ctx.registers[inst.data.bin.rhs] = try ctx.vm.invokeSpecialMethod(
         iterable_value,
@@ -904,7 +894,7 @@ fn handleGetIter(ctx: *HandlerContext, inst: Inst) Error!void {
     );
 }
 
-fn handleIterNext(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleIterNext(ctx: *HandlerContext, inst: *Inst) Error!void {
     const iterator_value = ctx.registers[inst.data.bin.lhs];
     ctx.registers[inst.data.bin.rhs] = try ctx.vm.invokeSpecialMethod(
         iterator_value,
@@ -913,26 +903,26 @@ fn handleIterNext(ctx: *HandlerContext, inst: Inst) Error!void {
     );
 }
 
-fn handleBuildDict(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleBuildDict(ctx: *HandlerContext, inst: *Inst) Error!void {
     const dict = try Dict.new(ctx.vm.gc);
     ctx.registers[inst.data.un] = Value.object(dict);
 }
 
-fn handleAddDictEntry(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleAddDictEntry(ctx: *HandlerContext, inst: *Inst) Error!void {
     const dict: *Dict = ctx.registers[inst.data.tri.dst].toObject().as(Dict);
     const key = ctx.registers[inst.data.tri.op1];
     const value = ctx.registers[inst.data.tri.op2];
     try dict.set(ctx.vm, key, value);
 }
 
-fn handleBuildFunction(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleBuildFunction(ctx: *HandlerContext, inst: *Inst) Error!void {
     const func_obj = try Function.withExecutable(ctx.vm.gc, ctx.constants[inst.data.bin.lhs].toObject().as(Executable));
     const function: *Function = func_obj.as(Function);
     function.module_env = ctx.vm.interpreter.getRunningModule();
     ctx.registers[inst.data.bin.rhs] = Value.object(func_obj);
 }
 
-fn handleBuildClass(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleBuildClass(ctx: *HandlerContext, inst: *Inst) Error!void {
     const class_name = ctx.identifiers[inst.data.bin.lhs];
     const class = try Class.new(ctx.vm.gc);
     class.super_class = ctx.vm.interpreter.base_class;
@@ -941,7 +931,7 @@ fn handleBuildClass(ctx: *HandlerContext, inst: Inst) Error!void {
     ctx.registers[inst.data.bin.rhs] = Value.object(Object.from(class));
 }
 
-fn handleSetSuperClass(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleSetSuperClass(ctx: *HandlerContext, inst: *Inst) Error!void {
     const sub_class_value = ctx.registers[inst.data.bin.rhs];
     const super_class_value = ctx.registers[inst.data.bin.lhs];
 
@@ -954,29 +944,29 @@ fn handleSetSuperClass(ctx: *HandlerContext, inst: Inst) Error!void {
     _ = try ctx.vm.raiseTypeError("Expected a class", .{});
 }
 
-fn handleAddClassMethod(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleAddClassMethod(ctx: *HandlerContext, inst: *Inst) Error!void {
     const class: *Class = ctx.registers[inst.data.bin.rhs].toObject().as(Class);
     const method: *Function = ctx.registers[inst.data.bin.lhs].toObject().as(Function);
     method.home_class = class;
     try class.addMethod(method.exe.name, ctx.registers[inst.data.bin.lhs]);
 }
 
-fn handleBuildList(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleBuildList(ctx: *HandlerContext, inst: *Inst) Error!void {
     const list = try List.new(ctx.vm.gc);
     ctx.registers[inst.data.un] = Value.object(list);
 }
 
-fn handleAppendListItem(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleAppendListItem(ctx: *HandlerContext, inst: *Inst) Error!void {
     const list: *List = ctx.registers[inst.data.bin.rhs].toObject().as(List);
     const item = ctx.registers[inst.data.bin.lhs];
     try list.append(item);
 }
 
-fn handleJmp(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleJmp(ctx: *HandlerContext, inst: *Inst) Error!void {
     ctx.record.ip = inst.data.un;
 }
 
-fn handleBranch(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleBranch(ctx: *HandlerContext, inst: *Inst) Error!void {
     if (ctx.registers[inst.data.tri.op1].isTruthy()) {
         ctx.record.ip = inst.data.tri.op2;
     } else {
@@ -984,7 +974,7 @@ fn handleBranch(ctx: *HandlerContext, inst: Inst) Error!void {
     }
 }
 
-fn handleIterCheckNext(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleIterCheckNext(ctx: *HandlerContext, inst: *Inst) Error!void {
     if (ctx.registers[inst.data.tri.op1].isUndefined()) {
         ctx.record.ip = inst.data.tri.dst;
     } else {
@@ -992,14 +982,14 @@ fn handleIterCheckNext(ctx: *HandlerContext, inst: Inst) Error!void {
     }
 }
 
-fn handleBuildTraceAndThrowException(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleBuildTraceAndThrowException(ctx: *HandlerContext, inst: *Inst) Error!void {
     const exception: *Exception = ctx.constants[inst.data.un].toObject().as(Exception);
     try exception.buildTraceback(ctx.vm);
     ctx.vm.interpreter.exception = exception;
     return Error.ExceptionThrown;
 }
 
-fn handleSuperCall(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleSuperCall(ctx: *HandlerContext, inst: *Inst) Error!void {
     const func = ctx.record.function.?;
     const home_class = func.home_class.?;
     const super_class = home_class.super_class.?;
@@ -1028,7 +1018,7 @@ fn handleSuperCall(ctx: *HandlerContext, inst: Inst) Error!void {
     );
 }
 
-fn handleCall(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleCall(ctx: *HandlerContext, inst: *Inst) Error!void {
     const callee = ctx.registers[inst.data.call.callee];
     if (!callee.isObject()) {
         _ = try ctx.vm.raiseTypeError("'{s}' is not callable", .{callee.getTypeString()});
@@ -1095,16 +1085,16 @@ fn handleCall(ctx: *HandlerContext, inst: Inst) Error!void {
     ctx.registers[inst.data.call.ret] = result;
 }
 
-fn handleRet(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleRet(ctx: *HandlerContext, inst: *Inst) Error!void {
     ctx.return_value = ctx.registers[inst.data.un];
     ctx.record.ip = ctx.record.executable.instructions.len;
 }
 
-fn handleRetNone(ctx: *HandlerContext, _: Inst) Error!void {
+fn handleRetNone(ctx: *HandlerContext, _: *Inst) Error!void {
     ctx.record.ip = ctx.record.executable.instructions.len;
 }
 
-fn handleRaiseException(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleRaiseException(ctx: *HandlerContext, inst: *Inst) Error!void {
     const exception_val = ctx.registers[inst.data.un];
     if (exception_val.asObject()) |exception_object| {
         if (exception_object.isInstanceOf(ctx.vm.interpreter.base_exception_class)) {
@@ -1117,7 +1107,7 @@ fn handleRaiseException(ctx: *HandlerContext, inst: Inst) Error!void {
     _ = try ctx.vm.raiseTypeError("raise requires an exception object", .{});
 }
 
-fn handleHlt(ctx: *HandlerContext, inst: Inst) Error!void {
+fn handleHlt(ctx: *HandlerContext, inst: *Inst) Error!void {
     _ = inst;
     ctx.record.ip = ctx.record.executable.instructions.len;
 }

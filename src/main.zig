@@ -4,6 +4,7 @@ const Interpreter = @import("runtime/Interpreter.zig");
 // TODO: should flatten the inheritance chain.
 // TODO: exception chain.
 // TODO: type speculation , switching opcodes.
+// TODO: str() for list and dict.
 pub fn main() !void {
     var gpa = std.heap.DebugAllocator(.{}){};
     defer {
