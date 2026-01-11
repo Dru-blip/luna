@@ -32,6 +32,7 @@ pub fn new(gc: *Gc) !*Class {
     try class.putField(gc.interpreter.common_names.ModuleNotFoundError, Value.object(Object.from(gc.interpreter.module_not_found_error_class)));
     try class.putField(gc.interpreter.common_names.InvalidAssignmentTargetError, Value.object(Object.from(gc.interpreter.invalid_assignment_target_error_class)));
     try class.putField(gc.interpreter.common_names.StackOverflowError, Value.object(Object.from(gc.interpreter.stack_overflow_error_class)));
+    try class.putField(gc.interpreter.common_names.Range, Value.object(Object.from(gc.interpreter.range_class)));
 
     return class;
 }

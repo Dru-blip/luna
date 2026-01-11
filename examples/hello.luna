@@ -52,3 +52,8 @@ class Pair {
         return 2
     }
 }
+
+
+foreach i in Range(1,10){
+    print(i)
+}

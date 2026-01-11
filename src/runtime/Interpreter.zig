@@ -24,6 +24,9 @@ const DictKeyIterator = @import("dict_iterator.zig").DictKeyIterator;
 const DictValueIterator = @import("dict_iterator.zig").DictValueIterator;
 const DictEntryIterator = @import("dict_iterator.zig").DictEntryIterator;
 const BaseExceptionClass = @import("BaseExceptionClass.zig");
+const range = @import("range.zig");
+const RangeClass = range.RangeClass;
+const RangeIterator = range.RangeIterator;
 
 const Interpreter = @This();
 
@@ -42,6 +45,7 @@ string_class: *Class = undefined,
 base_class: *Class = undefined,
 dict_class: *Class = undefined,
 list_class: *Class = undefined,
+range_class: *Class = undefined,
 
 //Iterator classes.
 list_iterator_class: *Class = undefined,
@@ -50,6 +54,7 @@ dict_iterator_class: *Class = undefined,
 dict_key_iterator_class: *Class = undefined,
 dict_value_iterator_class: *Class = undefined,
 dict_entry_iterator_class: *Class = undefined,
+range_iterator_class: *Class = undefined,
 
 //Error classes.
 base_exception_class: *Class = undefined,
@@ -121,6 +126,9 @@ pub const Names = struct {
     StackOverflowError: *String,
     InvalidAssignmentTargetError: *String,
 
+    Range: *String,
+    RangeIterator: *String,
+
     pub fn init(string_interner: *StringInterner) !Names {
         return .{
             .Class = try string_interner.intern("Class"),
@@ -173,6 +181,9 @@ pub const Names = struct {
             .ModuleNotFoundError = try string_interner.intern("ModuleNotFoundError"),
             .StackOverflowError = try string_interner.intern("StackOverflowError"),
             .InvalidAssignmentTargetError = try string_interner.intern("InvalidAssignmentTargetError"),
+
+            .Range = try string_interner.intern("Range"),
+            .RangeIterator = try string_interner.intern("RangeIterator"),
         };
     }
 };
@@ -198,6 +209,8 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     interpreter.dict_entry_iterator_class = try DictEntryIterator.new(&interpreter.gc);
     interpreter.dict_key_iterator_class = try DictKeyIterator.new(&interpreter.gc);
     interpreter.dict_value_iterator_class = try DictValueIterator.new(&interpreter.gc);
+    interpreter.range_class = try RangeClass.new(&interpreter.gc);
+    interpreter.range_iterator_class = try RangeIterator.new(&interpreter.gc);
 
     //TODO: should remove unnecessary assignments.
     Object.from(interpreter.base_class).class = interpreter.base_class;
@@ -216,6 +229,8 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     try DictKeyIterator.registerMethods(&interpreter.gc, interpreter.dict_key_iterator_class);
     try DictValueIterator.registerMethods(&interpreter.gc, interpreter.dict_value_iterator_class);
     try DictEntryIterator.registerMethods(&interpreter.gc, interpreter.dict_entry_iterator_class);
+    try RangeClass.registerMethods(&interpreter.gc, interpreter.range_class);
+    try RangeIterator.registerMethods(&interpreter.gc, interpreter.range_iterator_class);
 
     interpreter.common_names = try Names.init(&interpreter.string_interner);
     interpreter.string_class.name = interpreter.common_names.String;
@@ -229,6 +244,8 @@ pub fn init(gpa: std.mem.Allocator) !*Interpreter {
     interpreter.dict_value_iterator_class.name = interpreter.common_names.DictValueIterator;
     interpreter.dict_entry_iterator_class.name = interpreter.common_names.DictEntryIterator;
     interpreter.module_cache = ModuleCache.init(interpreter.gpa);
+    interpreter.range_class.name = interpreter.common_names.Range;
+    interpreter.range_iterator_class.name = interpreter.common_names.RangeIterator;
 
     //Make Exception classes
     try interpreter.initializeExceptionClasses();
