@@ -4,10 +4,27 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const mod = b.addModule("luna", .{
-        .root_source_file = b.path("src/root.zig"),
+    const luna = b.createModule(.{
+        .root_source_file = b.path("src/luna.zig"),
         .target = target,
+        .optimize = optimize,
     });
+
+    const lib_module = b.createModule(.{
+        .root_source_file = b.path("src/lib.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const luna_runtime = b.addLibrary(.{
+        .linkage = .dynamic,
+        .root_module = lib_module,
+        .name = "lunarun",
+        .use_llvm = true,
+    });
+
+    luna_runtime.root_module.addImport("luna", luna);
+    luna_runtime.root_module.link_libc = true;
 
     const exe = b.addExecutable(.{
         .name = "luna",
@@ -16,12 +33,13 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
-            .imports = &.{
-                .{ .name = "luna", .module = mod },
-            },
         }),
     });
 
+    exe.root_module.addImport("luna", luna);
+    exe.root_module.linkLibrary(luna_runtime);
+
+    b.installArtifact(luna_runtime);
     b.installArtifact(exe);
 
     const run_step = b.step("run", "Run the app");
@@ -36,7 +54,7 @@ pub fn build(b: *std.Build) void {
     }
 
     const mod_tests = b.addTest(.{
-        .root_module = mod,
+        .root_module = luna,
     });
 
     const run_mod_tests = b.addRunArtifact(mod_tests);

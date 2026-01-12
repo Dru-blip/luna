@@ -1,5 +1,5 @@
 const std = @import("std");
-const Interpreter = @import("runtime/Interpreter.zig");
+const Interpreter = @import("luna").Interpreter;
 
 // TODO: should flatten the inheritance chain.
 // TODO: exception chain.
