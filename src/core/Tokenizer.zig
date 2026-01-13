@@ -65,6 +65,7 @@ pub const Token = struct {
         comma,
         colon,
         dot,
+        dot_dot,
 
         number,
         string,
@@ -169,6 +170,7 @@ const State = enum {
     bang,
     ampersand,
     pipe,
+    dot,
     invalid,
 };
 
@@ -254,14 +256,11 @@ pub fn next(self: *Tokenizer) Token {
                 self.advance();
                 result.tag = .colon;
             },
-            '.' => {
-                self.advance();
-                result.tag = .dot;
-            },
             '^' => {
                 self.advance();
                 result.tag = .caret;
             },
+            '.' => continue :state .dot,
             '+' => continue :state .plus,
             '-' => continue :state .minus,
             '*' => continue :state .asterisk,
@@ -438,6 +437,17 @@ pub fn next(self: *Tokenizer) Token {
                 else => result.tag = .pipe,
             }
         },
+        .dot => {
+            self.advance();
+            std.debug.print("{any}\n", .{self.buffer[self.index]});
+            switch (self.buffer[self.index]) {
+                '.' => {
+                    result.tag = .dot_dot;
+                    self.advance();
+                },
+                else => result.tag = .dot,
+            }
+        },
         .identifier => {
             self.advance();
             switch (self.buffer[self.index]) {
@@ -459,7 +469,13 @@ pub fn next(self: *Tokenizer) Token {
             switch (self.buffer[self.index]) {
                 '0'...'9' => continue :state .int,
                 '.' => {
-                    continue :state .float;
+                    switch (self.buffer[self.index + 1]) {
+                        '0'...'9' => {
+                            self.advance();
+                            continue :state .float;
+                        },
+                        else => {},
+                    }
                 },
                 else => {},
             }

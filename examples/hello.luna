@@ -1,4 +1,4 @@
-class Pair {
+/*class Pair {
     fn __init__(a, b){
         this.a = a
         this.b = b
@@ -51,9 +51,9 @@ class Pair {
     fn __len__(){
         return 2
     }
-}
+}*/
 
 
-foreach i in Range(1,10){
+foreach i in 1..10{
     print(i)
 }

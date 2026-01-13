@@ -361,6 +361,8 @@ const operTable = std.enums.directEnumArrayDefault(Token.Tag, OperInfo, .{ .lbp 
     .slash_equal = .{ .lbp = 1, .rbp = 1, .tag = .div_assign },
     .modulus_equal = .{ .lbp = 1, .rbp = 1, .tag = .mod_assign },
 
+    .dot_dot = .{ .lbp = 6, .rbp = 6, .tag = .range_expr },
+
     .pipe_pipe = .{ .lbp = 15, .rbp = 16, .tag = .@"or" },
     .ampersand_ampersand = .{ .lbp = 17, .rbp = 18, .tag = .@"and" },
 

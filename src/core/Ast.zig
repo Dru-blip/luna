@@ -72,6 +72,7 @@ pub const Node = struct {
         this_expr,
         super_expr,
         function_expr,
+        range_expr,
 
         identifier,
         int_literal,
