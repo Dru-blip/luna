@@ -15,6 +15,7 @@ const Dict = @import("Dict.zig");
 const List = @import("List.zig");
 const Class = @import("Class.zig");
 const NativeFunction = @import("NativeFunction.zig");
+const Range = @import("range.zig").Range;
 
 const Vm = @This();
 
@@ -205,6 +206,9 @@ const handlers = blk: {
     table[@intFromEnum(Inst.Op.branch)] = handleBranch;
     table[@intFromEnum(Inst.Op.iter_check_next)] = handleIterCheckNext;
     table[@intFromEnum(Inst.Op.build_trace_and_throw_exception)] = handleBuildTraceAndThrowException;
+
+    table[@intFromEnum(Inst.Op.build_range)] = handleBuildRange;
+
     table[@intFromEnum(Inst.Op.super_call)] = handleSuperCall;
     table[@intFromEnum(Inst.Op.call)] = handleCall;
     table[@intFromEnum(Inst.Op.ret)] = handleRet;
@@ -987,6 +991,21 @@ fn handleBuildTraceAndThrowException(ctx: *HandlerContext, inst: *Inst) Error!vo
     try exception.buildTraceback(ctx.vm);
     ctx.vm.interpreter.exception = exception;
     return Error.ExceptionThrown;
+}
+
+fn handleBuildRange(ctx: *HandlerContext, inst: *Inst) Error!void {
+    const start = ctx.registers[inst.data.tri.op1];
+    const end = ctx.registers[inst.data.tri.op2];
+
+    if (start.type != .number) {
+        _ = try ctx.vm.raiseTypeError("Range start must be a number", .{});
+    }
+    if (end.type != .number) {
+        _ = try ctx.vm.raiseTypeError("Range end must be a number", .{});
+    }
+
+    const range = try Range.new(ctx.vm.gc, start.asNumber(), end.asNumber());
+    ctx.registers[inst.data.tri.dst] = Value.object(range);
 }
 
 fn handleSuperCall(ctx: *HandlerContext, inst: *Inst) Error!void {

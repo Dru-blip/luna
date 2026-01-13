@@ -72,6 +72,8 @@ pub const Inst = struct {
         set_super_class,
         get_super_class,
 
+        build_range,
+
         call, // uses call
         super_call, //uses super_call,
         ret, // uses un
@@ -393,6 +395,7 @@ pub const Executable = struct {
                 .super_call => try out.print("SuperCall", .{}),
 
                 .build_dict => try out.print("BuildDict r{d}", .{inst.data.un}),
+                .build_range => try out.print("BuildRange ", .{}),
 
                 .add_dict_entry => try out.print(
                     "AddDictEntry r{d}, r{d}, r{d}",

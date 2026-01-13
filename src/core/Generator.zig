@@ -793,6 +793,13 @@ fn genExpr(g: *Generator, node: *const Ast.Node) GenError!u32 {
             try g.addUn(.get_super_class, reg, node.loc);
             return reg;
         },
+        .range_expr => {
+            const dst = g.allocRegister();
+            const start = try g.genExpr(node.data.bin.lhs);
+            const end = try g.genExpr(node.data.bin.rhs);
+            try g.addTri(.build_range, start, end, dst, node.loc);
+            return dst;
+        },
         .assign => {
             return try g.genAssign(node, .assign, .add);
         },
