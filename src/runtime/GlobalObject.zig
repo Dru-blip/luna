@@ -8,6 +8,7 @@ const Interpreter = @import("Interpreter.zig");
 const Class = @import("Class.zig");
 const String = @import("String.zig");
 const Module = @import("Module.zig");
+const CliModule = @import("./stdlib/CliModule.zig");
 
 pub fn new(gc: *Gc) !*Class {
     const class = try Class.new(gc);
@@ -33,6 +34,8 @@ pub fn new(gc: *Gc) !*Class {
     try class.putField(gc.interpreter.common_names.InvalidAssignmentTargetError, Value.object(Object.from(gc.interpreter.invalid_assignment_target_error_class)));
     try class.putField(gc.interpreter.common_names.StackOverflowError, Value.object(Object.from(gc.interpreter.stack_overflow_error_class)));
     try class.putField(gc.interpreter.common_names.Range, Value.object(Object.from(gc.interpreter.range_class)));
+
+    try class.putField(gc.interpreter.common_names.cli, Value.object(Object.from(try CliModule.new(gc))));
 
     return class;
 }

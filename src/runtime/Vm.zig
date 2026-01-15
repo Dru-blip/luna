@@ -232,9 +232,9 @@ pub fn runRecord(vm: *Vm, r: *ActivationRecord, _: bool) Error!Value {
     const instructions = r.executable.instructions;
 
     loop: while (ctx.record.ip < instructions.len) {
-        var inst = instructions[ctx.record.ip];
+        const inst = &instructions[ctx.record.ip];
         ctx.record.ip += 1;
-        dispatch(&ctx, &inst) catch |err| {
+        dispatch(&ctx, inst) catch |err| {
             if (vm.interpreter.exception != null and vm.handleException(&ctx) == .Handled) {
                 continue :loop;
             }

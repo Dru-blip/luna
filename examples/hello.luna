@@ -54,6 +54,15 @@
 }*/
 
 
-foreach i in 1..10{
-    print(i)
+let sum=0
+
+foreach i in 1..100000000{
+    sum += i
 }
+
+
+/*for let i=0; i<10000000; i+=1{
+    sum += i
+}*/
+
+print(sum)

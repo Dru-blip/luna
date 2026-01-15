@@ -1,0 +1,7 @@
+
+
+print(cli.getenv("PATH"))
+
+foreach arg in cli.args(){
+    print(arg)
+}

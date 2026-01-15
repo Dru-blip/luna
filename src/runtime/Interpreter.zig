@@ -87,6 +87,7 @@ pub const Names = struct {
     DictEntryIterator: *String,
     String: *String,
     module: *String,
+    cli: *String,
     __getitem__: *String,
     __setitem__: *String,
     __getattr__: *String,
@@ -170,6 +171,8 @@ pub const Names = struct {
             .__hash__ = try string_interner.intern("__hash__"),
             .__len__ = try string_interner.intern("__len__"),
             .__constructor__ = try string_interner.intern("__constructor__"),
+
+            .cli = try string_interner.intern("cli"),
 
             .BaseException = try string_interner.intern("Exception"),
             .TypeError = try string_interner.intern("TypeError"),
