@@ -27,7 +27,7 @@ pub fn new(gc: *Gc) !*Class {
 fn getArgs(vm: *Vm, _: *Object, _: []const Value) !Value {
     const args_list: *List = (try List.new(vm.gc)).as(List);
 
-    var args_iter = std.process.args();
+    var args_iter = try std.process.argsWithAllocator(vm.gpa);
     while (args_iter.next()) |arg| {
         const arg_str = try String.new(vm.gc, arg);
         try args_list.append(Value.object(arg_str));

@@ -10,15 +10,9 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const lib_module = b.createModule(.{
-        .root_source_file = b.path("src/lib.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
     const luna_runtime = b.addLibrary(.{
         .linkage = .dynamic,
-        .root_module = lib_module,
+        .root_module = luna,
         .name = "lunarun",
         .use_llvm = true,
     });

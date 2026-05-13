@@ -44,6 +44,7 @@ pub const TracebackFrame = struct {
     function_name: *String,
     file_path: []const u8,
     location: Loc,
+    class_name: ?*String,
 };
 
 message: *String = undefined,
@@ -90,10 +91,17 @@ pub fn withMessage(vm: *Vm, exception_class: *Class, comptime fmt: []const u8, a
 
 pub fn buildTraceback(exception: *Exception, vm: *Vm) !void {
     for (vm.records.items) |*record| {
+        var class_name: ?*String = null;
+        if (record.function) |function| {
+            if (function.home_class) |class| {
+                class_name = class.name;
+            }
+        }
         const traceback_frame: TracebackFrame = .{
             .file_path = record.executable.filepath,
             .function_name = record.executable.name,
             .location = record.executable.spans[record.ip - 1],
+            .class_name = class_name,
         };
 
         try exception.traceback.append(vm.gpa, traceback_frame);
@@ -109,7 +117,11 @@ pub fn traceString(exception: *Exception, gpa: std.mem.Allocator) ![]const u8 {
 
     for (exception.traceback.items) |*frame| {
         var source: []const u8 = try source_cache.getOrLoad(frame.file_path);
-        try writer.print("   at {s} ({s}:{d}:{d})\n", .{ frame.function_name.asSlice(), frame.file_path, frame.location.line, frame.location.col });
+        if (frame.class_name) |c| {
+            try writer.print("   at {s}.{s} ({s}:{d}:{d})\n", .{ c.asSlice(), frame.function_name.asSlice(), frame.file_path, frame.location.line, frame.location.col });
+        } else {
+            try writer.print("   at {s} ({s}:{d}:{d})\n", .{ frame.function_name.asSlice(), frame.file_path, frame.location.line, frame.location.col });
+        }
 
         var line_start_offset: usize = 0;
         var line_length: usize = 0;

@@ -439,7 +439,6 @@ pub fn next(self: *Tokenizer) Token {
         },
         .dot => {
             self.advance();
-            std.debug.print("{any}\n", .{self.buffer[self.index]});
             switch (self.buffer[self.index]) {
                 '.' => {
                     result.tag = .dot_dot;
