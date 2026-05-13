@@ -1,9 +1,8 @@
 .zig-cache
 zig-out
-
 builddir
-
 .vscode
 .zed
-
 .clangd
+.crush
+.worktrees
