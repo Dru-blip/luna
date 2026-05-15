@@ -6,3 +6,4 @@ builddir
 .clangd
 .crush
 .worktrees
+.aider*
